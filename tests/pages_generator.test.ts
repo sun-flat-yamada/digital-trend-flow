@@ -1,0 +1,187 @@
+import * as fs from "fs";
+import * as path from "path";
+import {
+  markdownToHtml,
+  parseDailySummary,
+  scanDailySummaries,
+  generatePagesSite,
+} from "../src/publishing/pages_generator";
+import { PATHS } from "../src/core/paths";
+
+describe("pages_generator", () => {
+  const testDir = path.join(PATHS.TMP_AI, "test_pages");
+  const testArtifactsDir = path.join(testDir, "artifacts");
+  const testOutputDir = path.join(testDir, "_site");
+
+  beforeAll(() => {
+    fs.mkdirSync(testArtifactsDir, { recursive: true });
+    fs.mkdirSync(testOutputDir, { recursive: true });
+  });
+
+  afterAll(() => {
+    try {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  });
+
+  describe("markdownToHtml", () => {
+    it("should convert basic markdown elements into HTML", () => {
+      const md = `
+# Title
+## Section 1
+### Headline Item
+- Bullet 1
+- Bullet 2
+
+> This is a quote
+
+**出典**: https://example.com/source
+`;
+      const html = markdownToHtml(md);
+      expect(html).toContain('<h1 class="summary-h1">Title</h1>');
+      expect(html).toContain('<h2 class="summary-h2">Section 1</h2>');
+      expect(html).toContain('<h3 class="summary-h3">Headline Item</h3>');
+      expect(html).toContain('<ul class="summary-list">');
+      expect(html).toContain("<li>Bullet 1</li>");
+      expect(html).toContain('<blockquote class="summary-quote">');
+      expect(html).toContain('<div class="article-source">');
+      expect(html).toContain('href="https://example.com/source"');
+    });
+
+    it("should format inline markdown links and styles", () => {
+      const md = "Here is [an article](https://example.com) with **bold** text and `code`.";
+      const html = markdownToHtml(md);
+      expect(html).toContain('<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="link">an article</a>');
+      expect(html).toContain("<strong>bold</strong>");
+      expect(html).toContain("<code>code</code>");
+    });
+  });
+
+  describe("parseDailySummary", () => {
+    it("should correctly parse frontmatter and content", () => {
+      const filePath = path.join(testArtifactsDir, "2026-09-01_summary.md");
+      const content = `---
+title: Daily Summary 2026-09-01
+date: 2026-09-01T04:00:00.000Z
+type: daily_summary
+top_story: OpenAI introduces next-gen model
+categories:
+  - 💼 ビジネス動向
+  - 🤖 AI研究
+tags:
+  - OpenAI
+  - GPT-5
+articles_processed: 12
+quality_score: 95
+---
+
+# Daily Summary 2026-09-01
+
+## 💼 ビジネス動向
+
+### OpenAI introduces next-gen model
+**出典**: https://example.com/gpt5
+- Massive performance boost
+`;
+      fs.writeFileSync(filePath, content, "utf8");
+
+      const item = parseDailySummary(filePath);
+      expect(item).not.toBeNull();
+      expect(item?.date).toBe("2026-09-01");
+      expect(item?.title).toBe("Daily Summary 2026-09-01");
+      expect(item?.topStory).toBe("OpenAI introduces next-gen model");
+      expect(item?.categories).toContain("💼 ビジネス動向");
+      expect(item?.categories).toContain("🤖 AI研究");
+      expect(item?.tags).toContain("OpenAI");
+      expect(item?.articleCount).toBe(12);
+      expect(item?.qualityScore).toBe(95);
+      expect(item?.sourceUrl).toBe("https://example.com/gpt5");
+      expect(item?.contentHtml).toContain("OpenAI introduces next-gen model");
+    });
+
+    it("should return null for non-existent file", () => {
+      const item = parseDailySummary(path.join(testArtifactsDir, "non_existent.md"));
+      expect(item).toBeNull();
+    });
+  });
+
+  describe("generatePagesSite", () => {
+    it("should generate all required static site files with relative paths", () => {
+      // Create two sample summaries
+      const file1 = path.join(testArtifactsDir, "2026-09-01_summary.md");
+      const file2 = path.join(testArtifactsDir, "2026-09-02_summary.md");
+
+      fs.writeFileSync(file1, `---
+title: Daily Summary 2026-09-01
+top_story: First Story
+date: 2026-09-01
+articles_processed: 5
+categories:
+  - Tech
+---
+# Summary 1
+### First Story
+`, "utf8");
+
+      fs.writeFileSync(file2, `---
+title: Daily Summary 2026-09-02
+top_story: Second Story (Today's Headline)
+date: 2026-09-02
+articles_processed: 8
+categories:
+  - Business
+---
+# Summary 2
+### Second Story (Today's Headline)
+`, "utf8");
+
+      const result = generatePagesSite(testArtifactsDir, testOutputDir);
+
+      expect(result.summaryCount).toBe(2);
+      expect(result.latestDate).toBe("2026-09-02");
+
+      // Verify files created
+      const indexHtml = fs.readFileSync(path.join(testOutputDir, "index.html"), "utf8");
+      const stylesCss = fs.readFileSync(path.join(testOutputDir, "styles.css"), "utf8");
+      const appJs = fs.readFileSync(path.join(testOutputDir, "app.js"), "utf8");
+      const jsonStr = fs.readFileSync(path.join(testOutputDir, "data", "summaries.json"), "utf8");
+      const notFoundHtml = fs.readFileSync(path.join(testOutputDir, "404.html"), "utf8");
+
+      // Verify relative paths for fork and subpath safety
+      expect(indexHtml).toContain('href="./styles.css"');
+      expect(indexHtml).toContain('src="./app.js"');
+      expect(appJs).toContain("./data/summaries.json");
+
+      // Verify Today's headline presence
+      expect(indexHtml).toContain("Second Story (Today&#039;s Headline)");
+      expect(indexHtml).toContain("2026-09-02");
+      expect(indexHtml).toContain("カレンダー");
+      expect(indexHtml).toContain("リスト一覧");
+
+      // Verify JSON content
+      const data = JSON.parse(jsonStr);
+      expect(Array.isArray(data)).toBe(true);
+      expect(data.length).toBe(2);
+      expect(data[0].date).toBe("2026-09-02"); // sorted latest first
+      expect(data[1].date).toBe("2026-09-01");
+
+      // Verify CSS and JS exist
+      expect(stylesCss.length).toBeGreaterThan(100);
+      expect(appJs.length).toBeGreaterThan(100);
+      expect(notFoundHtml).toContain("404");
+    });
+
+    it("should handle empty directories gracefully", () => {
+      const emptyDir = path.join(testDir, "empty_artifacts");
+      const emptyOut = path.join(testDir, "empty_site");
+      fs.mkdirSync(emptyDir, { recursive: true });
+
+      const result = generatePagesSite(emptyDir, emptyOut);
+      expect(result.summaryCount).toBe(0);
+      expect(result.latestDate).toBeNull();
+      expect(fs.existsSync(path.join(emptyOut, "index.html"))).toBe(true);
+    });
+  });
+});

@@ -14,6 +14,7 @@
     "test": "npm run type-check && npm run test:config && npm run test:unit",
     "type-check": "tsc --noEmit",
     "build": "tsc",
+    "build:pages": "ts-node src/cli/build_pages.ts",
     "start": "node dist/main.js",
     "debug:filter": "ts-node src/cli/dry_run.ts",
     "lint": "eslint .",

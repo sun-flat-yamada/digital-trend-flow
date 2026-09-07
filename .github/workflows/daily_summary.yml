@@ -13,10 +13,12 @@ on:
         default: false
 
 env:
-  ARTIFACTS_REPO: "sun-flat-yamada/artifacts"
+  ARTIFACTS_REPO: ${{ vars.ARTIFACTS_REPO || format('{0}/artifacts', github.repository_owner) }}
 
 permissions:
   contents: write # content/ への git push に必要
+  pages: write    # GitHub Pages デプロイに必要
+  id-token: write # GitHub Pages OIDC トークン認証に必要
 
 jobs:
   daily-summary:
@@ -60,23 +62,55 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: npm run build && npm start
 
+      - name: Ensure Pages static site is generated
+        run: |
+          if [ ! -f "_site/index.html" ]; then
+            echo "Building pages static site..."
+            npm run build:pages
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
       - name: Commit and push generated summaries to artifacts repo
         run: |
-          cd artifacts/
-          if [ ! -d .git ]; then
-            git init
-            git branch -M main
-            git remote add origin https://oauth2:${{ secrets.PAT_GITHUB }}@github.com/${{ env.ARTIFACTS_REPO }}.git
+          if [ -n "${{ secrets.PAT_GITHUB }}" ] && [ -d "artifacts" ]; then
+            cd artifacts/
+            if [ ! -d .git ]; then
+              git init
+              git branch -M main
+              git remote add origin https://oauth2:${{ secrets.PAT_GITHUB }}@github.com/${{ env.ARTIFACTS_REPO }}.git
+            fi
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git add .
+            git diff --staged --quiet || git commit -m "chore: daily summary $(date -u '+%Y-%m-%d')"
+            git push -u origin main || echo "Push to artifacts repo skipped or failed"
+            cd ..
+          else
+            echo "PAT_GITHUB not set or artifacts dir not present, skipping external artifacts push."
           fi
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add .
-          git diff --staged --quiet || git commit -m "chore: daily summary $(date -u '+%Y-%m-%d')"
-          git push -u origin main
-          cd ..
 
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add pipeline_state.db || true
+          git add -f pipeline_state.db || true
           git diff --staged --quiet || git commit -m "chore: update pipeline state $(date -u '+%Y-%m-%d')"
-          git push
+          git push || true
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: daily-summary
+    if: always() && needs.daily-summary.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
