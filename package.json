@@ -40,26 +40,26 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^25.5.0",
     "@types/uuid": "^10.0.0",
-    "eslint": "^10.0.3",
-    "eslint-plugin-jsonc": "^3.1.2",
-    "eslint-plugin-yml": "^3.3.1",
-    "jest": "^30.3.0",
-    "jsonc-eslint-parser": "^3.1.0",
-    "ts-jest": "^29.4.9",
+    "eslint": "^10.9.1",
+    "eslint-plugin-jsonc": "^3.4.2",
+    "eslint-plugin-yml": "^3.8.1",
+    "jest": "^30.5.1",
+    "jsonc-eslint-parser": "^3.3.0",
+    "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "yaml-eslint-parser": "^2.0.0"
+    "yaml-eslint-parser": "^2.1.0"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "axios": "^1.13.6",
+    "axios": "^1.20.0",
     "better-sqlite3": "^12.8.0",
-    "dotenv": "^17.3.1",
+    "dotenv": "^17.4.2",
     "langfuse": "^3.38.20",
     "p-retry": "^7.1.1",
     "rss-parser": "^3.13.0",
     "uuid": "^13.0.0",
-    "yaml": "^2.8.2",
-    "zod": "^4.3.6"
+    "yaml": "^2.9.0",
+    "zod": "^4.5.4"
   }
 }
