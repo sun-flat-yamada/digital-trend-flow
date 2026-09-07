@@ -30,15 +30,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          # Personal Access Token でプッシュを許可
-          token: ${{ secrets.PAT_GITHUB }}
+          # Personal Access Token でプッシュを許可 (未設定時は github.token でフォールバック)
+          token: ${{ secrets.PAT_GITHUB || github.token }}
 
       - name: Checkout artifacts
         uses: actions/checkout@v4
         continue-on-error: true
         with:
           repository: ${{ env.ARTIFACTS_REPO }}
-          token: ${{ secrets.PAT_GITHUB }}
+          token: ${{ secrets.PAT_GITHUB || github.token }}
           path: artifacts
 
       - name: Setup Node.js
