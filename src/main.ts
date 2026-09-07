@@ -40,6 +40,7 @@ import { notifyDiscord } from "./publishing/discord_notifier";
 import { notifySlack } from "./publishing/slack_notifier";
 import { notifyTeams } from "./publishing/teams_notifier";
 import { generateAtomFeed } from "./publishing/feed_generator";
+import { generatePagesSite } from "./publishing/pages_generator";
 import { generatePodcast } from "./publishing/podcast_generator";
 import { evaluateQuality } from "./evaluation/quality_checker";
 import { analyzeTopicTrends, formatTrendAnalysis } from "./aggregation/trend_analyzer";
@@ -525,6 +526,13 @@ async function main() {
   // Item 6.5: Generate RSS feed
   generateAtomFeed();
 
+  // GitHub Pages static site generation
+  try {
+    generatePagesSite();
+  } catch (pagesErr: any) {
+    console.warn(`⚠️ GitHub Pages site generation failed: ${pagesErr.message}`);
+  }
+
   // Item C: Generate AI conversational podcast & audio briefing
   try {
     await generatePodcast(summaryMarkdown, today);
@@ -532,7 +540,7 @@ async function main() {
     console.warn(`⚠️ Podcast generation failed: ${podcastErr.message}`);
   }
 
-  await registry.events.emit("publish:complete", { channels: ["obsidian", "discord", "slack", "teams", "rss", "podcast"] });
+  await registry.events.emit("publish:complete", { channels: ["obsidian", "discord", "slack", "teams", "rss", "pages", "podcast"] });
 
   // Mark processed URLs
   for (const sa of selectedArticles) {

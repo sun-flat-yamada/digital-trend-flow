@@ -26,7 +26,7 @@
                         ↓ Quality Gate
               Automated Quality Checker (100pt)
                         ↓ Publish
-   Obsidian ─ note.com ─ Discord ─ Slack ─ Teams ─ Atom Feed
+   Obsidian ─ note.com ─ Discord ─ Slack ─ Teams ─ Atom Feed ─ GitHub Pages
 ```
 
 **なぜ Map-Reduce?** → Flash で事前圧縮 → Pro で統合。コスト 1/10 以下、品質安定化。

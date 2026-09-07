@@ -26,7 +26,7 @@
                         ↓ Quality Gate
               Automated Quality Checker (100pt)
                         ↓ Publish
-   Obsidian ─ note.com ─ Discord ─ Slack ─ Teams ─ Atom Feed
+   Obsidian ─ note.com ─ Discord ─ Slack ─ Teams ─ Atom Feed ─ GitHub Pages
 ```
 
 **Why Map-Reduce?** → Pre-compression with Flash → Integration with Pro. Reduces cost to less than 1/10 and stabilizes quality.
