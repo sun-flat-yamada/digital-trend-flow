@@ -1,0 +1,264 @@
+# ==========================================
+# グローバル設定
+# ==========================================
+# version: 設定ファイルのスキーマバージョン。将来的なフォーマット変更やシステム互換性管理のために定義されています。
+version: "2.0"
+
+# settings: アプリケーション全体の共通動作を定義するセクションです。
+settings:
+  # daily_threshold_score: 記事を収集対象として残すためのシステム全体の最低基準スコア。
+  daily_threshold_score: 0
+
+  # AIモデルの指定 (固定のモデル名、または latest-flash / latest-pro で自動最新化)
+  models:
+    platform: google
+    map: latest-flash
+    reduce: latest-pro
+    thinking: false  # Item 1.4: Thinking model (set true for Gemini 2.5+ Thinking)
+
+  # Item 1.2: フォールバック LLM プロバイダー (API キーが設定されている場合のみ有効)
+  # fallback_models:
+  #   platform: "openai"
+  #   map: "gpt-4.1-mini"
+  #   reduce: "gpt-4.1"
+
+  # Author名
+  author: Youhei Yamada
+
+  # Item 2.5: 鮮度スコアリング (Freshness)
+  freshness:
+    enabled: true
+    decay_lambda: 0.02   # 指数減衰係数 (大きいほど古い記事のスコアが低下)
+    max_age_hours: 72    # この時間を超えた記事は最低値
+
+  # Item 5.2: 処理済みURL の TTL (日数)
+  state_ttl_days: 90
+
+  # Item 3.1: LLM-as-a-Judge (Flash モデルで記事の関連性を自動評価)
+  llm_judge:
+    enabled: false       # true にするとLLM呼び出しが増加しコストが上昇
+    weight: 0.5          # キーワードスコアとの混合比率 (0=キーワードのみ, 1=LLMのみ)
+
+  # Item 2.4: セマンティック重複排除
+  semantic_dedup:
+    enabled: true
+    similarity_threshold: 0.75  # タイトル類似度がこれ以上のペアを重複とみなす
+
+# ==========================================
+# PURPOSES & SOURCES (第一レベルカテゴリと情報源)
+# ==========================================
+# 情報収集の分類（目的）と、それぞれに紐づく情報源(sources)や記事の評価ルール(scoring)を定義します。
+#
+# 【各目的カテゴリ配下のフィールド定義】
+# - label: 最終的なレポート出力等で使用される、カテゴリの表示用ラベル（絵文字・テキスト）です。
+# - priority: 処理やレポート表示における並び順の優先度です。（数値が小さいほど上位に表示・処理されます）
+# - quota:
+#     min: レポートに最低限含めたい記事数。この数に満たない場合、基準を満たせば積極的に採用されます。
+#     max: レポートに含める記事数の上限。この枠を超えた高スコア記事は除外されるか、他用途へ回ります。
+# - scoring: 記事を自動選定するための独自の採点ルールです。
+#     threshold: このカテゴリにおける最低スコアライン（足切り点）。これ未満のスコアの記事は不採用になります。
+#     title_multiplier: 本文だけでなく、記事のタイトル（見出し）にキーワードが含まれていた場合のスコアの加算倍率（重要視用）です。
+#     keywords: 採点の要となるキーワードリストです。記事内に `word` が含まれていれば、指定された `weight` 倍分のスコアが加算されます。
+#     ※ scoring に null を指定した場合、全カテゴリ横断のキーワードで採点し、最適な目的へ自動で動的割り当てが行われます。
+# - sources: このカテゴリに関連する情報収集元のリストです。
+#     type: 情報源の種類（rss: 従来型RSSフィード, xai_grok: xAI Grokによる検索経由, raindrop: Raindrop.ioの手動ブックマーク 等）
+#     name: 情報源を表す任意の識別用・表示用ネーム。
+#     [各type固有のパラメータ]:
+#       url (rss等): クロール先のURL。
+#       query (xai_grok): GrokのAPIで検索対象を絞り込むための検索式（各種演算子可）。
+#       collection_id / lookback_hours (raindrop等): ブックマーク管理サービス上の特定フォルダIDと、何時間前までの追加分を見るかの指定。
+purposes:
+  ai_research:
+    label: 🔬 AI・LLM 研究
+    priority: 1
+    quota:
+      min: 2
+      max: 5
+    scoring:
+      threshold: 8
+      title_multiplier: 2
+      keywords:
+        - {word: transformer, weight: 12}
+        - {word: fine-tuning, weight: 10}
+        - {word: SOTA, weight: 10}
+        - {word: LLM, weight: 8}
+        - {word: GPT, weight: 8}
+        - {word: benchmark, weight: 6}
+        - {word: diffusion, weight: 6}
+        - {word: pre-training, weight: 6}
+        - {word: paper, weight: 4}
+        - {word: arXiv, weight: 8}
+    sources:
+      - type: rss
+        name: Hugging Face Daily Papers
+        url: "https://huggingface.co/papers/rss.xml"
+      # Item 2.3: arXiv ソース
+      - type: arxiv
+        name: arXiv AI Papers
+        query: "cat:cs.AI OR cat:cs.CL OR cat:cs.LG"
+        max_results: 15
+      # Item D: Bluesky ソース
+      - type: bluesky
+        name: Bluesky AI Trends
+        query: AI OR LLM
+        min_likes: 30
+        max_items: 15
+
+  ai_dev_tools:
+    label: 🛠️ 開発ツール・IDE統合
+    priority: 2
+    quota:
+      min: 1
+      max: 4
+    scoring:
+      threshold: 10
+      title_multiplier: 2
+      keywords:
+        - {word: GitHub Copilot, weight: 15}
+        - {word: Claude Code, weight: 12}
+        - {word: Cursor, weight: 10}
+        - {word: Genspark, weight: 8}
+        - {word: M365 Copilot, weight: 12}
+        - {word: AI agent, weight: 8}
+        - {word: code generation, weight: 8}
+        - {word: IDE, weight: 6}
+        - {word: Copilot, weight: 6}
+        - {word: OpenAI, weight: 8}
+        - {word: Anthropic, weight: 8}
+        - {word: SDD, weight: 10}
+        - {word: Spec Driven Development, weight: 10}
+    sources:
+      - type: xai_grok
+        name: X (旧Twitter) AI Trends via Grok
+        query: "AI OR LLM OR Copilot min_faves:100 (lang:ja OR lang:en)"
+      # Item 2.3: Hacker News ソース
+      - type: hackernews
+        name: Hacker News Top Stories
+        min_score: 150
+        max_items: 20
+      # Item 2.3: GitHub Trending ソース
+      - type: github_trending
+        name: GitHub Trending (Python)
+        language_filter: python
+        since: daily
+      # Item D: Reddit ソース
+      - type: reddit
+        name: Reddit r/LocalLLaMA
+        subreddit: LocalLLaMA
+        min_score: 100
+        max_items: 15
+
+  business:
+    label: 💼 ビジネス動向
+    priority: 3
+    quota:
+      min: 1
+      max: 4
+    scoring:
+      threshold: 5
+      title_multiplier: 1.5
+      keywords:
+        - {word: acquisition, weight: 10}
+        - {word: funding, weight: 8}
+        - {word: revenue, weight: 6}
+        - {word: partnership, weight: 6}
+        - {word: IPO, weight: 10}
+        - {word: valuation, weight: 8}
+        - {word: startup, weight: 5}
+        - {word: 市場, weight: 5}
+        - {word: 戦略, weight: 5}
+        - {word: 業績, weight: 6}
+        - {word: AI, weight: 4}
+    sources:
+      - type: rss
+        name: Reuters Technology
+        url: "https://feeds.reuters.com/reuters/technologyNews"
+      - type: rss
+        name: VentureBeat
+        url: "https://venturebeat.com/feed/"
+      - type: rss
+        name: Forbes Tech
+        url: "https://www.forbes.com/innovation/feed/"
+      - type: rss
+        name: Ledge.ai (LEDGE)
+        url: "https://ledge.ai/feed/"
+
+  geopolitics:
+    label: 🌍 政治・地政学
+    priority: 4
+    quota:
+      min: 1
+      max: 3
+    scoring:
+      threshold: 3
+      title_multiplier: 1.5
+      keywords:
+        - {word: regulation, weight: 10}
+        - {word: sanctions, weight: 8}
+        - {word: AI regulation, weight: 12}
+        - {word: policy, weight: 6}
+        - {word: diplomacy, weight: 6}
+        - {word: summit, weight: 6}
+        - {word: security, weight: 5}
+        - {word: 規制, weight: 8}
+        - {word: 法律, weight: 6}
+        - {word: 外交, weight: 6}
+    sources:
+      - type: rss
+        name: Newsweek World
+        url: "https://www.newsweek.com/rss"
+      - type: rss
+        name: BBC News World
+        url: "https://feeds.bbci.co.uk/news/world/rss.xml"
+      - type: rss
+        name: The Conversation Global
+        url: "https://theconversation.com/global/articles.atom"
+
+  curated:
+    label: 📌 手動キュレーション
+    priority: 5
+    quota:
+      min: 0
+      max: 3
+    scoring: null # 全目的のキーワードで採点し、最適な目的に動的割り当て
+    sources:
+      - type: raindrop
+        name: Raindrop Inbox (手動クリップ)
+        collection_id: -1
+        # archive_collection_id: 12345
+        lookback_hours: 48
+
+# ==========================================
+# Advanced Blocklist (除外・無効化ルール)
+# ==========================================
+# 登録された有効な情報源から取得した記事であっても、以下のいずれかの条件に合致する場合は
+# ノイズ（PRやスパムなど不要な記事）と判定され、自動的に収集対象から除外されます。
+#
+# 【各フィールドの定義】
+# - domains: 記事の元URLのドメインがこれらに一致する場合、ソースに関わらず問答無用で除外します（プレスリリースサイトなどを指定）。
+# - url_strip_parameters: 同一記事の重複取得（Idempotency）の判定を正確に行うため、URLから除去する不要なトラッキング・広告パラメータ群です。
+# - keywords: 記事のタイトルや本文にこれらの文字列が完全一致で含まれる場合、広告・スパム・低品質コンテンツとみなして除外します。
+# - content_length: API抽出された本文の全体文字数の許容範囲（制限）です。
+#     min: 最低文字数。これ未満の記事は内容が極小のスタブやエラーページと判断し除外します。
+#     max: 最大文字数。これを超過する記事（異常に長い規約ページや乱雑なテキスト）はLLMの処理コスト・文字数オーバーを避けるため除外します。
+exclude:
+  domains:
+    - prtimes.jp
+    - prnewswire.com
+    - businesswire.com
+    - atpress.ne.jp
+  url_strip_parameters:
+    - utm_source
+    - utm_medium
+    - utm_campaign
+  keywords:
+    - "PR:"
+    - Sponsored
+    - 【スポンサー提供】
+    - この記事にはプロモーションが含まれています
+    - アフィリエイト
+    - 登録はこちら
+    - いかがでしたか
+  content_length:
+    min: 200
+    max: 50000

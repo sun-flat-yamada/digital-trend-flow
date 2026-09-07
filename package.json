@@ -1,0 +1,64 @@
+{
+  "name": "digital-trend-flow",
+  "version": "0.0.1",
+  "description": "An automated pipeline to Harvest daily digital trends, process them via LLMs, and output highly structural summaries.",
+  "main": "index.js",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test:config": "ts-node src/cli/test_config.ts",
+    "test:unit": "jest --forceExit",
+    "test:golden": "jest tests/golden_regression --forceExit",
+    "test": "npm run type-check && npm run test:config && npm run test:unit",
+    "type-check": "tsc --noEmit",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "debug:filter": "ts-node src/cli/dry_run.ts",
+    "lint": "eslint .",
+    "format": "eslint . --fix"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/tests"],
+    "transform": {
+      "^.+\\.tsx?$": ["ts-jest", { "tsconfig": { "module": "commonjs", "moduleResolution": "node", "types": ["node", "jest"], "strict": true, "esModuleInterop": true } }]
+    },
+    "transformIgnorePatterns": ["/node_modules/(?!uuid)"],
+    "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json"],
+    "testMatch": ["**/tests/**/*.test.ts"]
+  },
+  "keywords": [],
+  "author": "Youhei Yamada",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.5.0",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^10.0.3",
+    "eslint-plugin-jsonc": "^3.1.2",
+    "eslint-plugin-yml": "^3.3.1",
+    "jest": "^30.3.0",
+    "jsonc-eslint-parser": "^3.1.0",
+    "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "yaml-eslint-parser": "^2.0.0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.13.6",
+    "better-sqlite3": "^12.8.0",
+    "dotenv": "^17.3.1",
+    "langfuse": "^3.38.20",
+    "p-retry": "^7.1.1",
+    "rss-parser": "^3.13.0",
+    "uuid": "^13.0.0",
+    "yaml": "^2.8.2",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "recommendations": [
+    // ── Core Development ────────────────────
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "EditorConfig.EditorConfig",
+
+    // ── Language Support ────────────────────
+    "redhat.vscode-yaml",
+    "yzhang.markdown-all-in-one",
+    "DavidAnson.vscode-markdownlint",
+
+    // ── Git & GitHub ────────────────────────
+    "GitHub.vscode-github-actions",
+
+    // ── Quality of Life ─────────────────────
+    "streetsidesoftware.code-spell-checker"
+  ]
+}

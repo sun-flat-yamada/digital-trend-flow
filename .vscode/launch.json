@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Pipeline",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": ["${workspaceFolder}/src/main.ts"],
+      "cwd": "${workspaceFolder}",
+      "env": { "NODE_ENV": "development" },
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    },
+    {
+      "name": "Debug Filter (Dry Run)",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": ["${workspaceFolder}/src/cli/dry_run.ts", "${input:filterUrl}"],
+      "cwd": "${workspaceFolder}",
+      "env": { "NODE_ENV": "development" },
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "filterUrl",
+      "description": "URL to test with debug:filter",
+      "type": "promptString",
+      "default": "https://venturebeat.com/ai/"
+    }
+  ]
+}

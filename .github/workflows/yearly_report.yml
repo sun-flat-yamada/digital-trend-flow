@@ -1,0 +1,68 @@
+name: Yearly Trend Report
+
+on:
+  # 毎年1月1日の JST 05:00 (UTC 20:00 前日) に実行
+  schedule:
+    - cron: "0 20 1 1 *"
+  workflow_dispatch:
+
+env:
+  ARTIFACTS_REPO: "sun-flat-yamada/artifacts"
+
+permissions:
+  contents: write
+
+jobs:
+  yearly-report:
+    name: Generate Yearly Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ secrets.PAT_GITHUB }}
+          fetch-depth: 0
+
+      - name: Checkout artifacts
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: ${{ env.ARTIFACTS_REPO }}
+          token: ${{ secrets.PAT_GITHUB }}
+          path: artifacts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate yearly report
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
+        run: |
+          LAST_YEAR=$(date -d "last year" '+%Y')
+          echo "::warning::Yearly report generation is NOT YET IMPLEMENTED for: $LAST_YEAR"
+          echo "This workflow is a placeholder. See AGENTS.md for planned implementation."
+          exit 0
+
+      - name: Commit yearly report to artifacts repo
+        run: |
+          cd artifacts/
+          if [ ! -d .git ]; then
+            git init
+            git branch -M main
+            git remote add origin https://oauth2:${{ secrets.PAT_GITHUB }}@github.com/${{ env.ARTIFACTS_REPO }}.git
+          fi
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add contents/digital-trend/collection/yearly/ || true
+          git diff --staged --quiet || git commit -m "chore: yearly report $(date -u '+%Y')"
+          git push -u origin main
