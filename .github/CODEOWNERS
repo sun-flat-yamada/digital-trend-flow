@@ -1,0 +1,16 @@
+# Code Owners
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# These users/teams will be automatically requested for review
+# when a pull request modifies matching files.
+
+# ── Default: Repository owner reviews everything ──
+*                       @sun-flat-yamada
+
+# ── CI/CD: Workflow changes require explicit review ──
+.github/workflows/      @sun-flat-yamada
+.github/dependabot.yml  @sun-flat-yamada
+
+# ── Core configuration ──
+config.yml              @sun-flat-yamada
+AGENTS.md               @sun-flat-yamada

@@ -1,0 +1,41 @@
+[
+  {
+    "title": "OpenAI releases GPT-5 with improved reasoning",
+    "url": "https://openai.com/blog/gpt5",
+    "content": "OpenAI today announced GPT-5, their latest large language model. The model demonstrates a 30% improvement in coding benchmarks and significantly better long-context understanding. CEO Sam Altman described it as a major leap forward in artificial intelligence capabilities. The LLM achieves state-of-the-art performance across multiple evaluation suites.",
+    "expectedPurpose": "ai_research",
+    "expectedMinScore": 10,
+    "expectedKeywords": ["GPT", "LLM"]
+  },
+  {
+    "title": "NVIDIA acquires startup for $2B to boost AI chip design",
+    "url": "https://techcrunch.com/nvidia-acquisition",
+    "content": "NVIDIA announced a $2 billion acquisition of chip design startup ChipX, aiming to strengthen its AI accelerator portfolio. The deal is expected to close in Q3 2026 and will integrate ChipX's advanced packaging technology into NVIDIA's next-generation GPU architecture. This represents one of the largest acquisitions in the semiconductor industry this year.",
+    "expectedPurpose": "business",
+    "expectedMinScore": 5,
+    "expectedKeywords": ["acquisition"]
+  },
+  {
+    "title": "Spring gardening tips for beginners",
+    "url": "https://garden.com/spring-tips",
+    "content": "Plant your tomatoes after the last frost date in your area. Prepare the soil with compost and ensure good drainage. Water deeply but infrequently to encourage strong root growth. Mulch around plants to retain moisture and suppress weeds. Consider companion planting with basil and marigolds to naturally deter pests from your garden beds throughout the growing season.",
+    "expectedPurpose": "curated",
+    "expectedMinScore": 0,
+    "expectedKeywords": []
+  },
+  {
+    "title": "New transformer architecture achieves SOTA on NLP benchmarks",
+    "url": "https://arxiv.org/abs/2026.12345",
+    "content": "We present a novel transformer architecture that achieves state-of-the-art results on multiple NLP benchmarks. Our model uses a new attention mechanism called Sparse Dynamic Attention that reduces computation by 40% while maintaining accuracy. Fine-tuning experiments on downstream tasks show consistent improvements over existing LLM architectures. The approach is validated across diverse language understanding tasks.",
+    "expectedPurpose": "ai_research",
+    "expectedMinScore": 15,
+    "expectedKeywords": ["transformer", "LLM"]
+  },
+  {
+    "title": "PR: Company XYZ launches new product",
+    "url": "https://prnewswire.com/xyz-launch",
+    "content": "Company XYZ is proud to announce the launch of their new product suite.",
+    "expectedIsExcluded": true,
+    "expectedExclusionReason": "Domain blocked"
+  }
+]

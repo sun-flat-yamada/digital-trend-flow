@@ -1,0 +1,41 @@
+# ==========================================
+# .gitattributes — digital-trend-flow
+# ==========================================
+# Line endings, diff strategies, merge control, and Linguist configuration.
+# Last updated: 2026-04
+
+# ── Line Endings (Cross-Platform) ─────────
+* text=auto eol=lf
+*.bat eol=crlf
+*.ps1 eol=crlf
+*.cmd eol=crlf
+
+# ── Diff Drivers ───────────────────────────
+*.ts    diff=typescript
+*.tsx   diff=typescript
+*.md    diff=markdown
+*.json  diff=json
+
+# ── Lock Files (Suppress Diff & Merge) ────
+package-lock.json  binary linguist-generated
+yarn.lock          binary linguist-generated
+
+# ── Binary Files ───────────────────────────
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.svg   binary
+*.zip   binary
+*.tar   binary
+*.gz    binary
+*.woff  binary
+*.woff2 binary
+
+# ── Linguist: Statistics & Language Detection ──
+dist/**            linguist-generated
+content/**         linguist-generated
+*.min.js           linguist-generated
+*.min.css          linguist-generated
