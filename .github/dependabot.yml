@@ -35,5 +35,9 @@ updates:
       npm-major:
         patterns: ["*"]
         update-types: ["major"]
+    ignore:
+      # ts-jest specifies peer dependency typescript@">=4.3 <7"
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps"
