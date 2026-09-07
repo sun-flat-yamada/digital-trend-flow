@@ -1,0 +1,15 @@
+{
+  "active": {
+    "map": "map_v1.md",
+    "reduce": "dynamic",
+    "judge": "judge_v1.md",
+    "monthly_reduce": "monthly_reduce_v1.md"
+  },
+  "history": [
+    {
+      "version": "v1",
+      "activated_at": "2026-04-12",
+      "description": "Initial externalized prompts"
+    }
+  ]
+}

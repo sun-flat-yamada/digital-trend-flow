@@ -1,0 +1,79 @@
+# ==========================================
+# .gitignore — digital-trend-flow
+# ==========================================
+# Comprehensive ignore rules for Node.js + TypeScript projects.
+# Last updated: 2026-04
+
+# ── Dependencies ───────────────────────────
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+
+# ── TypeScript & Build Output ──────────────
+dist/
+build/
+out/
+*.tsbuildinfo
+*.js.map
+*.d.ts.map
+
+# ── Environment & Secrets ──────────────────
+.env
+.env.*
+!.env.example
+
+# ── Runtime Data ───────────────────────────
+processed_urls.json
+processed_urls.json.bak
+pipeline_state.db
+pipeline_state.db-wal
+pipeline_state.db-shm
+artifacts/
+
+# ── Logs ───────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Process ID Files ──────────────────────
+*.pid
+*.seed
+*.pid.lock
+
+# ── Testing & Coverage ────────────────────
+coverage/
+.nyc_output/
+
+# ── Caches ─────────────────────────────────
+.eslintcache
+.stylelintcache
+.cache/
+.turbo/
+
+# ── OS Files ───────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── IDE / Editor ───────────────────────────
+# Note: .vscode/ is intentionally tracked for shared workspace settings.
+# Only user-local state is ignored.
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# ── Backup ──────────────────────────
+_*/
+_*
+
+# ── AI Agent Temp ──────────────────────────
+_tmp_ai/
+.tmp_ai/
+lint-output.txt
+markdown_errors.txt

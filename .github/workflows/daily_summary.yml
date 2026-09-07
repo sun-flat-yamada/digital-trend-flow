@@ -1,0 +1,82 @@
+name: Daily Trend Summary
+
+on:
+  # 毎日JST 04:00 (UTC 19:00 前日) に実行
+  schedule:
+    - cron: "0 19 * * *"
+  # 手動トリガー (デバッグ・テスト用)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run mode (skip LLM + publishing)"
+        type: boolean
+        default: false
+
+env:
+  ARTIFACTS_REPO: "sun-flat-yamada/artifacts"
+
+permissions:
+  contents: write # content/ への git push に必要
+
+jobs:
+  daily-summary:
+    name: Generate Daily Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Personal Access Token でプッシュを許可
+          token: ${{ secrets.PAT_GITHUB }}
+
+      - name: Checkout artifacts
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: ${{ env.ARTIFACTS_REPO }}
+          token: ${{ secrets.PAT_GITHUB }}
+          path: artifacts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Run pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RAINDROP_TEST_TOKEN: ${{ secrets.RAINDROP_TEST_TOKEN }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: npm run build && npm start
+
+      - name: Commit and push generated summaries to artifacts repo
+        run: |
+          cd artifacts/
+          if [ ! -d .git ]; then
+            git init
+            git branch -M main
+            git remote add origin https://oauth2:${{ secrets.PAT_GITHUB }}@github.com/${{ env.ARTIFACTS_REPO }}.git
+          fi
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .
+          git diff --staged --quiet || git commit -m "chore: daily summary $(date -u '+%Y-%m-%d')"
+          git push -u origin main
+          cd ..
+
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add pipeline_state.db || true
+          git diff --staged --quiet || git commit -m "chore: update pipeline state $(date -u '+%Y-%m-%d')"
+          git push

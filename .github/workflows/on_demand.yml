@@ -1,0 +1,54 @@
+name: On-Demand Digest
+
+# Item 8.4: Event-driven pipeline execution via repository_dispatch
+on:
+  repository_dispatch:
+    types: [trigger-digest]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual trigger"
+        type: string
+        default: "Manual on-demand digest"
+
+permissions:
+  contents: write
+
+jobs:
+  on-demand:
+    name: On-Demand Digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ secrets.PAT_GITHUB }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run pipeline (on-demand)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RAINDROP_TEST_TOKEN: ${{ secrets.RAINDROP_TEST_TOKEN }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: npm run build && npm start
+
+      - name: Commit results
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add content/ || true
+          git add pipeline_state.db || true
+          git diff --staged --quiet || git commit -m "chore: on-demand digest $(date -u '+%Y-%m-%d %H:%M')"
+          git push
