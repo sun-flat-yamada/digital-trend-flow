@@ -93,6 +93,7 @@ src/
 | :------------------------------------- | :----------------------------------------------------------------- |
 | [Architecture](docs/architecture.md)   | Pipeline details, Map-Reduce strategy, Data flow                   |
 | [Configuration](docs/configuration.md) | `config.yml` reference, Env vars, GitHub Secrets                   |
+| [Settings & Limits](docs/settings.md)  | Execution limits, Rate limiting, Retries, GitHub Variables         |
 | [Sources](docs/sources.md)             | Configuration, authentication, and customization for all 7 sources |
 | [Deployment](docs/deployment.md)       | CI/CD, schedules, artifacts repository operations                  |
 | [Development](docs/development.md)     | Local development, testing, debugging, troubleshooting             |

@@ -206,6 +206,15 @@ export const EnvSchema = z.object({
   FIRECRAWL_API_KEY: z.string().optional(),
   // YouTube (Item 2.3)
   YOUTUBE_API_KEY: z.string().optional(),
+  // Concurrency & Rate Limiting (Defaults configured for Free Tier: 5 RPM)
+  API_CONCURRENCY: z.preprocess(
+    (val) => (val === "" || val === undefined ? 1 : Number(val)),
+    z.number().int().positive().default(1)
+  ),
+  API_INTERVAL_MS: z.preprocess(
+    (val) => (val === "" || val === undefined ? 13000 : Number(val)),
+    z.number().int().nonnegative().default(13000)
+  ),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;

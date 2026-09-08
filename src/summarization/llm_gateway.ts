@@ -8,6 +8,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import axios from "axios";
+import pRetry, { AbortError } from "../core/retry";
 import { env, config } from "../core/config";
 import { metrics, estimateCost } from "../core/metrics";
 import type { LLMCallMetrics } from "../core/metrics";
@@ -33,37 +34,109 @@ export interface LLMResponse {
   latencyMs: number;
 }
 
+// ── Error Classification & Utilities ──
+
+export function isRateLimitError(error: any): boolean {
+  const status = error?.status ?? error?.response?.status ?? error?.statusCode;
+  if (status === 429) return true;
+  const msg = String(error?.message || "");
+  return (
+    msg.includes("429") ||
+    msg.includes("Too Many Requests") ||
+    msg.includes("RESOURCE_EXHAUSTED") ||
+    msg.includes("Quota exceeded") ||
+    msg.includes("quota") ||
+    msg.includes("rate-limit") ||
+    msg.includes("rate_limit_exceeded")
+  );
+}
+
+export function isTransientError(error: any): boolean {
+  if (isRateLimitError(error)) return true;
+  const status = error?.status ?? error?.response?.status ?? error?.statusCode;
+  if (status === 500 || status === 502 || status === 503 || status === 504) return true;
+  const msg = String(error?.message || "");
+  return (
+    msg.includes("503") ||
+    msg.includes("502") ||
+    msg.includes("504") ||
+    msg.includes("Service Unavailable") ||
+    msg.includes("high demand") ||
+    msg.includes("overloaded") ||
+    msg.includes("ETIMEDOUT") ||
+    msg.includes("ECONNRESET") ||
+    msg.includes("ECONNABORTED") ||
+    msg.includes("socket hang up") ||
+    msg.includes("network timeout")
+  );
+}
+
+export function extractRetryDelayMs(error: any): number | null {
+  const msg = String(error?.message || "");
+  // Check "Please retry in 32.197s" or "Please retry in 32s"
+  const retryMatch = msg.match(/Please retry in ([\d.]+)s/i);
+  if (retryMatch && retryMatch[1]) {
+    const sec = parseFloat(retryMatch[1]);
+    if (!isNaN(sec) && sec > 0) {
+      return Math.ceil(sec * 1000);
+    }
+  }
+  // Check retryDelay field if present (e.g. JSON in message: "retryDelay":"32s")
+  const delayJsonMatch = msg.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
+  if (delayJsonMatch && delayJsonMatch[1]) {
+    const sec = parseInt(delayJsonMatch[1], 10);
+    if (!isNaN(sec) && sec > 0) {
+      return sec * 1000;
+    }
+  }
+  // Check header retry-after in axios response
+  const retryAfter = error?.response?.headers?.["retry-after"];
+  if (retryAfter) {
+    const sec = parseInt(retryAfter, 10);
+    if (!isNaN(sec) && sec > 0) {
+      return sec * 1000;
+    }
+  }
+  return null;
+}
+
 // ── Circuit Breaker ──
 
-interface CircuitState {
+export interface CircuitState {
   failures: number;
   lastFailure: number;
   isOpen: boolean;
 }
 
-const CIRCUIT_THRESHOLD = 3;
-const CIRCUIT_COOLDOWN_MS = 300_000; // 5 minutes
+export const CIRCUIT_THRESHOLD = 3;
+export const CIRCUIT_COOLDOWN_MS = 300_000; // 5 minutes
 
-const circuits: Record<string, CircuitState> = {};
+export const circuits: Record<string, CircuitState> = {};
 
-function getCircuit(provider: string): CircuitState {
+export function getCircuit(provider: string): CircuitState {
   if (!circuits[provider]) {
     circuits[provider] = { failures: 0, lastFailure: 0, isOpen: false };
   }
   return circuits[provider]!;
 }
 
-function recordFailure(provider: string): void {
+export function recordFailure(provider: string, error?: any): void {
+  // Distinguish rate limit errors from complete infrastructure outages
+  if (error && isRateLimitError(error)) {
+    console.warn(`  ℹ️ Rate limit on ${provider}. Not recording as infrastructure outage in circuit breaker.`);
+    return;
+  }
+
   const circuit = getCircuit(provider);
   circuit.failures++;
   circuit.lastFailure = Date.now();
   if (circuit.failures >= CIRCUIT_THRESHOLD) {
     circuit.isOpen = true;
-    console.warn(`⚡ Circuit breaker OPEN for provider: ${provider}`);
+    console.warn(`⚡ Circuit breaker OPEN for provider: ${provider} (${circuit.failures} consecutive outage failures)`);
   }
 }
 
-function isCircuitOpen(provider: string): boolean {
+export function isCircuitOpen(provider: string): boolean {
   const circuit = getCircuit(provider);
   if (!circuit.isOpen) return false;
   // Check if cooldown period has passed
@@ -76,10 +149,16 @@ function isCircuitOpen(provider: string): boolean {
   return true;
 }
 
-function recordSuccess(provider: string): void {
+export function recordSuccess(provider: string): void {
   const circuit = getCircuit(provider);
   circuit.failures = 0;
   circuit.isOpen = false;
+}
+
+export function resetCircuits(): void {
+  for (const key of Object.keys(circuits)) {
+    delete circuits[key];
+  }
 }
 
 // ── Provider Implementations ──
@@ -249,6 +328,47 @@ async function callProvider(
   }
 }
 
+export async function callProviderWithRetry(
+  provider: ProviderConfig,
+  request: LLMRequest
+): Promise<LLMResponse> {
+  return pRetry(
+    async () => {
+      try {
+        return await callProvider(provider, request);
+      } catch (error: any) {
+        const status = error?.status ?? error?.response?.status;
+        // Client errors (400 Bad Request, 401 Unauthorized, 403 Forbidden) should NOT retry
+        if (status === 400 || status === 401 || status === 403) {
+          throw new AbortError(error);
+        }
+        if (!isTransientError(error)) {
+          throw new AbortError(error);
+        }
+        throw error;
+      }
+    },
+    {
+      retries: 3,
+      factor: 2,
+      minTimeout: 2000,
+      maxTimeout: 65000,
+      onFailedAttempt: async ({ error, attemptNumber, retriesLeft }) => {
+        const isRateLimit = isRateLimitError(error);
+        const errorType = isRateLimit ? "RateLimit (429)" : "TransientError (503/Timeout)";
+        const delayHint = extractRetryDelayMs(error);
+        console.warn(
+          `  ⚠️ [${errorType}] ${provider.platform}/${provider.model} attempt ${attemptNumber} failed: ${error.message}. (${retriesLeft} retries left)`
+        );
+        if (delayHint && delayHint > 0 && retriesLeft > 0) {
+          console.log(`  ⏳ Respecting upstream retry delay: waiting ${Math.ceil(delayHint / 1000)}s...`);
+          await new Promise((resolve) => setTimeout(resolve, delayHint));
+        }
+      },
+    }
+  );
+}
+
 /**
  * Core LLM call function with automatic fallback and metrics recording.
  * Tries the primary provider first, falls back to secondary on failure.
@@ -266,7 +386,7 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
     }
 
     try {
-      const response = await callProvider(provider, request);
+      const response = await callProviderWithRetry(provider, request);
       recordSuccess(provider.platform);
 
       // Record metrics (Item 4.1)
@@ -282,17 +402,18 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
 
       return response;
     } catch (error: any) {
-      const status = error.response?.status;
+      const originalError = error instanceof AbortError ? error.originalError : error;
+      const status = (originalError as any)?.status ?? (originalError as any)?.response?.status;
       // Only fallback on transient errors (rate limit, server error, timeout)
       if (status === 400 || status === 401 || status === 403) {
         // Client errors — don't fallback, re-throw
-        throw error;
+        throw originalError;
       }
-      recordFailure(provider.platform);
+      recordFailure(provider.platform, originalError);
       console.warn(
-        `  ⚠️ ${provider.platform}/${provider.model} failed: ${error.message}. Trying next provider...`
+        `  ⚠️ ${provider.platform}/${provider.model} failed after retries: ${(originalError as any)?.message ?? originalError}. Trying next provider...`
       );
-      metrics.recordError(`${provider.platform}/${provider.model}: ${error.message}`);
+      metrics.recordError(`${provider.platform}/${provider.model}: ${(originalError as any)?.message ?? originalError}`);
     }
   }
 

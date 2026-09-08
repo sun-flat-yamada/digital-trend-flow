@@ -4,7 +4,7 @@
  */
 
 import * as path from "path";
-import { config } from "./core/config";
+import { config, env } from "./core/config";
 import { metrics } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
@@ -65,17 +65,21 @@ interface ScoredArticle {
   matchedKeywords: string[];
 }
 
-// ── Concurrency utility ──
+// ── Concurrency & Rate Limiting utility ──
 
-const API_CONCURRENCY = 5;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function mapWithConcurrency<T, R>(
+export async function mapWithConcurrency<T, R>(
   items: T[],
   fn: (item: T) => Promise<R>,
-  concurrency: number = API_CONCURRENCY
+  concurrency: number = env.API_CONCURRENCY,
+  intervalMs: number = env.API_INTERVAL_MS
 ): Promise<PromiseSettledResult<R>[]> {
   const results: PromiseSettledResult<R>[] = [];
   for (let i = 0; i < items.length; i += concurrency) {
+    if (i > 0 && intervalMs > 0) {
+      await sleep(intervalMs);
+    }
     const chunk = items.slice(i, i + concurrency);
     const chunkResults = await Promise.allSettled(chunk.map(fn));
     results.push(...chunkResults);
@@ -88,7 +92,8 @@ async function mapWithConcurrency<T, R>(
  */
 async function main() {
   const today = new Date().toISOString().split("T")[0] ?? "unknown-date";
-  console.log(`\n🚀 Digital Trend Flow - Daily Pipeline Starting (${today})...\n`);
+  console.log(`\n🚀 Digital Trend Flow - Daily Pipeline Starting (${today})...`);
+  console.log(`   ⚙️ API Concurrency: ${env.API_CONCURRENCY}, Interval: ${env.API_INTERVAL_MS}ms\n`);
 
   // Initialize Langfuse tracing (Item 4.3)
   initLangfuse();
@@ -343,7 +348,9 @@ async function main() {
         purposeLabel: scoreResult.purposeLabel,
         matchedKeywords: scoreResult.matchedKeywords,
       };
-    }
+    },
+    Math.max(env.API_CONCURRENCY, 3),
+    200
   );
 
   for (const result of extractionResults) {
@@ -381,7 +388,7 @@ async function main() {
   // ==========================
   // Phase 3: Map Processing
   // ==========================
-  console.log("\n🗺️ Phase 3: Map Processing - Extracting facts via LLM...");
+  console.log(`\n🗺️ Phase 3: Map Processing - Extracting facts via LLM (concurrency: ${env.API_CONCURRENCY}, interval: ${env.API_INTERVAL_MS}ms)...`);
 
   const mapInputs: MapInput[] = selectedArticles.map((sa) => ({
     title: sa.article.title,
@@ -390,7 +397,7 @@ async function main() {
     ...(sa.article.language !== undefined ? { language: sa.article.language } : {}),
   }));
 
-  const mapResults = await mapWithConcurrency(mapInputs, mapExtractFacts);
+  const mapResults = await mapWithConcurrency(mapInputs, mapExtractFacts, env.API_CONCURRENCY, env.API_INTERVAL_MS);
 
   const allFacts: (MapOutput & { purpose: string; purposeLabel: string; score: number })[] = [];
   for (let i = 0; i < mapResults.length; i++) {

@@ -60,6 +60,8 @@ jobs:
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          API_CONCURRENCY: ${{ vars.API_CONCURRENCY }}
+          API_INTERVAL_MS: ${{ vars.API_INTERVAL_MS }}
         run: npm run build && npm start
 
       - name: Ensure Pages static site is generated

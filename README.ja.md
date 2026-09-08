@@ -93,6 +93,7 @@ src/
 | :------------------------------------- | :----------------------------------------------------- |
 | [Architecture](docs/architecture.md)   | パイプライン詳細、Map-Reduce 戦略、データフロー        |
 | [Configuration](docs/configuration.md) | `config.yml` リファレンス、環境変数、GitHub Secrets    |
+| [Settings & Limits](docs/settings.md)  | 実行リミット、レート制限、リトライ、GitHub Variables   |
 | [Sources](docs/sources.md)             | 全 7 ソースの設定・認証・カスタマイズ                  |
 | [Deployment](docs/deployment.md)       | CI/CD、スケジュール、artifacts リポジトリ運用          |
 | [Development](docs/development.md)     | ローカル開発、テスト、デバッグ、トラブルシューティング |

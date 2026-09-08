@@ -127,3 +127,14 @@ exclude:
 
 > [!IMPORTANT]
 > デフォルトの `GITHUB_TOKEN` ではワークフローからの `git push` が許可されないため、`PAT_GITHUB` が必要です。
+
+---
+
+## GitHub Variables (CI/CD)
+
+並列実行数やレート制限インターバルの調整用。詳細は [Settings & Limits Guide](settings.md) を参照:
+
+| Variable | Default | Note |
+|:---|:---|:---|
+| `API_CONCURRENCY` | `1` | 並列リクエスト数 (Free Tier: 1, Paid: 5) |
+| `API_INTERVAL_MS` | `13000` | リクエスト間遅延ミリ秒 (Free Tier: 13000 = ~4.6 RPM) |

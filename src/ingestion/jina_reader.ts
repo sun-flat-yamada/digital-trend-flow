@@ -7,7 +7,7 @@
  */
 
 import axios from "axios";
-import pRetry from "p-retry";
+import pRetry from "../core/retry";
 import { env } from "../core/config";
 
 const JINA_API_BASE = "https://r.jina.ai/";
