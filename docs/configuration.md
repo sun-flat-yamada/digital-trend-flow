@@ -27,6 +27,7 @@ settings:
   semantic_dedup:
     enabled: true
     similarity_threshold: 0.75      # タイトル類似度閾値
+  language: "en"                    # 出力言語 (デフォルト: "en", GitHub Variables で上書き可能)
 ```
 
 ### Fallback Models (Optional)
