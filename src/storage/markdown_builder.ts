@@ -23,6 +23,7 @@ export interface SummaryFrontmatter {
   executionTimeSec?: number | undefined;
   qualityScore?: number | undefined;
   relatedNotes?: string[] | undefined;
+  language?: string | undefined;
 }
 
 /**
@@ -89,13 +90,18 @@ export function saveMarkdownFile(
   if (metadata?.relatedNotes && metadata.relatedNotes.length > 0) {
     frontmatterObj["related_notes"] = metadata.relatedNotes;
   }
+  if (metadata?.language) {
+    frontmatterObj["language"] = metadata.language;
+  }
 
   const frontmatter = `---\n${yaml.stringify(frontmatterObj)}---\n\n`;
 
   // Obsidian navigation links
   let footer = "";
   if (metadata?.previousDate) {
-    footer = `\n\n---\n\n← [[${metadata.previousDate}_summary|前日のサマリー]]`;
+    const isEn = metadata.language?.toLowerCase() === "en" || metadata.language?.toLowerCase() === "english";
+    const prevText = isEn ? "Previous Summary" : "前日のサマリー";
+    footer = `\n\n---\n\n← [[${metadata.previousDate}_summary|${prevText}]]`;
   }
 
   const fullContent = frontmatter + content + footer;

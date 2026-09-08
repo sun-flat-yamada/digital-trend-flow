@@ -20,11 +20,12 @@ const MAX_REDUCE_INPUT_CHARS = 200_000;
 export async function reduceSummarize(
   allFacts: (MapOutput & { purpose: string; purposeLabel: string; score?: number })[],
   date: string,
-  activePurposes: { key: string; label: string }[] = []
+  activePurposes: { key: string; label: string }[] = [],
+  targetLanguage: string = "en"
 ): Promise<string> {
   try {
     // Build dynamic purpose-aware prompt
-    const systemPrompt = buildReducePrompt(activePurposes);
+    const systemPrompt = buildReducePrompt(activePurposes, targetLanguage);
 
     // Compress facts: strip internal metadata, keep only what the LLM needs
     const compressedFacts = allFacts.map((f) => ({
@@ -93,13 +94,15 @@ Based on these facts, generate the daily briefing with purpose-sectioned format.
       grouped.set(f.purposeLabel, existing);
     }
 
+    const isJa = targetLanguage.toLowerCase() === "ja" || targetLanguage.toLowerCase() === "japanese";
+    const sourceLabel = isJa ? "出典" : "Source";
     const sections = Array.from(grouped.entries())
       .map(
         ([label, facts]) =>
           `## ${label}\n\n${facts
             .map(
               (f) =>
-                `### ${f.source_title}\n**出典**: ${f.source_url}\n${f.facts.map((fact) => `- ${fact.text}`).join("\n")}`
+                `### ${f.source_title}\n**${sourceLabel}**: ${f.source_url}\n${f.facts.map((fact) => `- ${fact.text}`).join("\n")}`
             )
             .join("\n\n")}`
       )

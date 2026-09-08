@@ -44,6 +44,9 @@ settings:
     enabled: true
     similarity_threshold: 0.75  # タイトル類似度がこれ以上のペアを重複とみなす
 
+  # 出力言語設定 (デフォルトは英語 "en"、GitHub Actions Variables や環境変数 OUTPUT_LANGUAGE / SUMMARY_LANGUAGE で上書き可能)
+  language: en
+
 # ==========================================
 # PURPOSES & SOURCES (第一レベルカテゴリと情報源)
 # ==========================================

@@ -62,9 +62,14 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           API_CONCURRENCY: ${{ vars.API_CONCURRENCY }}
           API_INTERVAL_MS: ${{ vars.API_INTERVAL_MS }}
+          OUTPUT_LANGUAGE: ${{ vars.OUTPUT_LANGUAGE || 'en' }}
+          SUMMARY_LANGUAGE: ${{ vars.SUMMARY_LANGUAGE || '' }}
         run: npm run build && npm start
 
       - name: Ensure Pages static site is generated
+        env:
+          OUTPUT_LANGUAGE: ${{ vars.OUTPUT_LANGUAGE || 'en' }}
+          SUMMARY_LANGUAGE: ${{ vars.SUMMARY_LANGUAGE || '' }}
         run: |
           if [ ! -f "_site/index.html" ]; then
             echo "Building pages static site..."

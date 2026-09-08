@@ -428,7 +428,14 @@ async function main() {
     }
   }
 
-  const summaryMarkdown = await reduceSummarize(allFacts, today, activePurposes);
+  const targetLanguage =
+    process.env.OUTPUT_LANGUAGE ||
+    process.env.SUMMARY_LANGUAGE ||
+    config.settings.language ||
+    "en";
+  console.log(`  🌐 Output language: ${targetLanguage}`);
+
+  const summaryMarkdown = await reduceSummarize(allFacts, today, activePurposes, targetLanguage);
   console.log("  → Summary generated successfully.");
   await registry.events.emit("reduce:complete", { length: summaryMarkdown.length });
 
@@ -438,7 +445,7 @@ async function main() {
   console.log("\n🔍 Phase 5: Quality Evaluation...");
 
   const expectedUrls = selectedArticles.map((sa) => sa.article.url);
-  const qualityResult = evaluateQuality(summaryMarkdown, expectedUrls);
+  const qualityResult = evaluateQuality(summaryMarkdown, expectedUrls, targetLanguage);
   metrics.setQualityScore(qualityResult.overallScore);
 
   if (trace) recordQualityScore(trace, qualityResult.overallScore);
@@ -493,6 +500,7 @@ async function main() {
     estimatedCostUsd: finalMetrics.total_cost_usd,
     executionTimeSec: (finalMetrics.duration_ms ?? 0) / 1000,
     qualityScore: qualityResult.overallScore,
+    language: targetLanguage,
   };
 
   const outputDir = path.join(PATHS.ARTIFACTS_DAILY.absolute, yyyy, mm);
@@ -535,7 +543,7 @@ async function main() {
 
   // GitHub Pages static site generation
   try {
-    generatePagesSite();
+    generatePagesSite(undefined, undefined, targetLanguage);
   } catch (pagesErr: any) {
     console.warn(`⚠️ GitHub Pages site generation failed: ${pagesErr.message}`);
   }

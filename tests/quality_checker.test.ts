@@ -45,12 +45,49 @@ OpenAIが新しいGPT-5モデルを発表しました。このモデルは従来
     expect(formatCheck?.passed).toBe(false);
   });
 
-  test("detects non-Japanese content", () => {
+  test("detects non-Japanese content when target language is ja", () => {
     const englishSummary = `## 🔥 Top News\n\nThis is an English summary about AI trends.\n\n## Research\n\nMore English content here.`;
-    const result = evaluateQuality(englishSummary, []);
+    const result = evaluateQuality(englishSummary, [], "ja");
 
     const langCheck = result.checks.find((c) => c.name === "Language Check");
     expect(langCheck?.passed).toBe(false);
+  });
+
+  test("validates English content by default (en)", () => {
+    const englishSummary = `## 🔥 Today's Top Story
+
+### OpenAI Announces GPT-5 with Major Breakthroughs
+**Source**: [OpenAI](https://openai.com/blog/gpt5) | **Category**: 🔬 AI Research
+
+OpenAI has officially launched GPT-5, marking a significant milestone in generative AI capabilities.
+The model demonstrates unprecedented reasoning ability and sets state of the art results across multiple rigorous academic benchmarks.
+Engineers and researchers around the world are evaluating its architectural advancements and efficiency improvements.
+
+- **🚀 Technical Breakthrough / Quantitative Advance**: 35% improvement on SWE-bench coding tasks.
+- **⚠️ Trade-offs & Adoption Considerations**: Higher context token cost and latency for complex queries.
+- **💡 Recommended Actions for Engineers**: Conduct immediate proof-of-concept testing on internal datasets.
+
+---
+
+## 🔬 AI Research
+
+1. **New Attention Architecture**: Efficient transformer variant.
+   **Source**: [Research Paper](https://arxiv.org/abs/2609.0001)
+
+## 📰 Other Relevant News
+
+- [DeepMind Announcement](https://deepmind.com) — 🔬 AI Research
+`;
+    const result = evaluateQuality(englishSummary, ["https://openai.com/blog/gpt5", "https://arxiv.org/abs/2609.0001"]);
+
+    const langCheck = result.checks.find((c) => c.name === "Language Check");
+    expect(langCheck?.passed).toBe(true);
+
+    const formatCheck = result.checks.find((c) => c.name === "Format Compliance");
+    expect(formatCheck?.passed).toBe(true);
+
+    const insightCheck = result.checks.find((c) => c.name === "Actionable Insights");
+    expect(insightCheck?.passed).toBe(true);
   });
 
   test("validates citation coverage", () => {

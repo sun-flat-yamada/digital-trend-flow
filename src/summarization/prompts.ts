@@ -155,22 +155,27 @@ export const JUDGE_RESPONSE_SCHEMA = {
 
 /**
  * Builds a purpose-aware Reduce prompt dynamically based on the active
- * purpose categories found in today's articles.
+ * purpose categories found in today's articles and the target output language.
  */
 export function buildReducePrompt(
-  activePurposes: { key: string; label: string }[]
+  activePurposes: { key: string; label: string }[],
+  targetLanguage: string = "en"
 ): string {
+  const isJa = targetLanguage.toLowerCase() === "ja" || targetLanguage.toLowerCase() === "japanese";
+  const sourceLabel = isJa ? "出典" : "Source";
+
   const purposeSections = activePurposes
     .map(
       (p) => `## ${p.label}
 
-1. **[トレンドタイトル]**: [1-2文の分析]
-   **出典**: [Source Title](Source URL)
+1. **[${isJa ? "トレンドタイトル" : "Trend Title"}]**: [${isJa ? "1-2文の分析" : "1-2 sentence analysis"}]
+   **${sourceLabel}**: [Source Title](Source URL)
 2. ...`
     )
     .join("\n\n");
 
-  return `あなたは、テクノロジー業界に精通した上級アナリストです。
+  if (isJa) {
+    return `あなたは、テクノロジー業界に精通した上級アナリストです。
 読者は技術リーダー・エンジニアリングマネージャーであり、意思決定に直結する情報を求めています。
 
 入力として、複数記事から抽出されたファクトの JSON 配列を受け取ります。
@@ -209,15 +214,58 @@ ${purposeSections}
 6. 日本語で執筆すること。ただし、技術用語（transformer, fine-tuning, LLM 等）は原語のまま使用してよい。
 7. 翻訳調ではなく、自然で読みやすい日本語で書くこと。
 8. カテゴリは上記の順序を守ること。`;
+  }
+
+  const isEn = targetLanguage.toLowerCase() === "en" || targetLanguage.toLowerCase() === "english";
+  const languageInstruction = isEn
+    ? "Write the briefing in fluent, professional, and natural English."
+    : `Write the entire briefing in fluent, professional ${targetLanguage}. Translate section headings and labels appropriately into ${targetLanguage} while strictly adhering to the requested structure.`;
+
+  return `You are a senior technology industry analyst.
+Your readers are engineering leaders, CTOs, and technical managers who require actionable, high-signal intelligence for strategic decision-making.
+
+You will receive a JSON array of extracted facts from multiple articles as input.
+Each fact contains "category" (category label) and "pipeline_score" (the pipeline's relevance score).
+
+**Output Format (Strict Compliance Required):**
+
+## 🔥 Today's Top Story
+
+### [Title]
+**Source**: [Source Title](Source URL) | **Category**: [Purpose Label]
+
+[In-depth analysis of the single most critical and impactful story across all categories. Treat the highest pipeline_score fact as the prime candidate. Evaluate in terms of direct business impact, technical breakthroughs, and industry shifts. Explain why it matters and what ripple effects it will create in 2-3 paragraphs.]
+
+- **🚀 Technical Breakthrough / Quantitative Advance**: [Specific quantitative improvements, novelty, architectural or algorithmic innovations]
+- **⚠️ Trade-offs & Adoption Considerations**: [Compute requirements, inference costs, licensing, backward compatibility, impact on existing tech stacks]
+- **💡 Recommended Actions for Engineers**: [Concrete guidance: "Start PoC immediately", "Review documentation", "Wait-and-see", etc.]
+
+---
+
+${purposeSections}
+
+## 📰 Other Relevant News
+
+- [Article Title](Source URL) — [Purpose Label]
+- ...
+
+**Rules:**
+1. Always include clickable markdown citation links for all sources (**Source**: [Title](URL)).
+2. The 🔥 Top Story must include deep analytical insight and the three mandatory bullet points: Technical Breakthrough, Trade-offs & Adoption Considerations, and Recommended Actions for Engineers.
+3. Include 1-3 items per active category section.
+4. Completely omit any category section that has no corresponding facts.
+5. Target length: roughly 800 to 1,500 words (or 3,000-6,000 characters).
+6. ${languageInstruction}
+7. Maintain the exact order of categories as listed above.`;
 }
 
-// Legacy export
+// Legacy export (default English)
 export const REDUCE_SYSTEM_PROMPT = buildReducePrompt([
   { key: "ai_research", label: "🔬 AI・LLM 研究" },
   { key: "ai_dev_tools", label: "🛠️ 開発ツール・IDE統合" },
   { key: "business", label: "💼 ビジネス動向" },
   { key: "geopolitics", label: "🌍 政治・地政学" },
-]);
+], "en");
 
 // ── Monthly Digest Prompt (Item 6.1) ──
 

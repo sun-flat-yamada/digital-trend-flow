@@ -70,6 +70,27 @@ describe("saveMarkdownFile", () => {
     expect(content).toContain("[[2026-04-17_summary|前日のサマリー]]");
   });
 
+  test("includes language in frontmatter and English backlink when language is en", () => {
+    const metadata: SummaryFrontmatter = {
+      language: "en",
+      previousDate: "2026-09-07",
+    };
+
+    const filePath = saveMarkdownFile(
+      testDir,
+      "test_english.md",
+      "English Summary",
+      "English Content.",
+      5,
+      "Author",
+      metadata
+    );
+
+    const content = fs.readFileSync(filePath, "utf8");
+    expect(content).toContain("language: en");
+    expect(content).toContain("[[2026-09-07_summary|Previous Summary]]");
+  });
+
   test("creates parent directories automatically", () => {
     const nestedDir = path.join(testDir, "nested", "deep");
     const filePath = saveMarkdownFile(

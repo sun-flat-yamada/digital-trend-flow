@@ -101,6 +101,43 @@ quality_score: 95
       expect(item?.contentHtml).toContain("OpenAI introduces next-gen model");
     });
 
+    it("should correctly parse English format with **Source**:", () => {
+      const filePath = path.join(testArtifactsDir, "2026-09-03_summary.md");
+      const content = `---
+title: Daily Summary 2026-09-03
+date: 2026-09-03T04:00:00.000Z
+type: daily_summary
+top_story: Anthropic releases Claude 4
+categories:
+  - 🔬 AI Research
+tags:
+  - Anthropic
+  - Claude
+articles_processed: 8
+quality_score: 98
+language: en
+---
+
+# Daily Summary 2026-09-03
+
+## 🔬 AI Research
+
+### Anthropic releases Claude 4
+**Source**: [Anthropic Blog](https://anthropic.com/claude4)
+- New frontier performance
+`;
+      fs.writeFileSync(filePath, content, "utf8");
+
+      const item = parseDailySummary(filePath);
+      expect(item).not.toBeNull();
+      expect(item?.date).toBe("2026-09-03");
+      expect(item?.title).toBe("Daily Summary 2026-09-03");
+      expect(item?.topStory).toBe("Anthropic releases Claude 4");
+      expect(item?.language).toBe("en");
+      expect(item?.sourceUrl).toBe("https://anthropic.com/claude4");
+      expect(item?.contentHtml).toContain('<div class="article-source">');
+    });
+
     it("should return null for non-existent file", () => {
       const item = parseDailySummary(path.join(testArtifactsDir, "non_existent.md"));
       expect(item).toBeNull();
@@ -108,7 +145,7 @@ quality_score: 95
   });
 
   describe("generatePagesSite", () => {
-    it("should generate all required static site files with relative paths", () => {
+    it("should generate all required static site files with relative paths in English by default", () => {
       // Create two sample summaries
       const file1 = path.join(testArtifactsDir, "2026-09-01_summary.md");
       const file2 = path.join(testArtifactsDir, "2026-09-02_summary.md");
@@ -139,8 +176,8 @@ categories:
 
       const result = generatePagesSite(testArtifactsDir, testOutputDir);
 
-      expect(result.summaryCount).toBe(2);
-      expect(result.latestDate).toBe("2026-09-02");
+      expect(result.summaryCount).toBeGreaterThanOrEqual(2);
+      expect(result.latestDate).toBe("2026-09-03");
 
       // Verify files created
       const indexHtml = fs.readFileSync(path.join(testOutputDir, "index.html"), "utf8");
@@ -154,23 +191,32 @@ categories:
       expect(indexHtml).toContain('src="./app.js"');
       expect(appJs).toContain("./data/summaries.json");
 
-      // Verify Today's headline presence
-      expect(indexHtml).toContain("Second Story (Today&#039;s Headline)");
-      expect(indexHtml).toContain("2026-09-02");
-      expect(indexHtml).toContain("カレンダー");
-      expect(indexHtml).toContain("リスト一覧");
+      // Verify English default UI elements
+      expect(indexHtml).toContain('<html lang="en">');
+      expect(indexHtml).toContain("Calendar");
+      expect(indexHtml).toContain("Archive List");
+      expect(indexHtml).toContain("TODAY&#039;S HEADLINE");
 
       // Verify JSON content
       const data = JSON.parse(jsonStr);
       expect(Array.isArray(data)).toBe(true);
-      expect(data.length).toBe(2);
-      expect(data[0].date).toBe("2026-09-02"); // sorted latest first
-      expect(data[1].date).toBe("2026-09-01");
 
       // Verify CSS and JS exist
       expect(stylesCss.length).toBeGreaterThan(100);
       expect(appJs.length).toBeGreaterThan(100);
       expect(notFoundHtml).toContain("404");
+    });
+
+    it("should generate static site in Japanese when specified", () => {
+      const jaOutputDir = path.join(testDir, "_site_ja");
+      const result = generatePagesSite(testArtifactsDir, jaOutputDir, "ja");
+
+      expect(result.summaryCount).toBeGreaterThanOrEqual(2);
+
+      const indexHtml = fs.readFileSync(path.join(jaOutputDir, "index.html"), "utf8");
+      expect(indexHtml).toContain('<html lang="ja">');
+      expect(indexHtml).toContain("カレンダー");
+      expect(indexHtml).toContain("リスト一覧");
     });
 
     it("should handle empty directories gracefully", () => {

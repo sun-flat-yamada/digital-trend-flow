@@ -22,9 +22,102 @@ export interface PageSummaryItem {
   articleCount: number;
   qualityScore: number | null;
   topPurpose?: string;
+  language?: string;
   contentHtml: string;
   rawMarkdown: string;
   sourceUrl?: string;
+}
+
+export interface PagesI18n {
+  langCode: string;
+  pageTitle: string;
+  pageDescription: string;
+  themeToggleTitle: string;
+  tabCalendar: string;
+  tabList: string;
+  calWeekdays: string[];
+  calLegendHasData: string;
+  calLegendSelected: string;
+  searchPlaceholder: string;
+  searchAriaLabel: string;
+  headlineBadge: string;
+  articlesLabel: (count: number) => string;
+  qualityLabel: (score: string) => string;
+  copyLink: string;
+  copiedLink: string;
+  noDataHeadline: string;
+  noDataContent: string;
+  noSearchResults: string;
+  cardArticles: (count: number) => string;
+  summaryAvailableTooltip: string;
+  monthTitle: (year: number, month: number) => string;
+  notFoundTitle: string;
+  notFoundDesc: string;
+  notFoundBack: string;
+}
+
+export const I18N_EN: PagesI18n = {
+  langCode: "en",
+  pageTitle: "Digital Trend Flow — Daily Technology Trend Hub",
+  pageDescription: "AI-powered automated daily digital & tech trend intelligence platform. Browse top headlines and back numbers.",
+  themeToggleTitle: "Toggle dark/light mode",
+  tabCalendar: "📅 Calendar",
+  tabList: "📋 Archive List",
+  calWeekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  calLegendHasData: "Has Summary",
+  calLegendSelected: "Selected",
+  searchPlaceholder: "Search by title, tag, or category...",
+  searchAriaLabel: "Search archive",
+  headlineBadge: "🌟 TODAY'S HEADLINE",
+  articlesLabel: (count) => `📊 Articles: ${count}`,
+  qualityLabel: (score) => `🏆 Quality: ${score}`,
+  copyLink: "🔗 Copy Link",
+  copiedLink: "Link copied!",
+  noDataHeadline: "No headline available for today.",
+  noDataContent: '<p class="no-data">No data available. Run the pipeline to generate summaries.</p>',
+  noSearchResults: "No matching summaries found",
+  cardArticles: (count) => `${count} articles`,
+  summaryAvailableTooltip: "Summary available: ",
+  monthTitle: (year, month) => {
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    return `${monthNames[month]} ${year}`;
+  },
+  notFoundTitle: "Page Not Found — Digital Trend Flow",
+  notFoundDesc: "Redirecting to home page...",
+  notFoundBack: "Back to Home",
+};
+
+export const I18N_JA: PagesI18n = {
+  langCode: "ja",
+  pageTitle: "Digital Trend Flow — Daily Technology Trend Hub",
+  pageDescription: "AIを活用した毎日のデジタル・テック動向自動集約プラットフォーム。トップヘッドラインおよびバックナンバー（カレンダー・リスト）を閲覧できます。",
+  themeToggleTitle: "ダーク/ライト切替",
+  tabCalendar: "📅 カレンダー",
+  tabList: "📋 リスト一覧",
+  calWeekdays: ["日", "月", "火", "水", "木", "金", "土"],
+  calLegendHasData: "サマリーあり",
+  calLegendSelected: "選択中",
+  searchPlaceholder: "タイトルやタグで検索...",
+  searchAriaLabel: "バックナンバー検索",
+  headlineBadge: "🌟 TODAY'S HEADLINE",
+  articlesLabel: (count) => `📊 収集記事: ${count}件`,
+  qualityLabel: (score) => `🏆 品質: ${score}`,
+  copyLink: "🔗 リンクをコピー",
+  copiedLink: "リンクをコピーしました",
+  noDataHeadline: "本日のヘッドライン情報はまだありません。",
+  noDataContent: '<p class="no-data">データがありません。パイプラインを実行してサマリーを生成してください。</p>',
+  noSearchResults: "該当するサマリーはありません",
+  cardArticles: (count) => `${count} 記事`,
+  summaryAvailableTooltip: "サマリーあり: ",
+  monthTitle: (year, month) => `${year}年 ${String(month + 1).padStart(2, "0")}月`,
+  notFoundTitle: "ページが見つかりません — Digital Trend Flow",
+  notFoundDesc: "トップページへ自動遷移します...",
+  notFoundBack: "トップページへ戻る",
+};
+
+export function getI18n(lang: string = "en"): PagesI18n {
+  const isJa = lang.toLowerCase() === "ja" || lang.toLowerCase() === "japanese";
+  return isJa ? I18N_JA : I18N_EN;
 }
 
 /**
@@ -126,8 +219,8 @@ export function markdownToHtml(md: string): string {
       continue;
     }
 
-    // Source link line (e.g. **出典**: https://...)
-    if (line.includes("**出典**:")) {
+    // Source link line (e.g. **出典**: https://... or **Source**: https://...)
+    if (line.includes("**出典**:") || line.includes("**Source**:")) {
       const formatted = formatInline(line);
       htmlParts.push(`<div class="article-source">${formatted}</div>`);
       continue;
@@ -219,9 +312,9 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
     }
 
     let sourceUrl: string | undefined = undefined;
-    const sourceMatch = markdownBody.match(/\*\*出典\*\*:\s*(https?:\/\/[^\s)]+)/);
+    const sourceMatch = markdownBody.match(/\*\*(?:出典|Source)\*\*:\s*(?:\[[^\]]+\]\()?(https?:\/\/[^\s)]+)/);
     if (sourceMatch && sourceMatch[1]) {
-      sourceUrl = sourceMatch[1];
+      sourceUrl = sourceMatch[1].replace(/\)$/, "");
     }
 
     const categories: string[] = Array.isArray(frontmatter.categories)
@@ -236,6 +329,8 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
     const qualityScore = typeof frontmatter.quality_score === "number"
       ? frontmatter.quality_score
       : null;
+    const language: string | undefined =
+      typeof frontmatter.language === "string" ? frontmatter.language : undefined;
 
     const contentHtml = markdownToHtml(markdownBody);
 
@@ -248,6 +343,7 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
       articleCount,
       qualityScore,
       ...(frontmatter.top_purpose ? { topPurpose: frontmatter.top_purpose } : {}),
+      ...(language ? { language } : {}),
       contentHtml,
       rawMarkdown: markdownBody,
       ...(sourceUrl ? { sourceUrl } : {}),
@@ -317,8 +413,11 @@ export function scanDailySummaries(artifactsDir?: string): PageSummaryItem[] {
  */
 export function generatePagesSite(
   artifactsDir?: string,
-  outputDir: string = PATHS.PAGES_OUTPUT.absolute
+  outputDir: string = PATHS.PAGES_OUTPUT.absolute,
+  language?: string
 ): { outputPath: string; summaryCount: number; latestDate: string | null } {
+  const siteLang = language || process.env.OUTPUT_LANGUAGE || process.env.SUMMARY_LANGUAGE || "en";
+  const i18n = getI18n(siteLang);
   const summaries = scanDailySummaries(artifactsDir);
   const outDir = path.resolve(process.cwd(), outputDir);
   const dataDir = path.join(outDir, "data");
@@ -329,13 +428,13 @@ export function generatePagesSite(
   fs.writeFileSync(jsonPath, JSON.stringify(summaries, null, 2), "utf8");
 
   fs.writeFileSync(path.join(outDir, "styles.css"), generateCss(), "utf8");
-  fs.writeFileSync(path.join(outDir, "app.js"), generateJs(), "utf8");
+  fs.writeFileSync(path.join(outDir, "app.js"), generateJs(i18n), "utf8");
 
   const latestSummary = summaries[0] ?? null;
-  fs.writeFileSync(path.join(outDir, "index.html"), generateHtml(summaries, latestSummary), "utf8");
-  fs.writeFileSync(path.join(outDir, "404.html"), generate404Html(), "utf8");
+  fs.writeFileSync(path.join(outDir, "index.html"), generateHtml(summaries, latestSummary, i18n), "utf8");
+  fs.writeFileSync(path.join(outDir, "404.html"), generate404Html(i18n), "utf8");
 
-  console.log(`🌐 GitHub Pages site generated at: ${outDir} (${summaries.length} summaries)`);
+  console.log(`🌐 GitHub Pages site generated at: ${outDir} (${summaries.length} summaries, lang: ${i18n.langCode})`);
   return {
     outputPath: outDir,
     summaryCount: summaries.length,
@@ -346,11 +445,15 @@ export function generatePagesSite(
 /**
  * Generates the main HTML page with embedded initial state for instant load.
  */
-function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | null): string {
+function generateHtml(
+  summaries: PageSummaryItem[],
+  initial: PageSummaryItem | null,
+  i18n: PagesI18n = I18N_EN
+): string {
   const initialDate = initial ? initial.date : "";
   const initialTitle = initial ? initial.title : "No summaries available";
-  const initialTopStory = initial ? initial.topStory : "本日のヘッドライン情報はまだありません。";
-  const initialContent = initial ? initial.contentHtml : "<p class=\"no-data\">データがありません。パイプラインを実行してサマリーを生成してください。</p>";
+  const initialTopStory = initial ? initial.topStory : i18n.noDataHeadline;
+  const initialContent = initial ? initial.contentHtml : i18n.noDataContent;
   const initialCategories = initial ? initial.categories : [];
   const initialTags = initial ? initial.tags : [];
   const initialArticleCount = initial ? initial.articleCount : 0;
@@ -358,13 +461,17 @@ function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | n
     ? `${initial.qualityScore.toFixed(0)} pt`
     : "-";
 
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+  const initialCalTitle = i18n.monthTitle(currentYear, currentMonth);
+
   return `<!DOCTYPE html>
-<html lang="ja">
+<html lang="${i18n.langCode}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Digital Trend Flow — Daily Technology Trend Hub</title>
-  <meta name="description" content="AIを活用した毎日のデジタル・テック動向自動集約プラットフォーム。トップヘッドラインおよびバックナンバー（カレンダー・リスト）を閲覧できます。">
+  <title>${escapeHtml(i18n.pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(i18n.pageDescription)}">
   <link rel="stylesheet" href="./styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
 </head>
@@ -377,11 +484,11 @@ function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | n
           <span class="brand-logo">📡</span>
           <div class="brand-text">
             <span class="brand-name">Digital Trend Flow</span>
-            <span class="brand-sub">Daily AI & Tech Trend Observatory</span>
+            <span class="brand-sub">${escapeHtml(i18n.pageDescription.slice(0, 45))}</span>
           </div>
         </div>
         <div class="header-actions">
-          <button id="themeToggle" class="btn-icon" aria-label="テーマ切替" title="ダーク/ライト切替">
+          <button id="themeToggle" class="btn-icon" aria-label="${escapeHtml(i18n.themeToggleTitle)}" title="${escapeHtml(i18n.themeToggleTitle)}">
             <span class="theme-icon">🌙</span>
           </button>
           <a href="https://github.com/sun-flat-yamada/digital-trend-flow" target="_blank" rel="noopener noreferrer" class="btn-github">
@@ -398,10 +505,10 @@ function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | n
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-tabs">
           <button class="tab-btn active" data-tab="calendar" id="tabCalendarBtn">
-            <span>📅 カレンダー</span>
+            <span>${escapeHtml(i18n.tabCalendar)}</span>
           </button>
           <button class="tab-btn" data-tab="list" id="tabListBtn">
-            <span>📋 リスト一覧</span>
+            <span>${escapeHtml(i18n.tabList)}</span>
             <span class="count-badge" id="listCountBadge">${summaries.length}</span>
           </button>
         </div>
@@ -410,27 +517,27 @@ function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | n
         <div class="tab-content active" id="calendarTab">
           <div class="calendar-widget">
             <div class="calendar-header">
-              <button id="calPrev" class="cal-nav-btn" aria-label="前月">◀</button>
-              <div id="calTitle" class="calendar-title">2026年 09月</div>
-              <button id="calNext" class="cal-nav-btn" aria-label="次月">▶</button>
+              <button id="calPrev" class="cal-nav-btn" aria-label="Previous">◀</button>
+              <div id="calTitle" class="calendar-title">${escapeHtml(initialCalTitle)}</div>
+              <button id="calNext" class="cal-nav-btn" aria-label="Next">▶</button>
             </div>
             <div class="calendar-weekdays">
-              <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+              ${i18n.calWeekdays.map((w) => `<span>${escapeHtml(w)}</span>`).join("")}
             </div>
             <div id="calendarGrid" class="calendar-grid">
               <!-- Rendered by app.js -->
             </div>
           </div>
           <div class="calendar-legend">
-            <span class="legend-item"><span class="legend-dot has-data"></span>サマリーあり</span>
-            <span class="legend-item"><span class="legend-dot selected"></span>選択中</span>
+            <span class="legend-item"><span class="legend-dot has-data"></span>${escapeHtml(i18n.calLegendHasData)}</span>
+            <span class="legend-item"><span class="legend-dot selected"></span>${escapeHtml(i18n.calLegendSelected)}</span>
           </div>
         </div>
 
         <!-- Tab 2: Back Number List View -->
         <div class="tab-content" id="listTab">
           <div class="search-box">
-            <input type="text" id="searchInput" placeholder="タイトルやタグで検索..." aria-label="バックナンバー検索">
+            <input type="text" id="searchInput" placeholder="${escapeHtml(i18n.searchPlaceholder)}" aria-label="${escapeHtml(i18n.searchAriaLabel)}">
             <span class="search-icon">🔍</span>
           </div>
           <div class="backnumber-list" id="backnumberList">
@@ -441,13 +548,13 @@ function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | n
 
       <!-- Main Content / Detail View -->
       <main class="content-area">
-        <!-- Top Headline Card (当日の Head line) -->
+        <!-- Top Headline Card (Today's Headline) -->
         <section class="headline-section" id="headlineCard">
           <div class="headline-badge-bar">
-            <span class="badge-headline">🌟 TODAY'S HEADLINE</span>
+            <span class="badge-headline">${escapeHtml(i18n.headlineBadge)}</span>
             <span class="badge-date" id="displayDate">${initialDate}</span>
-            <span class="badge-stat" id="displayArticleCount">📊 収集記事: ${initialArticleCount}件</span>
-            <span class="badge-stat" id="displayQuality">🏆 品質: ${initialQuality}</span>
+            <span class="badge-stat" id="displayArticleCount">${escapeHtml(i18n.articlesLabel(initialArticleCount))}</span>
+            <span class="badge-stat" id="displayQuality">${escapeHtml(i18n.qualityLabel(initialQuality))}</span>
           </div>
 
           <h1 class="headline-title" id="displayTopStory">${escapeHtml(initialTopStory)}</h1>
@@ -467,8 +574,8 @@ function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | n
           <div class="summary-body-header">
             <h2 id="summaryDocumentTitle">${escapeHtml(initialTitle)}</h2>
             <div class="quick-nav-actions">
-              <button id="copyLinkBtn" class="btn-action" title="この日のリンクをコピー">
-                🔗 リンクをコピー
+              <button id="copyLinkBtn" class="btn-action" title="${escapeHtml(i18n.copyLink)}">
+                ${escapeHtml(i18n.copyLink)}
               </button>
             </div>
           </div>
@@ -496,20 +603,20 @@ function generateHtml(summaries: PageSummaryItem[], initial: PageSummaryItem | n
 /**
  * Generates 404 page redirecting to index.
  */
-function generate404Html(): string {
+function generate404Html(i18n: PagesI18n = I18N_EN): string {
   return `<!DOCTYPE html>
-<html lang="ja">
+<html lang="${i18n.langCode}">
 <head>
   <meta charset="UTF-8">
-  <title>ページが見つかりません — Digital Trend Flow</title>
+  <title>${escapeHtml(i18n.notFoundTitle)}</title>
   <meta http-equiv="refresh" content="2;url=./">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body data-theme="dark" style="display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center;">
   <div>
     <h1>404 Not Found</h1>
-    <p>トップページへ自動遷移します...</p>
-    <a href="./" class="btn-action">トップページへ戻る</a>
+    <p>${escapeHtml(i18n.notFoundDesc)}</p>
+    <a href="./" class="btn-action">${escapeHtml(i18n.notFoundBack)}</a>
   </div>
 </body>
 </html>`;
@@ -1220,8 +1327,22 @@ body {
 /**
  * Generates client-side interactivity JavaScript.
  */
-function generateJs(): string {
+function generateJs(i18n: PagesI18n = I18N_EN): string {
+  const i18nConfig = JSON.stringify({
+    langCode: i18n.langCode,
+    isJa: i18n.langCode === "ja",
+    articlesPrefix: i18n.langCode === "ja" ? "📊 収集記事: " : "📊 Articles: ",
+    articlesSuffix: i18n.langCode === "ja" ? "件" : "",
+    qualityPrefix: i18n.langCode === "ja" ? "🏆 品質: " : "🏆 Quality: ",
+    cardArticlesSuffix: i18n.langCode === "ja" ? " 記事" : " articles",
+    copySuccess: i18n.copiedLink,
+    copyOriginal: i18n.copyLink,
+    summaryTooltip: i18n.summaryAvailableTooltip,
+    noResults: i18n.noSearchResults,
+  });
+
   return `(function () {
+  const I18N = ${i18nConfig};
   let allSummaries = [];
   let currentSummary = null;
   let currentCalendarYear = new Date().getFullYear();
@@ -1259,8 +1380,8 @@ function generateJs(): string {
         if (!currentSummary) return;
         const url = window.location.origin + window.location.pathname + '#' + currentSummary.date;
         navigator.clipboard.writeText(url).then(() => {
-          copyBtn.textContent = '✅ コピー完了';
-          setTimeout(() => { copyBtn.textContent = '🔗 リンクをコピー'; }, 2000);
+          copyBtn.textContent = '✅ ' + I18N.copySuccess;
+          setTimeout(() => { copyBtn.textContent = I18N.copyOriginal; }, 2000);
         });
       });
     }
@@ -1307,11 +1428,11 @@ function generateJs(): string {
     if (displayTopStory) displayTopStory.textContent = item.topStory;
 
     const displayCount = document.getElementById('displayArticleCount');
-    if (displayCount) displayCount.textContent = '📊 収集記事: ' + item.articleCount + '件';
+    if (displayCount) displayCount.textContent = I18N.articlesPrefix + item.articleCount + I18N.articlesSuffix;
 
     const displayQuality = document.getElementById('displayQuality');
     if (displayQuality) {
-      displayQuality.textContent = '🏆 品質: ' + (item.qualityScore !== null ? item.qualityScore.toFixed(0) + ' pt' : '-');
+      displayQuality.textContent = I18N.qualityPrefix + (item.qualityScore !== null ? item.qualityScore.toFixed(0) + ' pt' : '-');
     }
 
     const catContainer = document.getElementById('displayCategories');
@@ -1343,7 +1464,12 @@ function generateJs(): string {
   function renderCalendar() {
     const calTitle = document.getElementById('calTitle');
     if (calTitle) {
-      calTitle.textContent = currentCalendarYear + '年 ' + String(currentCalendarMonth + 1).padStart(2, '0') + '月';
+      if (I18N.isJa) {
+        calTitle.textContent = currentCalendarYear + '年 ' + String(currentCalendarMonth + 1).padStart(2, '0') + '月';
+      } else {
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        calTitle.textContent = (monthNames[currentCalendarMonth] || '') + ' ' + currentCalendarYear;
+      }
     }
 
     const grid = document.getElementById('calendarGrid');
@@ -1372,7 +1498,7 @@ function generateJs(): string {
       const hasSummary = allSummaries.some(s => s.date === dayStr);
       if (hasSummary) {
         cell.classList.add('has-data');
-        cell.title = 'サマリーあり: ' + dayStr;
+        cell.title = I18N.summaryTooltip + dayStr;
         cell.addEventListener('click', () => selectDate(dayStr));
       }
 
@@ -1405,7 +1531,7 @@ function generateJs(): string {
     listContainer.innerHTML = '';
 
     if (filtered.length === 0) {
-      listContainer.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted); padding:1rem; text-align:center;">該当するサマリーはありません</p>';
+      listContainer.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted); padding:1rem; text-align:center;">' + I18N.noResults + '</p>';
       return;
     }
 
@@ -1415,7 +1541,7 @@ function generateJs(): string {
       card.innerHTML = \`
         <div class="card-header-bar">
           <span class="card-date">\${item.date}</span>
-          <span class="card-count">\${item.articleCount} 記事</span>
+          <span class="card-count">\${item.articleCount}\${I18N.cardArticlesSuffix}</span>
         </div>
         <div class="card-title">\${escapeHtml(item.topStory || item.title)}</div>
       \`;

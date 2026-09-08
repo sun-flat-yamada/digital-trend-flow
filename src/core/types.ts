@@ -176,6 +176,8 @@ export const ConfigSchema = z.object({
       enabled: z.boolean().default(false),
       similarity_threshold: z.number().default(0.92),
     }).default({ enabled: false, similarity_threshold: 0.92 }),
+    // Output language (default: "en")
+    language: z.string().default("en"),
   }),
   purposes: z.record(z.string(), PurposeSchema),
   exclude: ExcludeSchema,
@@ -215,6 +217,9 @@ export const EnvSchema = z.object({
     (val) => (val === "" || val === undefined ? 13000 : Number(val)),
     z.number().int().nonnegative().default(13000)
   ),
+  // Output language specification (default: "en")
+  OUTPUT_LANGUAGE: z.string().default("en"),
+  SUMMARY_LANGUAGE: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
