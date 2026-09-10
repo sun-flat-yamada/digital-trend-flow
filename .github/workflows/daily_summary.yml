@@ -64,6 +64,9 @@ jobs:
           API_INTERVAL_MS: ${{ vars.API_INTERVAL_MS }}
           OUTPUT_LANGUAGE: ${{ vars.OUTPUT_LANGUAGE || 'en' }}
           SUMMARY_LANGUAGE: ${{ vars.SUMMARY_LANGUAGE || '' }}
+          AI_MODEL_MAP: ${{ vars.AI_MODEL_MAP || '' }}
+          AI_MODEL_REDUCE: ${{ vars.AI_MODEL_REDUCE || '' }}
+          AI_MODEL_PLATFORM: ${{ vars.AI_MODEL_PLATFORM || '' }}
         run: npm run build && npm start
 
       - name: Ensure Pages static site is generated

@@ -9,11 +9,17 @@ settings:
   # daily_threshold_score: 記事を収集対象として残すためのシステム全体の最低基準スコア。
   daily_threshold_score: 0
 
-  # AIモデルの指定 (固定のモデル名、または latest-flash / latest-pro で自動最新化)
+  # AIモデルの指定 (固定のモデル名、または latest-flash-lite / latest-flash / latest-pro で自動最新化)
+  # ※ 2026年9月現在の最高コスパ推奨設定:
+  #   - map: latest-flash-lite (gemini-3.1-flash-lite: $0.25/$1.50 per 1M tokens, Free Tier 1,000〜1,500 RPD)
+  #   - reduce: latest-flash (gemini-3.8-flash または gemini-2.5-flash / gemini-3.1-flash-lite)
+  #   ※ Google AI Studio Free Tier では Pro モデルの無料枠が廃止 (limit: 0) されたため、
+  #     Free Tier 運用時は reduce にも Flash / Flash-Lite 系モデルを指定してください。
+  #   ※ GitHub Actions Variables (AI_MODEL_MAP, AI_MODEL_REDUCE) による動的オーバーライドも可能です。
   models:
     platform: google
-    map: latest-flash
-    reduce: latest-pro
+    map: latest-flash-lite
+    reduce: latest-flash
     thinking: false  # Item 1.4: Thinking model (set true for Gemini 2.5+ Thinking)
 
   # Item 1.2: フォールバック LLM プロバイダー (API キーが設定されている場合のみ有効)

@@ -303,6 +303,14 @@ function getProviderConfigs(phase: "map" | "reduce"): ProviderConfig[] {
     { platform: primary.platform, model: primary[phase] },
   ];
 
+  // If reduce phase uses a distinct model on Google (e.g. Pro),
+  // add an in-provider fallback to the Map model (Flash / Flash-Lite).
+  // This ensures Free Tier users whose Pro model hits "limit: 0" will gracefully
+  // fall back to a working Flash model without failing the pipeline.
+  if (phase === "reduce" && primary.platform === "google" && primary.reduce !== primary.map) {
+    providers.push({ platform: "google", model: primary.map });
+  }
+
   // Add fallback providers if configured
   const fallback = config.settings.fallback_models;
   if (fallback) {
@@ -340,6 +348,13 @@ export async function callProviderWithRetry(
         const status = error?.status ?? error?.response?.status;
         // Client errors (400 Bad Request, 401 Unauthorized, 403 Forbidden) should NOT retry
         if (status === 400 || status === 401 || status === 403) {
+          throw new AbortError(error);
+        }
+        // If quota limit is 0 (e.g. Pro model on Free Tier), retrying will never succeed.
+        // Abort immediately so fallback provider/model can take over without wasting minutes.
+        const msg = String(error?.message || "");
+        if (isRateLimitError(error) && (msg.includes("limit: 0") || msg.includes('"limit":0'))) {
+          console.warn(`  ⚠️ Quota limit is 0 for ${provider.platform}/${provider.model}. Aborting retries immediately to allow fallback.`);
           throw new AbortError(error);
         }
         if (!isTransientError(error)) {

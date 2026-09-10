@@ -123,4 +123,12 @@ describe("LLM Gateway - Circuit Breaker Separation", () => {
     expect(getCircuit(provider).failures).toBe(0);
     expect(getCircuit(provider).isOpen).toBe(false);
   });
+
+  test("quota error with limit: 0 is recognized as rate limit and aborts retries", async () => {
+    const errorWithLimit0 = new Error(
+      "[429 Too Many Requests] Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-3.1-pro"
+    );
+    expect(isRateLimitError(errorWithLimit0)).toBe(true);
+    expect(isTransientError(errorWithLimit0)).toBe(true);
+  });
 });

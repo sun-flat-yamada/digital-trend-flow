@@ -3,6 +3,12 @@ import { env } from "../core/config";
 // Cache the resolved models to avoid repeated API calls
 const resolvedCache: Record<string, string> = {};
 
+export function clearResolvedCache(): void {
+  for (const key of Object.keys(resolvedCache)) {
+    delete resolvedCache[key];
+  }
+}
+
 export async function resolveModel(configuredModel: string, platform: string = "google"): Promise<string> {
   // If platform is not google, we don't have auto-resolution logic yet.
   // We return the configured model as-is for other platforms (e.g., openai).
@@ -10,19 +16,36 @@ export async function resolveModel(configuredModel: string, platform: string = "
     return configuredModel;
   }
 
-  // If it's already a specific model like "gemini-2.0-flash", return as is.
-  if (!configuredModel.startsWith("latest-")) {
+  const modelLower = configuredModel.toLowerCase().trim();
+  const isAuto =
+    modelLower.startsWith("latest-") ||
+    modelLower === "cheapest" ||
+    modelLower === "cost-effective" ||
+    modelLower === "flash-lite";
+
+  // If it's already a specific model like "gemini-2.5-flash", return as is.
+  if (!isAuto) {
     return configuredModel;
   }
 
-  const cacheKey = `${platform}:${configuredModel}`;
+  const cacheKey = `${platform}:${modelLower}`;
   // Check cache
   if (resolvedCache[cacheKey]) {
-    return resolvedCache[cacheKey];
+    return resolvedCache[cacheKey]!;
   }
 
-  const isFlash = configuredModel.includes("flash");
-  const fallbackModel = isFlash ? "gemini-2.0-flash" : "gemini-2.0-pro";
+  const isFlashLite =
+    modelLower.includes("lite") ||
+    modelLower === "cheapest" ||
+    modelLower === "cost-effective";
+  const isPro = !isFlashLite && modelLower.includes("pro");
+
+  // Fallback models as of 2026-09
+  const fallbackModel = isFlashLite
+    ? "gemini-3.1-flash-lite"
+    : isPro
+    ? "gemini-2.5-pro"
+    : "gemini-3.8-flash";
 
   try {
     const url = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -37,34 +60,41 @@ export async function resolveModel(configuredModel: string, platform: string = "
       throw new Error("No models array in response");
     }
 
-    // Filter models based on flash / pro
-    const targetType = isFlash ? "flash" : "pro";
-    
-    // Example model name: "models/gemini-2.0-flash", "models/gemini-1.5-pro"
-    // We want the one with the highest version number.
-    // Avoid "-exp" or "-thinking" or "-8b" variants if possible by checking for exact ending,
-    // though new models might have different suffixes. We prioritize the base flash/pro.
-    let highestVersion = -1;
+    // Filter models based on target category: flash-lite / flash / pro
+    const geminiModels = data.models
+      .filter((m: any) => m.name && m.name.startsWith("models/gemini-"))
+      .filter((m: any) => {
+        const name = m.name.toLowerCase();
+        if (isFlashLite) {
+          return name.includes("lite");
+        } else if (isPro) {
+          return name.includes("pro");
+        } else {
+          // Base flash: contains flash but NOT lite
+          return name.includes("flash") && !name.includes("lite");
+        }
+      })
+      // Favor stable models: exclude -exp (experimental)
+      .filter((m: any) => !m.name.toLowerCase().includes("exp"));
+
+    let highestScore = -1;
     let latestModelId = "";
 
-    const geminiModels = data.models
-      .filter((m: any) => m.name.startsWith("models/gemini-"))
-      .filter((m: any) => m.name.includes(targetType))
-      // Favor stable models over experimental ones by filtering out "-exp" for the automatic selection
-      .filter((m: any) => !m.name.includes("exp"));
-
     for (const m of geminiModels) {
-      // Extract version: "models/gemini-2.0-flash" -> 2.0
-      const match = m.name.match(/gemini-(\d+\.\d+)/);
-      if (match) {
+      // Extract version: "models/gemini-3.1-flash-lite" -> 3.1, "models/gemini-3-flash" -> 3
+      const match = m.name.match(/gemini-(\d+(?:\.\d+)?)/i);
+      if (match && match[1]) {
         const version = parseFloat(match[1]);
-        if (version > highestVersion) {
-          highestVersion = version;
-          latestModelId = m.name.replace("models/", ""); 
-        } else if (version === highestVersion) {
-          // If tie (e.g., gemini-2.0-flash and gemini-2.0-flash-lite), pick the shorter one to get the base model
-          if (latestModelId && m.name.length < latestModelId.length + 7) { 
-             latestModelId = m.name.replace("models/", "");
+        const isPreview = m.name.toLowerCase().includes("preview");
+        // Prefer stable over preview: stable versions get +0.01 boost
+        const score = version + (isPreview ? 0 : 0.01);
+        if (score > highestScore) {
+          highestScore = score;
+          latestModelId = m.name.replace("models/", "");
+        } else if (score === highestScore && latestModelId) {
+          // Tie-breaker: prefer shorter / standard name
+          if (m.name.length < latestModelId.length + 7) {
+            latestModelId = m.name.replace("models/", "");
           }
         }
       }
@@ -77,10 +107,11 @@ export async function resolveModel(configuredModel: string, platform: string = "
     }
 
     console.warn(`⚠️ Could not auto-resolve ${configuredModel}, falling back to ${fallbackModel}`);
+    resolvedCache[cacheKey] = fallbackModel;
     return fallbackModel;
-    
   } catch (error: any) {
     console.error(`⚠️ Error fetching latest models for ${configuredModel}: ${error.message}`);
+    resolvedCache[cacheKey] = fallbackModel;
     return fallbackModel;
   }
 }

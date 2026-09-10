@@ -682,25 +682,31 @@ function twoPassSelect(articles: ScoredArticle[]): ScoredArticle[] {
   return selected;
 }
 
+async function cleanup(): Promise<void> {
+  try {
+    flushState();
+  } catch (e: any) {
+    console.error("⚠️ Failed to flush state:", e.message);
+  }
+  try {
+    await flushLangfuse();
+  } catch {
+    // Non-fatal
+  }
+  try {
+    closeDb();
+  } catch {
+    // Non-fatal
+  }
+}
+
 main()
-  .finally(async () => {
-    try {
-      flushState();
-    } catch (e: any) {
-      console.error("⚠️ Failed to flush state:", e.message);
-    }
-    try {
-      await flushLangfuse();
-    } catch {
-      // Non-fatal
-    }
-    try {
-      closeDb();
-    } catch {
-      // Non-fatal
-    }
+  .then(async () => {
+    await cleanup();
+    process.exit(0);
   })
-  .catch((err) => {
+  .catch(async (err) => {
+    await cleanup();
     console.error("💀 Fatal pipeline error:", err);
     metrics.recordError(`Fatal: ${err.message ?? err}`);
     registry.events.emit("pipeline:error", { error: String(err) }).catch(() => {});

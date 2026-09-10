@@ -220,6 +220,12 @@ export const EnvSchema = z.object({
   // Output language specification (default: "en")
   OUTPUT_LANGUAGE: z.string().default("en"),
   SUMMARY_LANGUAGE: z.string().optional(),
+  // AI Model overrides (Item: Cost-effective model configuration)
+  AI_MODEL_MAP: z.string().optional(),
+  AI_MODEL_REDUCE: z.string().optional(),
+  AI_MODEL_PLATFORM: z.string().optional(),
+  GEMINI_MAP_MODEL: z.string().optional(),
+  GEMINI_REDUCE_MODEL: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;

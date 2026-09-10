@@ -47,10 +47,35 @@ function loadAndValidateConfig(configPath: string): AppConfig {
   }
 }
 
+/**
+ * Applies environment variable overrides to configuration.
+ */
+function applyEnvOverrides(cfg: AppConfig, envCfg: EnvConfig): AppConfig {
+  const mapOverride = envCfg.AI_MODEL_MAP || envCfg.GEMINI_MAP_MODEL;
+  const reduceOverride = envCfg.AI_MODEL_REDUCE || envCfg.GEMINI_REDUCE_MODEL;
+  const platformOverride = envCfg.AI_MODEL_PLATFORM;
+
+  if (mapOverride || reduceOverride || platformOverride) {
+    return {
+      ...cfg,
+      settings: {
+        ...cfg.settings,
+        models: {
+          ...cfg.settings.models,
+          ...(platformOverride ? { platform: platformOverride } : {}),
+          ...(mapOverride ? { map: mapOverride } : {}),
+          ...(reduceOverride ? { reduce: reduceOverride } : {}),
+        },
+      },
+    };
+  }
+  return cfg;
+}
+
 // Singleton instances loaded synchronously at startup.
 // It is explicitly intentional to load this once at application boot to 'fail fast'.
 export const env = loadAndValidateEnv();
-export const config = loadAndValidateConfig(PATHS.CONFIG);
+export const config = applyEnvOverrides(loadAndValidateConfig(PATHS.CONFIG), env);
 
 export default {
   env,
