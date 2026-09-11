@@ -57,6 +57,27 @@ describe("pages_generator", () => {
       expect(html).toContain("<strong>bold</strong>");
       expect(html).toContain("<code>code</code>");
     });
+
+    it("should correctly render foldable details and summary blocks for execution metrics", () => {
+      const md = `
+<details class="pipeline-metrics">
+<summary>📊 記事生成メトリクス（所要時間・消費Token・コスト）</summary>
+
+- **所要時間**: 42.5秒
+- **消費Token**: 入力 12,500 / 出力 1,500 (合計: 14,000)
+- **コスト**: $0.0035 (約 ¥0.54)
+</details>
+`;
+      const html = markdownToHtml(md);
+      expect(html).toContain('<details class="pipeline-metrics">');
+      expect(html).toContain("<summary>📊 記事生成メトリクス（所要時間・消費Token・コスト）</summary>");
+      expect(html).toContain('<ul class="summary-list">');
+      expect(html).toContain("<li><strong>所要時間</strong>: 42.5秒</li>");
+      expect(html).toContain("<li><strong>消費Token</strong>: 入力 12,500 / 出力 1,500 (合計: 14,000)</li>");
+      expect(html).toContain("<li><strong>コスト</strong>: $0.0035 (約 ¥0.54)</li>");
+      expect(html).toContain("</ul>");
+      expect(html).toContain("</details>");
+    });
   });
 
   describe("parseDailySummary", () => {
@@ -196,6 +217,9 @@ categories:
       expect(indexHtml).toContain("Calendar");
       expect(indexHtml).toContain("Archive List");
       expect(indexHtml).toContain("TODAY&#039;S HEADLINE");
+      expect(indexHtml).toContain("Has Summary");
+      expect(indexHtml).toContain("Today");
+      expect(indexHtml).toContain("Selected");
 
       // Verify JSON content
       const data = JSON.parse(jsonStr);
@@ -203,6 +227,9 @@ categories:
 
       // Verify CSS and JS exist
       expect(stylesCss.length).toBeGreaterThan(100);
+      expect(stylesCss).toContain(".cal-cell.is-today");
+      expect(stylesCss).toContain(".cal-cell.selected");
+      expect(stylesCss).toContain("details.pipeline-metrics");
       expect(appJs.length).toBeGreaterThan(100);
       expect(notFoundHtml).toContain("404");
     });
@@ -217,6 +244,9 @@ categories:
       expect(indexHtml).toContain('<html lang="ja">');
       expect(indexHtml).toContain("カレンダー");
       expect(indexHtml).toContain("リスト一覧");
+      expect(indexHtml).toContain("サマリーあり");
+      expect(indexHtml).toContain("本日");
+      expect(indexHtml).toContain("選択中");
     });
 
     it("should handle empty directories gracefully", () => {

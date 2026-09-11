@@ -50,6 +50,7 @@ describe("multilingual prompts & i18n", () => {
       expect(i18n.tabCalendar).toBe("📅 Calendar");
       expect(i18n.tabList).toBe("📋 Archive List");
       expect(i18n.headlineBadge).toBe("🌟 TODAY'S HEADLINE");
+      expect(i18n.calLegendToday).toBe("Today");
     });
 
     it("should return Japanese i18n for ja", () => {
@@ -57,6 +58,7 @@ describe("multilingual prompts & i18n", () => {
       expect(i18n.langCode).toBe("ja");
       expect(i18n.tabCalendar).toBe("📅 カレンダー");
       expect(i18n.tabList).toBe("📋 リスト一覧");
+      expect(i18n.calLegendToday).toBe("本日");
     });
 
     it("should return Japanese i18n for Japanese", () => {

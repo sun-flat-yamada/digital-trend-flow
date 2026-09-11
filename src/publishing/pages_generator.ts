@@ -37,6 +37,7 @@ export interface PagesI18n {
   tabList: string;
   calWeekdays: string[];
   calLegendHasData: string;
+  calLegendToday: string;
   calLegendSelected: string;
   searchPlaceholder: string;
   searchAriaLabel: string;
@@ -65,6 +66,7 @@ export const I18N_EN: PagesI18n = {
   tabList: "📋 Archive List",
   calWeekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
   calLegendHasData: "Has Summary",
+  calLegendToday: "Today",
   calLegendSelected: "Selected",
   searchPlaceholder: "Search by title, tag, or category...",
   searchAriaLabel: "Search archive",
@@ -96,6 +98,7 @@ export const I18N_JA: PagesI18n = {
   tabList: "📋 リスト一覧",
   calWeekdays: ["日", "月", "火", "水", "木", "金", "土"],
   calLegendHasData: "サマリーあり",
+  calLegendToday: "本日",
   calLegendSelected: "選択中",
   searchPlaceholder: "タイトルやタグで検索...",
   searchAriaLabel: "バックナンバー検索",
@@ -224,6 +227,36 @@ export function markdownToHtml(md: string): string {
       const formatted = formatInline(line);
       htmlParts.push(`<div class="article-source">${formatted}</div>`);
       continue;
+    }
+
+    // Foldable details block (e.g. <details class="pipeline-metrics">, <summary>...</summary>, </details>)
+    if (line.startsWith("<details") || line.startsWith("</details>") || line.startsWith("<summary")) {
+      if (inList) {
+        htmlParts.push("</ul>");
+        inList = false;
+      }
+      if (inBlockquote) {
+        htmlParts.push("</blockquote>");
+        inBlockquote = false;
+      }
+
+      if (line.startsWith("<details")) {
+        htmlParts.push(line);
+        continue;
+      }
+      if (line.startsWith("</details>")) {
+        htmlParts.push("</details>");
+        continue;
+      }
+      if (line.startsWith("<summary")) {
+        const summaryMatch = line.match(/^<summary(?:\s+[^>]*)?>([\s\S]*?)<\/summary>$/);
+        if (summaryMatch && summaryMatch[1]) {
+          htmlParts.push(`<summary>${formatInline(summaryMatch[1])}</summary>`);
+        } else {
+          htmlParts.push(line);
+        }
+        continue;
+      }
     }
 
     // Regular paragraph
@@ -530,7 +563,8 @@ function generateHtml(
           </div>
           <div class="calendar-legend">
             <span class="legend-item"><span class="legend-dot has-data"></span>${escapeHtml(i18n.calLegendHasData)}</span>
-            <span class="legend-item"><span class="legend-dot selected"></span>${escapeHtml(i18n.calLegendSelected)}</span>
+            <span class="legend-item"><span class="legend-box is-today"></span>${escapeHtml(i18n.calLegendToday)}</span>
+            <span class="legend-item"><span class="legend-box selected"></span>${escapeHtml(i18n.calLegendSelected)}</span>
           </div>
         </div>
 
@@ -921,6 +955,7 @@ body {
   cursor: default;
   position: relative;
   transition: all 0.2s ease;
+  border: 2px solid transparent;
 }
 
 .cal-cell.empty {
@@ -932,52 +967,78 @@ body {
   font-weight: 600;
   cursor: pointer;
   background: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.2);
 }
 
 .cal-cell.has-data:hover {
-  background: var(--accent-primary);
-  color: #0f172a;
+  background: rgba(56, 189, 248, 0.22);
+  border-color: var(--accent-primary);
+}
+
+.cal-cell.is-today {
+  border: 2px solid var(--accent-amber) !important;
 }
 
 .cal-cell.selected {
   background: var(--accent-primary) !important;
   color: #0f172a !important;
   font-weight: 700;
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
 }
 
-.cal-cell.is-today {
-  border-bottom: 2px solid var(--accent-amber);
+.cal-cell.is-today.selected {
+  background: var(--accent-primary) !important;
+  color: #0f172a !important;
+  border: 2px solid var(--accent-amber) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6), 0 0 4px rgba(56, 189, 248, 0.4);
 }
 
 .calendar-legend {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   font-size: 0.75rem;
   color: var(--text-muted);
   justify-content: center;
-  margin-top: 0.5rem;
+  align-items: center;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
 }
 
 .legend-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  display: inline-block;
 }
 
 .legend-dot.has-data {
   background: var(--accent-primary);
 }
 
-.legend-dot.selected {
-  background: var(--accent-amber);
+.legend-box {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.legend-box.is-today {
+  border: 2px solid var(--accent-amber);
+  background: transparent;
+}
+
+.legend-box.selected {
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  box-shadow: 0 0 4px rgba(56, 189, 248, 0.5);
 }
 
 /* Back Number List */
@@ -1301,6 +1362,66 @@ body {
   font-size: 0.85em;
 }
 
+/* Execution Metrics Accordion */
+details.pipeline-metrics {
+  margin: 2rem 0 1rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--bg-highlight);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+details.pipeline-metrics[open] {
+  background: var(--bg-surface);
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+details.pipeline-metrics summary {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  user-select: none;
+}
+
+details.pipeline-metrics summary::-webkit-details-marker {
+  display: none;
+}
+
+details.pipeline-metrics summary::before {
+  content: "▶";
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+
+details.pipeline-metrics[open] summary::before {
+  transform: rotate(90deg);
+  color: var(--accent-primary);
+}
+
+details.pipeline-metrics summary:hover {
+  color: var(--text-primary);
+}
+
+details.pipeline-metrics .summary-list {
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  padding-left: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+details.pipeline-metrics .summary-list li {
+  margin-bottom: 0.35rem;
+}
+
 /* Footer */
 .app-footer {
   margin-top: auto;
@@ -1478,7 +1599,10 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
 
     const firstDay = new Date(currentCalendarYear, currentCalendarMonth, 1).getDay();
     const totalDays = new Date(currentCalendarYear, currentCalendarMonth + 1, 0).getDate();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
 
     for (let i = 0; i < firstDay; i++) {
       const cell = document.createElement('div');
@@ -1504,10 +1628,12 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
 
       if (currentSummary && currentSummary.date === dayStr) {
         cell.classList.add('selected');
+        cell.setAttribute('aria-selected', 'true');
       }
 
       if (dayStr === todayStr) {
         cell.classList.add('is-today');
+        cell.setAttribute('aria-current', 'date');
       }
 
       grid.appendChild(cell);

@@ -499,6 +499,7 @@ async function main() {
     mentionedTechnologies: extractMentionedTechnologies(summaryMarkdown),
     estimatedCostUsd: finalMetrics.total_cost_usd,
     executionTimeSec: (finalMetrics.duration_ms ?? 0) / 1000,
+    totalTokens: finalMetrics.total_tokens,
     qualityScore: qualityResult.overallScore,
     language: targetLanguage,
   };
