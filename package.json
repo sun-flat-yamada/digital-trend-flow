@@ -39,7 +39,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.5.1",
-    "@types/uuid": "^10.0.0",
+    "@types/uuid": "^11.0.0",
     "eslint": "^10.10.0",
     "eslint-plugin-jsonc": "^3.4.2",
     "eslint-plugin-yml": "^3.8.1",
