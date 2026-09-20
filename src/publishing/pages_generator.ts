@@ -13,8 +13,13 @@ import * as path from "path";
 import * as yaml from "yaml";
 import { PATHS } from "../core/paths";
 
+export type ReportType = "daily" | "weekly" | "monthly" | "yearly";
+
 export interface PageSummaryItem {
+  id?: string;
   date: string; // "YYYY-MM-DD"
+  period?: string; // "2026-W38", "2026-09", "2026", "2026-09-20"
+  reportType?: ReportType;
   title: string;
   topStory: string;
   categories: string[];
@@ -35,6 +40,15 @@ export interface PagesI18n {
   themeToggleTitle: string;
   tabCalendar: string;
   tabList: string;
+  tabReports: string;
+  filterAll: string;
+  filterWeekly: string;
+  filterMonthly: string;
+  filterYearly: string;
+  reportBadgeDaily: string;
+  reportBadgeWeekly: string;
+  reportBadgeMonthly: string;
+  reportBadgeYearly: string;
   calWeekdays: string[];
   calLegendHasData: string;
   calLegendToday: string;
@@ -49,21 +63,33 @@ export interface PagesI18n {
   noDataHeadline: string;
   noDataContent: string;
   noSearchResults: string;
+  noReportsFound: string;
   cardArticles: (count: number) => string;
   summaryAvailableTooltip: string;
   monthTitle: (year: number, month: number) => string;
   notFoundTitle: string;
   notFoundDesc: string;
   notFoundBack: string;
+  periodLabel: string;
 }
 
 export const I18N_EN: PagesI18n = {
   langCode: "en",
-  pageTitle: "Digital Trend Flow — Daily Technology Trend Hub",
-  pageDescription: "AI-powered automated daily digital & tech trend intelligence platform. Browse top headlines and back numbers.",
+  pageTitle: "Digital Trend Flow — Technology Trend Hub",
+  pageDescription:
+    "AI-powered automated daily digital & tech trend intelligence platform. Browse headlines, weekly reports, and archives.",
   themeToggleTitle: "Toggle dark/light mode",
   tabCalendar: "📅 Calendar",
   tabList: "📋 Archive List",
+  tabReports: "📊 Reports",
+  filterAll: "All",
+  filterWeekly: "Weekly",
+  filterMonthly: "Monthly",
+  filterYearly: "Yearly",
+  reportBadgeDaily: "🌟 TODAY'S HEADLINE",
+  reportBadgeWeekly: "📊 WEEKLY REPORT",
+  reportBadgeMonthly: "🗓️ MONTHLY DIGEST",
+  reportBadgeYearly: "🏆 YEARLY REPORT",
   calWeekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
   calLegendHasData: "Has Summary",
   calLegendToday: "Today",
@@ -76,26 +102,52 @@ export const I18N_EN: PagesI18n = {
   copyLink: "🔗 Copy Link",
   copiedLink: "Link copied!",
   noDataHeadline: "No headline available for today.",
-  noDataContent: '<p class="no-data">No data available. Run the pipeline to generate summaries.</p>',
+  noDataContent:
+    '<p class="no-data">No data available. Run the pipeline to generate summaries.</p>',
   noSearchResults: "No matching summaries found",
+  noReportsFound: "No periodic reports found",
   cardArticles: (count) => `${count} articles`,
   summaryAvailableTooltip: "Summary available: ",
   monthTitle: (year, month) => {
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
     return `${monthNames[month]} ${year}`;
   },
   notFoundTitle: "Page Not Found — Digital Trend Flow",
   notFoundDesc: "Redirecting to home page...",
   notFoundBack: "Back to Home",
+  periodLabel: "Period",
 };
 
 export const I18N_JA: PagesI18n = {
   langCode: "ja",
-  pageTitle: "Digital Trend Flow — Daily Technology Trend Hub",
-  pageDescription: "AIを活用した毎日のデジタル・テック動向自動集約プラットフォーム。トップヘッドラインおよびバックナンバー（カレンダー・リスト）を閲覧できます。",
+  pageTitle: "Digital Trend Flow — Technology Trend Hub",
+  pageDescription:
+    "デジタル・テック動向の自動集約Hub。ヘッドライン、週次・月次レポート、バックナンバーを閲覧できます。",
   themeToggleTitle: "ダーク/ライト切替",
   tabCalendar: "📅 カレンダー",
   tabList: "📋 リスト一覧",
+  tabReports: "📊 定期レポート",
+  filterAll: "すべて",
+  filterWeekly: "週次",
+  filterMonthly: "月次",
+  filterYearly: "年次",
+  reportBadgeDaily: "🌟 当日ヘッドライン",
+  reportBadgeWeekly: "📊 週間トレンド分析",
+  reportBadgeMonthly: "🗓️ 月次ダイジェスト",
+  reportBadgeYearly: "🏆 年間トレンドレポート",
   calWeekdays: ["日", "月", "火", "水", "木", "金", "土"],
   calLegendHasData: "サマリーあり",
   calLegendToday: "本日",
@@ -108,14 +160,18 @@ export const I18N_JA: PagesI18n = {
   copyLink: "🔗 リンクをコピー",
   copiedLink: "リンクをコピーしました",
   noDataHeadline: "本日のヘッドライン情報はまだありません。",
-  noDataContent: '<p class="no-data">データがありません。パイプラインを実行してサマリーを生成してください。</p>',
+  noDataContent:
+    '<p class="no-data">データがありません。パイプラインを実行してサマリーを生成してください。</p>',
   noSearchResults: "該当するサマリーはありません",
+  noReportsFound: "該当する定期レポートはありません",
   cardArticles: (count) => `${count} 記事`,
   summaryAvailableTooltip: "サマリーあり: ",
-  monthTitle: (year, month) => `${year}年 ${String(month + 1).padStart(2, "0")}月`,
+  monthTitle: (year, month) =>
+    `${year}年 ${String(month + 1).padStart(2, "0")}月`,
   notFoundTitle: "ページが見つかりません — Digital Trend Flow",
   notFoundDesc: "トップページへ自動遷移します...",
   notFoundBack: "トップページへ戻る",
+  periodLabel: "対象期間",
 };
 
 export function getI18n(lang: string = "en"): PagesI18n {
@@ -155,7 +211,12 @@ export function markdownToHtml(md: string): string {
     }
 
     // End list if not list item
-    if (inList && !line.startsWith("- ") && !line.startsWith("* ") && line !== "") {
+    if (
+      inList &&
+      !line.startsWith("- ") &&
+      !line.startsWith("* ") &&
+      line !== ""
+    ) {
       htmlParts.push("</ul>");
       inList = false;
     }
@@ -174,7 +235,7 @@ export function markdownToHtml(md: string): string {
         htmlParts.push("</blockquote>");
         inBlockquote = false;
       }
-      htmlParts.push("<hr class=\"summary-divider\" />");
+      htmlParts.push('<hr class="summary-divider" />');
       continue;
     }
 
@@ -204,7 +265,7 @@ export function markdownToHtml(md: string): string {
     if (line.startsWith(">")) {
       const content = formatInline(line.replace(/^>\s?/, ""));
       if (!inBlockquote) {
-        htmlParts.push("<blockquote class=\"summary-quote\">");
+        htmlParts.push('<blockquote class="summary-quote">');
         inBlockquote = true;
       }
       htmlParts.push(`<p>${content}</p>`);
@@ -215,7 +276,7 @@ export function markdownToHtml(md: string): string {
     if (line.startsWith("- ") || line.startsWith("* ")) {
       const itemContent = formatInline(line.slice(2));
       if (!inList) {
-        htmlParts.push("<ul class=\"summary-list\">");
+        htmlParts.push('<ul class="summary-list">');
         inList = true;
       }
       htmlParts.push(`<li>${itemContent}</li>`);
@@ -230,7 +291,11 @@ export function markdownToHtml(md: string): string {
     }
 
     // Foldable details block (e.g. <details class="pipeline-metrics">, <summary>...</summary>, </details>)
-    if (line.startsWith("<details") || line.startsWith("</details>") || line.startsWith("<summary")) {
+    if (
+      line.startsWith("<details") ||
+      line.startsWith("</details>") ||
+      line.startsWith("<summary")
+    ) {
       if (inList) {
         htmlParts.push("</ul>");
         inList = false;
@@ -249,7 +314,9 @@ export function markdownToHtml(md: string): string {
         continue;
       }
       if (line.startsWith("<summary")) {
-        const summaryMatch = line.match(/^<summary(?:\s+[^>]*)?>([\s\S]*?)<\/summary>$/);
+        const summaryMatch = line.match(
+          /^<summary(?:\s+[^>]*)?>([\s\S]*?)<\/summary>$/,
+        );
         if (summaryMatch && summaryMatch[1]) {
           htmlParts.push(`<summary>${formatInline(summaryMatch[1])}</summary>`);
         } else {
@@ -276,10 +343,16 @@ function formatInline(text: string): string {
   let res = escapeHtml(text);
 
   // Markdown links [text](url)
-  res = res.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$1</a>');
+  res = res.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$1</a>',
+  );
 
   // Plain URLs not wrapped in <a>
-  res = res.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$2</a>');
+  res = res.replace(
+    /(^|[\s(])(https?:\/\/[^\s<)]+)/g,
+    '$1<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$2</a>',
+  );
 
   // Bold **text**
   res = res.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -296,6 +369,9 @@ function formatInline(text: string): string {
 /**
  * Parses a single daily summary markdown file.
  */
+/**
+ * Parses a single summary or periodic report markdown file.
+ */
 export function parseDailySummary(filePath: string): PageSummaryItem | null {
   try {
     if (!fs.existsSync(filePath)) return null;
@@ -311,7 +387,24 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
         try {
           frontmatter = yaml.parse(match[1]) || {};
         } catch {
+          // Fallback simple line-by-line key-value parsing
           frontmatter = {};
+          const fmLines = match[1].split(/\r?\n/);
+          for (const fml of fmLines) {
+            const colonIdx = fml.indexOf(":");
+            if (colonIdx > 0 && !fml.startsWith(" ") && !fml.startsWith("-")) {
+              const k = fml.slice(0, colonIdx).trim();
+              let v = fml.slice(colonIdx + 1).trim();
+              if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+                v = v.slice(1, -1);
+              }
+              if (/^\d+$/.test(v)) {
+                (frontmatter as any)[k] = parseInt(v, 10);
+              } else {
+                (frontmatter as any)[k] = v;
+              }
+            }
+          }
         }
         markdownBody = content.slice(match[0].length).trim();
       }
@@ -332,8 +425,49 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
       date = new Date().toISOString().slice(0, 10);
     }
 
+    // Determine reportType: "daily" | "weekly" | "monthly" | "yearly"
+    let reportType: ReportType = "daily";
+    const rawType = (frontmatter.type || "").toLowerCase();
+    const basename = path.basename(filePath).toLowerCase();
+    const normPath = filePath.replace(/\\/g, "/").toLowerCase();
+
+    if (
+      rawType === "weekly_report" ||
+      rawType.includes("weekly") ||
+      basename.includes("weekly") ||
+      normPath.includes("/weekly/")
+    ) {
+      reportType = "weekly";
+    } else if (
+      rawType === "monthly_report" ||
+      rawType === "monthly_digest" ||
+      rawType.includes("monthly") ||
+      basename.includes("monthly") ||
+      normPath.includes("/monthly/")
+    ) {
+      reportType = "monthly";
+    } else if (
+      rawType === "yearly_report" ||
+      rawType.includes("yearly") ||
+      basename.includes("yearly") ||
+      normPath.includes("/yearly/")
+    ) {
+      reportType = "yearly";
+    } else {
+      reportType = "daily";
+    }
+
     // Title & Headline
-    const title = frontmatter.title || `Daily Summary ${date}`;
+    const defaultTitle =
+      reportType === "weekly"
+        ? `Weekly Report ${date}`
+        : reportType === "monthly"
+          ? `Monthly Digest ${date.slice(0, 7)}`
+          : reportType === "yearly"
+            ? `Yearly Report ${date.slice(0, 4)}`
+            : `Daily Summary ${date}`;
+
+    const title = frontmatter.title || defaultTitle;
     let topStory = frontmatter.top_story || "";
     if (!topStory) {
       const h3Match = markdownBody.match(/###\s+(.+)/);
@@ -344,8 +478,34 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
       }
     }
 
+    // Determine period identifier (e.g. "2026-W38", "2026-09", "2026", "2026-09-20")
+    let period: string = frontmatter.period ? String(frontmatter.period) : "";
+    if (!period) {
+      if (reportType === "weekly") {
+        const weekMatch =
+          basename.match(/(\d{4}-w\d{2})/i) ||
+          title.match(/(\d{4}-w\d{2})/i) ||
+          markdownBody.match(/(\d{4}-w\d{2})/i);
+        period = weekMatch && weekMatch[1] ? weekMatch[1].toUpperCase() : date;
+      } else if (reportType === "monthly") {
+        const monthMatch =
+          basename.match(/(\d{4}-\d{2})/) || title.match(/(\d{4}-\d{2})/);
+        period = monthMatch && monthMatch[1] ? monthMatch[1] : date.slice(0, 7);
+      } else if (reportType === "yearly") {
+        const yearMatch =
+          basename.match(/(\d{4})/) || title.match(/(\d{4})/);
+        period = yearMatch && yearMatch[1] ? yearMatch[1] : date.slice(0, 4);
+      } else {
+        period = date;
+      }
+    }
+
+    const id = `${reportType}-${period || date}`;
+
     let sourceUrl: string | undefined = undefined;
-    const sourceMatch = markdownBody.match(/\*\*(?:出典|Source)\*\*:\s*(?:\[[^\]]+\]\()?(https?:\/\/[^\s)]+)/);
+    const sourceMatch = markdownBody.match(
+      /\*\*(?:出典|Source)\*\*:\s*(?:\[[^\]]+\]\()?(https?:\/\/[^\s)]+)/,
+    );
     if (sourceMatch && sourceMatch[1]) {
       sourceUrl = sourceMatch[1].replace(/\)$/, "");
     }
@@ -356,26 +516,50 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
     const tags: string[] = Array.isArray(frontmatter.tags)
       ? frontmatter.tags
       : [];
-    const articleCount = typeof frontmatter.articles_processed === "number"
-      ? frontmatter.articles_processed
-      : (typeof frontmatter.article_count === "number" ? frontmatter.article_count : 0);
-    const qualityScore = typeof frontmatter.quality_score === "number"
-      ? frontmatter.quality_score
-      : null;
+    const rawCount =
+      frontmatter.articles_processed ??
+      frontmatter.article_count ??
+      frontmatter.total_articles;
+    const parsedCount =
+      typeof rawCount === "number"
+        ? rawCount
+        : typeof rawCount === "string"
+          ? parseInt(rawCount, 10)
+          : 0;
+    const articleCount = Number.isNaN(parsedCount) ? 0 : parsedCount;
+
+    const rawQuality = frontmatter.quality_score;
+    const parsedQuality =
+      typeof rawQuality === "number"
+        ? rawQuality
+        : typeof rawQuality === "string"
+          ? parseFloat(rawQuality)
+          : null;
+    const qualityScore =
+      parsedQuality !== null && !Number.isNaN(parsedQuality)
+        ? parsedQuality
+        : null;
     const language: string | undefined =
-      typeof frontmatter.language === "string" ? frontmatter.language : undefined;
+      typeof frontmatter.language === "string"
+        ? frontmatter.language
+        : undefined;
 
     const contentHtml = markdownToHtml(markdownBody);
 
     return {
+      id,
       date,
+      period,
+      reportType,
       title,
       topStory,
       categories,
       tags,
       articleCount,
       qualityScore,
-      ...(frontmatter.top_purpose ? { topPurpose: frontmatter.top_purpose } : {}),
+      ...(frontmatter.top_purpose
+        ? { topPurpose: frontmatter.top_purpose }
+        : {}),
       ...(language ? { language } : {}),
       contentHtml,
       rawMarkdown: markdownBody,
@@ -387,16 +571,47 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
   }
 }
 
+export interface ScannedSummariesResult {
+  all: PageSummaryItem[];
+  daily: PageSummaryItem[];
+  reports: PageSummaryItem[];
+}
+
 /**
- * Scans directories for daily summary Markdown files.
+ * Scans directories for all daily summaries and periodic reports (weekly, monthly, yearly).
  */
-export function scanDailySummaries(artifactsDir?: string): PageSummaryItem[] {
+export function scanAllSummaries(artifactsDir?: string): ScannedSummariesResult {
   const searchDirs = artifactsDir
     ? [artifactsDir].filter((d) => fs.existsSync(d))
     : [
         PATHS.ARTIFACTS_DAILY.absolute,
+        PATHS.ARTIFACTS_WEEKLY.absolute,
+        PATHS.ARTIFACTS_MONTHLY.absolute,
+        PATHS.ARTIFACTS_YEARLY.absolute,
         path.resolve(process.cwd(), "artifacts/contents/daily"),
-        path.resolve(process.cwd(), "artifacts/contents/digital-trend/collection/daily"),
+        path.resolve(process.cwd(), "artifacts/contents/weekly"),
+        path.resolve(process.cwd(), "artifacts/contents/monthly"),
+        path.resolve(process.cwd(), "artifacts/contents/yearly"),
+        path.resolve(
+          process.cwd(),
+          "artifacts/contents/digital-trend/collection/daily",
+        ),
+        path.resolve(
+          process.cwd(),
+          "artifacts/contents/digital-trend/collection/weekly",
+        ),
+        path.resolve(
+          process.cwd(),
+          "artifacts/contents/digital-trend/collection/monthly",
+        ),
+        path.resolve(
+          process.cwd(),
+          "artifacts/contents/digital-trend/collection/yearly",
+        ),
+        path.resolve(
+          process.cwd(),
+          "artifacts/contents/digital-trend/collection",
+        ),
         path.resolve(process.cwd(), "artifacts"),
       ].filter((d): d is string => typeof d === "string" && fs.existsSync(d));
 
@@ -409,7 +624,17 @@ export function scanDailySummaries(artifactsDir?: string): PageSummaryItem[] {
         const fullPath = path.join(dir, item.name);
         if (item.isDirectory()) {
           walk(fullPath);
-        } else if (item.isFile() && item.name.endsWith(".md") && (item.name.includes("summary") || item.name.includes("trend"))) {
+        } else if (
+          item.isFile() &&
+          item.name.endsWith(".md") &&
+          (item.name.includes("summary") ||
+            item.name.includes("trend") ||
+            item.name.includes("report") ||
+            item.name.includes("digest") ||
+            item.name.includes("weekly") ||
+            item.name.includes("monthly") ||
+            item.name.includes("yearly"))
+        ) {
           foundFiles.add(fullPath);
         }
       }
@@ -430,15 +655,41 @@ export function scanDailySummaries(artifactsDir?: string): PageSummaryItem[] {
     }
   }
 
-  const byDate = new Map<string, PageSummaryItem>();
+  // Deduplicate by unique key
+  const byKey = new Map<string, PageSummaryItem>();
   for (const item of items) {
-    const existing = byDate.get(item.date);
+    const key =
+      item.id || `${item.reportType || "daily"}-${item.period || item.date}`;
+    const existing = byKey.get(key);
     if (!existing || item.rawMarkdown.length > existing.rawMarkdown.length) {
-      byDate.set(item.date, item);
+      byKey.set(key, item);
     }
   }
 
-  return Array.from(byDate.values()).sort((a, b) => b.date.localeCompare(a.date));
+  const deduplicated = Array.from(byKey.values());
+
+  const daily = deduplicated
+    .filter((i) => i.reportType === "daily" || !i.reportType)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const reports = deduplicated
+    .filter((i) => i.reportType && i.reportType !== "daily")
+    .sort((a, b) => {
+      const aKey = a.period || a.date;
+      const bKey = b.period || b.date;
+      return bKey.localeCompare(aKey);
+    });
+
+  const all = [...daily, ...reports];
+
+  return { all, daily, reports };
+}
+
+/**
+ * Scans directories for daily summary Markdown files (backward compatibility).
+ */
+export function scanDailySummaries(artifactsDir?: string): PageSummaryItem[] {
+  return scanAllSummaries(artifactsDir).daily;
 }
 
 /**
@@ -447,31 +698,54 @@ export function scanDailySummaries(artifactsDir?: string): PageSummaryItem[] {
 export function generatePagesSite(
   artifactsDir?: string,
   outputDir: string = PATHS.PAGES_OUTPUT.absolute,
-  language?: string
-): { outputPath: string; summaryCount: number; latestDate: string | null } {
-  const siteLang = language || process.env.OUTPUT_LANGUAGE || process.env.SUMMARY_LANGUAGE || "en";
+  language?: string,
+): {
+  outputPath: string;
+  summaryCount: number;
+  latestDate: string | null;
+  reportCount: number;
+} {
+  const siteLang =
+    language ||
+    process.env.OUTPUT_LANGUAGE ||
+    process.env.SUMMARY_LANGUAGE ||
+    "en";
   const i18n = getI18n(siteLang);
-  const summaries = scanDailySummaries(artifactsDir);
+  const { all, daily, reports } = scanAllSummaries(artifactsDir);
   const outDir = path.resolve(process.cwd(), outputDir);
   const dataDir = path.join(outDir, "data");
 
   fs.mkdirSync(dataDir, { recursive: true });
 
   const jsonPath = path.join(dataDir, "summaries.json");
-  fs.writeFileSync(jsonPath, JSON.stringify(summaries, null, 2), "utf8");
+  fs.writeFileSync(jsonPath, JSON.stringify(all, null, 2), "utf8");
+
+  const reportsJsonPath = path.join(dataDir, "reports.json");
+  fs.writeFileSync(reportsJsonPath, JSON.stringify(reports, null, 2), "utf8");
 
   fs.writeFileSync(path.join(outDir, "styles.css"), generateCss(), "utf8");
   fs.writeFileSync(path.join(outDir, "app.js"), generateJs(i18n), "utf8");
 
-  const latestSummary = summaries[0] ?? null;
-  fs.writeFileSync(path.join(outDir, "index.html"), generateHtml(summaries, latestSummary, i18n), "utf8");
-  fs.writeFileSync(path.join(outDir, "404.html"), generate404Html(i18n), "utf8");
+  const latestSummary = daily[0] ?? all[0] ?? null;
+  fs.writeFileSync(
+    path.join(outDir, "index.html"),
+    generateHtml(all, daily, reports, latestSummary, i18n),
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(outDir, "404.html"),
+    generate404Html(i18n),
+    "utf8",
+  );
 
-  console.log(`🌐 GitHub Pages site generated at: ${outDir} (${summaries.length} summaries, lang: ${i18n.langCode})`);
+  console.log(
+    `🌐 GitHub Pages site generated at: ${outDir} (${daily.length} daily summaries, ${reports.length} periodic reports, lang: ${i18n.langCode})`,
+  );
   return {
     outputPath: outDir,
-    summaryCount: summaries.length,
+    summaryCount: all.length,
     latestDate: latestSummary ? latestSummary.date : null,
+    reportCount: reports.length,
   };
 }
 
@@ -479,20 +753,36 @@ export function generatePagesSite(
  * Generates the main HTML page with embedded initial state for instant load.
  */
 function generateHtml(
-  summaries: PageSummaryItem[],
+  allSummaries: PageSummaryItem[],
+  dailySummaries: PageSummaryItem[],
+  periodicReports: PageSummaryItem[],
   initial: PageSummaryItem | null,
-  i18n: PagesI18n = I18N_EN
+  i18n: PagesI18n = I18N_EN,
 ): string {
-  const initialDate = initial ? initial.date : "";
+  const initialDate = initial ? (initial.period || initial.date) : "";
   const initialTitle = initial ? initial.title : "No summaries available";
   const initialTopStory = initial ? initial.topStory : i18n.noDataHeadline;
   const initialContent = initial ? initial.contentHtml : i18n.noDataContent;
   const initialCategories = initial ? initial.categories : [];
   const initialTags = initial ? initial.tags : [];
   const initialArticleCount = initial ? initial.articleCount : 0;
-  const initialQuality = initial?.qualityScore !== null && initial?.qualityScore !== undefined
-    ? `${initial.qualityScore.toFixed(0)} pt`
-    : "-";
+  const initialQuality =
+    initial?.qualityScore !== null && initial?.qualityScore !== undefined
+      ? `${initial.qualityScore.toFixed(0)} pt`
+      : "-";
+
+  let initialBadge = i18n.reportBadgeDaily;
+  let initialBadgeClass = "badge-daily";
+  if (initial?.reportType === "weekly") {
+    initialBadge = i18n.reportBadgeWeekly;
+    initialBadgeClass = "badge-weekly";
+  } else if (initial?.reportType === "monthly") {
+    initialBadge = i18n.reportBadgeMonthly;
+    initialBadgeClass = "badge-monthly";
+  } else if (initial?.reportType === "yearly") {
+    initialBadge = i18n.reportBadgeYearly;
+    initialBadgeClass = "badge-yearly";
+  }
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
@@ -534,7 +824,7 @@ function generateHtml(
 
     <!-- Main Container -->
     <div class="main-container">
-      <!-- Sidebar / Back Number Navigation -->
+      <!-- Sidebar / Navigation -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-tabs">
           <button class="tab-btn active" data-tab="calendar" id="tabCalendarBtn">
@@ -542,7 +832,11 @@ function generateHtml(
           </button>
           <button class="tab-btn" data-tab="list" id="tabListBtn">
             <span>${escapeHtml(i18n.tabList)}</span>
-            <span class="count-badge" id="listCountBadge">${summaries.length}</span>
+            <span class="count-badge" id="listCountBadge">${dailySummaries.length}</span>
+          </button>
+          <button class="tab-btn" data-tab="reports" id="tabReportsBtn">
+            <span>${escapeHtml(i18n.tabReports)}</span>
+            <span class="count-badge count-badge-reports" id="reportsCountBadge">${periodicReports.length}</span>
           </button>
         </div>
 
@@ -578,14 +872,27 @@ function generateHtml(
             <!-- Rendered by app.js -->
           </div>
         </div>
+
+        <!-- Tab 3: Periodic Reports View -->
+        <div class="tab-content" id="reportsTab">
+          <div class="reports-filter-bar">
+            <button class="filter-pill active" data-filter="all">${escapeHtml(i18n.filterAll)}</button>
+            <button class="filter-pill" data-filter="weekly">${escapeHtml(i18n.filterWeekly)}</button>
+            <button class="filter-pill" data-filter="monthly">${escapeHtml(i18n.filterMonthly)}</button>
+            <button class="filter-pill" data-filter="yearly">${escapeHtml(i18n.filterYearly)}</button>
+          </div>
+          <div class="reports-list" id="periodicReportsList">
+            <!-- Rendered by app.js -->
+          </div>
+        </div>
       </aside>
 
       <!-- Main Content / Detail View -->
       <main class="content-area">
-        <!-- Top Headline Card (Today's Headline) -->
+        <!-- Top Headline Card (Today's Headline or Report Summary) -->
         <section class="headline-section" id="headlineCard">
           <div class="headline-badge-bar">
-            <span class="badge-headline">${escapeHtml(i18n.headlineBadge)}</span>
+            <span class="badge-headline ${initialBadgeClass}" id="displayHeadlineBadge">${escapeHtml(initialBadge)}</span>
             <span class="badge-date" id="displayDate">${initialDate}</span>
             <span class="badge-stat" id="displayArticleCount">${escapeHtml(i18n.articlesLabel(initialArticleCount))}</span>
             <span class="badge-stat" id="displayQuality">${escapeHtml(i18n.qualityLabel(initialQuality))}</span>
@@ -1129,6 +1436,103 @@ body {
   overflow: hidden;
 }
 
+/* Periodic Reports View */
+.count-badge-reports {
+  background: var(--accent-secondary);
+  color: #ffffff;
+}
+
+.reports-filter-bar {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 9999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-pill:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.filter-pill.active {
+  background: var(--accent-primary);
+  color: #0f172a;
+  border-color: var(--accent-primary);
+}
+
+.reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.report-card {
+  padding: 0.75rem;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.report-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.report-card.active {
+  border-color: var(--accent-primary);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.report-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.report-badge.weekly {
+  background: rgba(129, 140, 248, 0.2);
+  color: #818cf8;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+}
+
+.report-badge.monthly {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.report-badge.yearly {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.report-badge.daily {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
 /* Content Area */
 .content-area {
   display: flex;
@@ -1136,7 +1540,7 @@ body {
   gap: 1.5rem;
 }
 
-/* Headline Section (当日の Head line) */
+/* Headline Section (当日の Head line or レポート概要) */
 .headline-section {
   background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(30, 41, 59, 0.8) 100%);
   border: 1px solid var(--border);
@@ -1173,6 +1577,26 @@ body {
   padding: 0.2rem 0.6rem;
   border-radius: var(--radius-sm);
   letter-spacing: 0.05em;
+}
+
+.badge-headline.badge-daily {
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  color: #0f172a;
+}
+
+.badge-headline.badge-weekly {
+  background: linear-gradient(90deg, #818cf8, #c084fc);
+  color: #0f172a;
+}
+
+.badge-headline.badge-monthly {
+  background: linear-gradient(90deg, #34d399, #38bdf8);
+  color: #0f172a;
+}
+
+.badge-headline.badge-yearly {
+  background: linear-gradient(90deg, #fbbf24, #f43f5e);
+  color: #0f172a;
 }
 
 .badge-date {
@@ -1460,12 +1884,21 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
     copyOriginal: i18n.copyLink,
     summaryTooltip: i18n.summaryAvailableTooltip,
     noResults: i18n.noSearchResults,
+    noReportsFound: i18n.noReportsFound,
+    reportBadgeDaily: i18n.reportBadgeDaily,
+    reportBadgeWeekly: i18n.reportBadgeWeekly,
+    reportBadgeMonthly: i18n.reportBadgeMonthly,
+    reportBadgeYearly: i18n.reportBadgeYearly,
+    periodLabel: i18n.periodLabel,
   });
 
   return `(function () {
   const I18N = ${i18nConfig};
-  let allSummaries = [];
+  let allItems = [];
+  let dailySummaries = [];
+  let periodicReports = [];
   let currentSummary = null;
+  let currentReportFilter = 'all';
   let currentCalendarYear = new Date().getFullYear();
   let currentCalendarMonth = new Date().getMonth();
 
@@ -1473,7 +1906,9 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
     try {
       const res = await fetch('./data/summaries.json');
       if (res.ok) {
-        allSummaries = await res.json();
+        allItems = await res.json();
+        dailySummaries = allItems.filter(s => !s.reportType || s.reportType === 'daily');
+        periodicReports = allItems.filter(s => s.reportType && s.reportType !== 'daily');
       }
     } catch (e) {
       console.warn('Failed to load external summaries.json:', e);
@@ -1482,24 +1917,23 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
     setupTheme();
     setupTabs();
     setupSearch();
+    setupReportsFilter();
     setupRouting();
 
-    const hashDate = window.location.hash.replace(/^#/, '');
-    const found = allSummaries.find(s => s.date === hashDate);
-    if (found) {
-      selectDate(found.date);
-    } else if (allSummaries.length > 0) {
-      selectDate(allSummaries[0].date);
-    }
+    handleHashOrInitialSelect();
 
     renderCalendar();
     renderBacknumberList();
+    renderPeriodicReportsList();
 
     const copyBtn = document.getElementById('copyLinkBtn');
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
         if (!currentSummary) return;
-        const url = window.location.origin + window.location.pathname + '#' + currentSummary.date;
+        const targetHash = currentSummary.reportType === 'daily' || !currentSummary.reportType
+          ? currentSummary.date
+          : (currentSummary.id || currentSummary.period || currentSummary.date);
+        const url = window.location.origin + window.location.pathname + '#' + targetHash;
         navigator.clipboard.writeText(url).then(() => {
           copyBtn.textContent = '✅ ' + I18N.copySuccess;
           setTimeout(() => { copyBtn.textContent = I18N.copyOriginal; }, 2000);
@@ -1526,24 +1960,81 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
     });
   }
 
+  function findItem(key) {
+    if (!key) return null;
+    const cleanKey = decodeURIComponent(key).replace(/^#/, '').replace(/^report\\//, '').replace(/^report:/, '');
+    return allItems.find(s =>
+      (s.id && s.id.toLowerCase() === cleanKey.toLowerCase()) ||
+      s.date === cleanKey ||
+      (s.period && s.period.toLowerCase() === cleanKey.toLowerCase()) ||
+      ((s.reportType || '') + '-' + (s.period || '')).toLowerCase() === cleanKey.toLowerCase()
+    );
+  }
+
+  function handleHashOrInitialSelect() {
+    const hash = window.location.hash.replace(/^#/, '');
+    const found = findItem(hash);
+    if (found) {
+      selectItem(found);
+      if (found.reportType && found.reportType !== 'daily') {
+        const reportsTabBtn = document.getElementById('tabReportsBtn');
+        const reportsTab = document.getElementById('reportsTab');
+        const calTabBtn = document.getElementById('tabCalendarBtn');
+        const listTabBtn = document.getElementById('tabListBtn');
+        const calTab = document.getElementById('calendarTab');
+        const listTab = document.getElementById('listTab');
+        [calTabBtn, listTabBtn].forEach(b => b?.classList.remove('active'));
+        [calTab, listTab].forEach(c => c?.classList.remove('active'));
+        reportsTabBtn?.classList.add('active');
+        reportsTab?.classList.add('active');
+      }
+    } else if (dailySummaries.length > 0) {
+      selectItem(dailySummaries[0]);
+    } else if (allItems.length > 0) {
+      selectItem(allItems[0]);
+    }
+  }
+
   function setupRouting() {
     window.addEventListener('hashchange', () => {
-      const hashDate = window.location.hash.replace(/^#/, '');
-      if (hashDate && (!currentSummary || currentSummary.date !== hashDate)) {
-        selectDate(hashDate);
+      const hash = window.location.hash.replace(/^#/, '');
+      if (hash && (!currentSummary || (currentSummary.id !== hash && currentSummary.date !== hash && currentSummary.period !== hash))) {
+        const found = findItem(hash);
+        if (found) selectItem(found);
       }
     });
   }
 
-  function selectDate(dateStr) {
-    const item = allSummaries.find(s => s.date === dateStr);
+  function selectItem(itemOrKey) {
+    const item = typeof itemOrKey === 'string' ? findItem(itemOrKey) : itemOrKey;
     if (!item) return;
 
     currentSummary = item;
-    window.location.hash = dateStr;
+    const targetHash = item.reportType === 'daily' || !item.reportType
+      ? item.date
+      : (item.id || item.period || item.date);
+    window.location.hash = targetHash;
+
+    const displayBadge = document.getElementById('displayHeadlineBadge');
+    if (displayBadge) {
+      let badgeText = I18N.reportBadgeDaily;
+      let badgeClass = 'badge-daily';
+      if (item.reportType === 'weekly') {
+        badgeText = I18N.reportBadgeWeekly;
+        badgeClass = 'badge-weekly';
+      } else if (item.reportType === 'monthly') {
+        badgeText = I18N.reportBadgeMonthly;
+        badgeClass = 'badge-monthly';
+      } else if (item.reportType === 'yearly') {
+        badgeText = I18N.reportBadgeYearly;
+        badgeClass = 'badge-yearly';
+      }
+      displayBadge.textContent = badgeText;
+      displayBadge.className = 'badge-headline ' + badgeClass;
+    }
 
     const displayDate = document.getElementById('displayDate');
-    if (displayDate) displayDate.textContent = item.date;
+    if (displayDate) displayDate.textContent = item.period || item.date;
 
     const displayTopStory = document.getElementById('displayTopStory');
     if (displayTopStory) displayTopStory.textContent = item.topStory;
@@ -1572,14 +2063,17 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
     const renderArea = document.getElementById('markdownRender');
     if (renderArea) renderArea.innerHTML = item.contentHtml;
 
-    const [y, m] = item.date.split('-').map(Number);
-    if (y && m) {
-      currentCalendarYear = y;
-      currentCalendarMonth = m - 1;
+    if (item.date) {
+      const [y, m] = item.date.split('-').map(Number);
+      if (y && m) {
+        currentCalendarYear = y;
+        currentCalendarMonth = m - 1;
+      }
     }
 
     renderCalendar();
     renderBacknumberList();
+    renderPeriodicReportsList();
   }
 
   function renderCalendar() {
@@ -1619,14 +2113,14 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
       cell.className = 'cal-cell';
       cell.textContent = String(day);
 
-      const hasSummary = allSummaries.some(s => s.date === dayStr);
+      const hasSummary = dailySummaries.some(s => s.date === dayStr);
       if (hasSummary) {
         cell.classList.add('has-data');
         cell.title = I18N.summaryTooltip + dayStr;
-        cell.addEventListener('click', () => selectDate(dayStr));
+        cell.addEventListener('click', () => selectItem(dayStr));
       }
 
-      if (currentSummary && currentSummary.date === dayStr) {
+      if (currentSummary && currentSummary.date === dayStr && (!currentSummary.reportType || currentSummary.reportType === 'daily')) {
         cell.classList.add('selected');
         cell.setAttribute('aria-selected', 'true');
       }
@@ -1644,7 +2138,7 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
     const listContainer = document.getElementById('backnumberList');
     if (!listContainer) return;
 
-    const filtered = allSummaries.filter(item => {
+    const filtered = dailySummaries.filter(item => {
       if (!filterText) return true;
       const q = filterText.toLowerCase();
       return item.title.toLowerCase().includes(q) ||
@@ -1663,7 +2157,8 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
 
     filtered.forEach(item => {
       const card = document.createElement('div');
-      card.className = 'backnumber-card' + (currentSummary && currentSummary.date === item.date ? ' active' : '');
+      const isSelected = currentSummary && currentSummary.date === item.date && (!currentSummary.reportType || currentSummary.reportType === 'daily');
+      card.className = 'backnumber-card' + (isSelected ? ' active' : '');
       card.innerHTML = \`
         <div class="card-header-bar">
           <span class="card-date">\${item.date}</span>
@@ -1671,7 +2166,44 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
         </div>
         <div class="card-title">\${escapeHtml(item.topStory || item.title)}</div>
       \`;
-      card.addEventListener('click', () => selectDate(item.date));
+      card.addEventListener('click', () => selectItem(item));
+      listContainer.appendChild(card);
+    });
+  }
+
+  function renderPeriodicReportsList() {
+    const listContainer = document.getElementById('periodicReportsList');
+    if (!listContainer) return;
+
+    const filtered = periodicReports.filter(item => {
+      if (currentReportFilter === 'all') return true;
+      return item.reportType === currentReportFilter;
+    });
+
+    listContainer.innerHTML = '';
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted); padding:1rem; text-align:center;">' + I18N.noReportsFound + '</p>';
+      return;
+    }
+
+    filtered.forEach(item => {
+      const card = document.createElement('div');
+      const isSelected = currentSummary && (currentSummary.id === item.id || (currentSummary.period === item.period && currentSummary.reportType === item.reportType));
+      card.className = 'report-card' + (isSelected ? ' active' : '');
+      const typeBadgeClass = 'report-badge ' + (item.reportType || 'weekly');
+      const typeBadgeLabel = (item.reportType || 'weekly').toUpperCase();
+      const periodDisplay = item.period || item.date;
+
+      card.innerHTML = \`
+        <div class="card-header-bar">
+          <span class="\${typeBadgeClass}">\${typeBadgeLabel}</span>
+          <span class="card-date">\${escapeHtml(periodDisplay)}</span>
+          <span class="card-count">\${item.articleCount}\${I18N.cardArticlesSuffix}</span>
+        </div>
+        <div class="card-title">\${escapeHtml(item.topStory || item.title)}</div>
+      \`;
+      card.addEventListener('click', () => selectItem(item));
       listContainer.appendChild(card);
     });
   }
@@ -1679,21 +2211,32 @@ function generateJs(i18n: PagesI18n = I18N_EN): string {
   function setupTabs() {
     const calTabBtn = document.getElementById('tabCalendarBtn');
     const listTabBtn = document.getElementById('tabListBtn');
+    const reportsTabBtn = document.getElementById('tabReportsBtn');
     const calTab = document.getElementById('calendarTab');
     const listTab = document.getElementById('listTab');
+    const reportsTab = document.getElementById('reportsTab');
 
-    calTabBtn?.addEventListener('click', () => {
-      calTabBtn.classList.add('active');
-      listTabBtn?.classList.remove('active');
-      calTab?.classList.add('active');
-      listTab?.classList.remove('active');
-    });
+    function switchTab(activeBtn, activeContent) {
+      [calTabBtn, listTabBtn, reportsTabBtn].forEach(b => b?.classList.remove('active'));
+      [calTab, listTab, reportsTab].forEach(c => c?.classList.remove('active'));
+      activeBtn?.classList.add('active');
+      activeContent?.classList.add('active');
+    }
 
-    listTabBtn?.addEventListener('click', () => {
-      listTabBtn.classList.add('active');
-      calTabBtn?.classList.remove('active');
-      listTab?.classList.add('active');
-      calTab?.classList.remove('active');
+    calTabBtn?.addEventListener('click', () => switchTab(calTabBtn, calTab));
+    listTabBtn?.addEventListener('click', () => switchTab(listTabBtn, listTab));
+    reportsTabBtn?.addEventListener('click', () => switchTab(reportsTabBtn, reportsTab));
+  }
+
+  function setupReportsFilter() {
+    const filterButtons = document.querySelectorAll('.reports-filter-bar .filter-pill');
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentReportFilter = btn.getAttribute('data-filter') || 'all';
+        renderPeriodicReportsList();
+      });
     });
   }
 

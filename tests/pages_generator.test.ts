@@ -4,6 +4,7 @@ import {
   markdownToHtml,
   parseDailySummary,
   scanDailySummaries,
+  scanAllSummaries,
   generatePagesSite,
 } from "../src/publishing/pages_generator";
 import { PATHS } from "../src/core/paths";
@@ -159,9 +160,81 @@ language: en
       expect(item?.contentHtml).toContain('<div class="article-source">');
     });
 
+    it("should correctly parse weekly report with reportType and period", () => {
+      const filePath = path.join(testArtifactsDir, "2026-09-20_digital-trend_weekly_report.md");
+      const content = `---
+title: Weekly Trend Report 2026-W38
+date: 2026-09-20
+type: weekly_report
+period: 2026-W38
+top_story: AI agents transform dev workflows this week
+categories:
+  - 🛠️ 開発ツール・IDE統合
+tags:
+  - Agent
+  - Coding
+articles_processed: 45
+---
+# Weekly Trend Report 2026-W38
+## 📈 今週のトレンド概要
+A massive acceleration in AI agent adoption.
+`;
+      fs.writeFileSync(filePath, content, "utf8");
+
+      const item = parseDailySummary(filePath);
+      expect(item).not.toBeNull();
+      expect(item?.reportType).toBe("weekly");
+      expect(item?.period).toBe("2026-W38");
+      expect(item?.id).toBe("weekly-2026-W38");
+      expect(item?.articleCount).toBe(45);
+      expect(item?.topStory).toBe("AI agents transform dev workflows this week");
+    });
+
+    it("should correctly parse monthly digest with reportType and period", () => {
+      const filePath = path.join(testArtifactsDir, "2026-09-30_digital-trend_monthly_report.md");
+      const content = `---
+title: Monthly Digest 2026-09
+date: 2026-09-30
+type: monthly_report
+period: 2026-09
+top_story: "September highlights: Next-gen frontier architectures"
+categories:
+  - 🔬 AI研究
+tags:
+  - LLM
+articles_processed: 180
+---
+# Monthly Digest 2026-09
+## 📈 今月のトレンド概要
+Overview of breakthroughs across September.
+`;
+      fs.writeFileSync(filePath, content, "utf8");
+
+      const item = parseDailySummary(filePath);
+      expect(item).not.toBeNull();
+      expect(item?.reportType).toBe("monthly");
+      expect(item?.period).toBe("2026-09");
+      expect(item?.id).toBe("monthly-2026-09");
+      expect(item?.articleCount).toBe(180);
+    });
+
     it("should return null for non-existent file", () => {
       const item = parseDailySummary(path.join(testArtifactsDir, "non_existent.md"));
       expect(item).toBeNull();
+    });
+  });
+
+  describe("scanAllSummaries", () => {
+    it("should separate daily summaries and periodic reports into distinct collections", () => {
+      const result = scanAllSummaries(testArtifactsDir);
+      expect(result.all.length).toBeGreaterThanOrEqual(3);
+      expect(result.daily.length).toBeGreaterThanOrEqual(1);
+      expect(result.reports.length).toBeGreaterThanOrEqual(2);
+
+      const hasWeekly = result.reports.some(r => r.reportType === "weekly");
+      const hasMonthly = result.reports.some(r => r.reportType === "monthly");
+      expect(hasWeekly).toBe(true);
+      expect(hasMonthly).toBe(true);
     });
   });
 
@@ -216,6 +289,11 @@ categories:
       expect(indexHtml).toContain('<html lang="en">');
       expect(indexHtml).toContain("Calendar");
       expect(indexHtml).toContain("Archive List");
+      expect(indexHtml).toContain("Reports");
+      expect(indexHtml).toContain('id="tabReportsBtn"');
+      expect(indexHtml).toContain('id="reportsTab"');
+      expect(indexHtml).toContain('data-filter="weekly"');
+      expect(indexHtml).toContain('data-filter="monthly"');
       expect(indexHtml).toContain("TODAY&#039;S HEADLINE");
       expect(indexHtml).toContain("Has Summary");
       expect(indexHtml).toContain("Today");
@@ -225,12 +303,20 @@ categories:
       const data = JSON.parse(jsonStr);
       expect(Array.isArray(data)).toBe(true);
 
+      const reportsJsonStr = fs.readFileSync(path.join(testOutputDir, "data", "reports.json"), "utf8");
+      const reportsData = JSON.parse(reportsJsonStr);
+      expect(Array.isArray(reportsData)).toBe(true);
+      expect(reportsData.some((r: any) => r.reportType === "weekly")).toBe(true);
+
       // Verify CSS and JS exist
       expect(stylesCss.length).toBeGreaterThan(100);
       expect(stylesCss).toContain(".cal-cell.is-today");
       expect(stylesCss).toContain(".cal-cell.selected");
+      expect(stylesCss).toContain(".report-card");
+      expect(stylesCss).toContain(".badge-headline.badge-weekly");
       expect(stylesCss).toContain("details.pipeline-metrics");
       expect(appJs.length).toBeGreaterThan(100);
+      expect(appJs).toContain("renderPeriodicReportsList");
       expect(notFoundHtml).toContain("404");
     });
 
@@ -244,6 +330,9 @@ categories:
       expect(indexHtml).toContain('<html lang="ja">');
       expect(indexHtml).toContain("カレンダー");
       expect(indexHtml).toContain("リスト一覧");
+      expect(indexHtml).toContain("定期レポート");
+      expect(indexHtml).toContain("週次");
+      expect(indexHtml).toContain("月次");
       expect(indexHtml).toContain("サマリーあり");
       expect(indexHtml).toContain("本日");
       expect(indexHtml).toContain("選択中");

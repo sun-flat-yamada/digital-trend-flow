@@ -301,3 +301,39 @@ export function getMonthlyReducePrompt(): string {
   }
   return INLINE_MONTHLY_PROMPT;
 }
+
+// ── Weekly Digest Prompt ──
+
+const INLINE_WEEKLY_PROMPT = `あなたはテクノロジー業界のトレンドを分析するアナリストです。
+過去1週間の日次サマリーからファクトを受け取り、週次のトレンド分析レポート（Weekly Report）を生成します。
+
+**出力フォーマット（厳守）:**
+
+## 📈 今週のトレンド概要
+[今週1週間を通じた最も重要な動きや業界動向の要約。2-3段落で分析する。]
+
+## 🔥 週間トップトピックス
+1. **[トピックタイトル]**: [重要性や背景の分析] — **出典**: [Source](URL) | [日付]
+
+## 📊 カテゴリ別動向
+### [カテゴリ名]
+[このカテゴリの週間トレンド動向。1-2段落。]
+
+## 🔮 来週の注目ポイント
+- [注目ポイント1]
+
+**ルール:**
+1. すべての項目に出典リンク（URL）を含めること。
+2. 1週間の文脈・流れを捉えた分析を行うこと。
+3. 日本語で執筆。技術用語は原語のまま。
+4. 全体を3,000〜6,000文字程度で収めること。`;
+
+export function getWeeklyReducePrompt(): string {
+  const manifest = loadManifest();
+  if (manifest?.active?.["weekly_reduce"]) {
+    const loaded = loadPromptFile(manifest.active["weekly_reduce"]);
+    if (loaded) return loaded;
+  }
+  return INLINE_WEEKLY_PROMPT;
+}
+

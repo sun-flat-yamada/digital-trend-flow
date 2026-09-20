@@ -39,6 +39,13 @@ export const PATHS = {
       "artifacts/contents/digital-trend/collection/daily",
     ),
   },
+  ARTIFACTS_WEEKLY: {
+    relative: "artifacts/contents/digital-trend/collection/weekly",
+    absolute: path.resolve(
+      PROJECT_ROOT,
+      "artifacts/contents/digital-trend/collection/weekly",
+    ),
+  },
   ARTIFACTS_MONTHLY: {
     relative: "artifacts/contents/digital-trend/collection/monthly",
     absolute: path.resolve(

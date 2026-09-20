@@ -3,7 +3,8 @@
     "map": "map_v1.md",
     "reduce": "dynamic",
     "judge": "judge_v1.md",
-    "monthly_reduce": "monthly_reduce_v1.md"
+    "monthly_reduce": "monthly_reduce_v1.md",
+    "weekly_reduce": "weekly_reduce_v1.md"
   },
   "history": [
     {

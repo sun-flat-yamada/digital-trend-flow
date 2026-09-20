@@ -20,6 +20,9 @@ function run() {
   console.log(`✅ GitHub Pages build completed successfully!`);
   console.log(`   Output: ${result.outputPath}`);
   console.log(`   Summaries indexed: ${result.summaryCount}`);
+  if (result.reportCount !== undefined) {
+    console.log(`   Periodic reports indexed: ${result.reportCount}`);
+  }
   if (result.latestDate) {
     console.log(`   Latest headline date: ${result.latestDate}`);
   }
