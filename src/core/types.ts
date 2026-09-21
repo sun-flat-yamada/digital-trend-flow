@@ -200,6 +200,20 @@ export const EnvSchema = z.object({
   // Slack / Teams (Item 6.4)
   SLACK_WEBHOOK_URL: z.string().url().optional().or(z.literal("")),
   TEAMS_WEBHOOK_URL: z.string().url().optional().or(z.literal("")),
+  // Email / SMTP Notification
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.preprocess(
+    (val) => (val === "" || val === undefined ? 587 : Number(val)),
+    z.number().int().positive().default(587)
+  ),
+  SMTP_SECURE: z.preprocess(
+    (val) => (val === "true" || val === true ? true : false),
+    z.boolean().default(false)
+  ),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().optional(),
+  MAIL_TO: z.string().optional(),
   // Langfuse (Item 4.3)
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
   LANGFUSE_SECRET_KEY: z.string().optional(),

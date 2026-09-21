@@ -60,6 +60,15 @@ jobs:
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
           API_CONCURRENCY: ${{ vars.API_CONCURRENCY }}
           API_INTERVAL_MS: ${{ vars.API_INTERVAL_MS }}
           OUTPUT_LANGUAGE: ${{ vars.OUTPUT_LANGUAGE || 'en' }}

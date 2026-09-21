@@ -39,6 +39,7 @@ import { extractMentionedCompanies, extractMentionedTechnologies } from "./stora
 import { notifyDiscord } from "./publishing/discord_notifier";
 import { notifySlack } from "./publishing/slack_notifier";
 import { notifyTeams } from "./publishing/teams_notifier";
+import { notifyEmail } from "./publishing/email_notifier";
 import { generateAtomFeed } from "./publishing/feed_generator";
 import { generatePagesSite } from "./publishing/pages_generator";
 import { generatePodcast } from "./publishing/podcast_generator";
@@ -538,6 +539,7 @@ async function main() {
   await notifyDiscord(title, summaryMarkdown, selectedArticles.length);
   await notifySlack(title, summaryMarkdown, selectedArticles.length);
   await notifyTeams(title, summaryMarkdown, selectedArticles.length);
+  await notifyEmail(title, summaryMarkdown, selectedArticles.length);
 
   // Item 6.5: Generate RSS feed
   generateAtomFeed();

@@ -105,6 +105,13 @@ exclude:
 | `DISCORD_WEBHOOK_URL` | Discord 通知 |
 | `SLACK_WEBHOOK_URL` | Slack 通知 |
 | `TEAMS_WEBHOOK_URL` | Teams 通知 |
+| `SMTP_HOST` | メール配信 SMTP サーバーホスト (例: `smtp.gmail.com`) |
+| `SMTP_PORT` | メール配信 SMTP ポート (デフォルト: `587`) |
+| `SMTP_SECURE` | メール配信 SSL 有効化 (`true` or `false`, デフォルト: `false`) |
+| `SMTP_USER` | メール配信 SMTP ユーザー名 |
+| `SMTP_PASS` | メール配信 SMTP パスワード / アプリパスワード |
+| `MAIL_FROM` | メール送信元 (例: `Digital Trend Flow <noreply@example.com>`) |
+| `MAIL_TO` | メール送信先アドレス (カンマ区切りで複数指定可) |
 
 ### Optional — Observability
 

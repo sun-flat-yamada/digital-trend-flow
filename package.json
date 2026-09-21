@@ -23,13 +23,39 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "roots": ["<rootDir>/tests"],
+    "roots": [
+      "<rootDir>/tests"
+    ],
     "transform": {
-      "^.+\\.tsx?$": ["ts-jest", { "tsconfig": { "module": "commonjs", "moduleResolution": "node", "types": ["node", "jest"], "strict": true, "esModuleInterop": true } }]
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "commonjs",
+            "moduleResolution": "node",
+            "types": [
+              "node",
+              "jest"
+            ],
+            "strict": true,
+            "esModuleInterop": true
+          }
+        }
+      ]
     },
-    "transformIgnorePatterns": ["/node_modules/(?!uuid)"],
-    "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json"],
-    "testMatch": ["**/tests/**/*.test.ts"]
+    "transformIgnorePatterns": [
+      "/node_modules/(?!uuid)"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.ts"
+    ]
   },
   "keywords": [],
   "author": "Youhei Yamada",
@@ -39,6 +65,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.5.1",
+    "@types/nodemailer": "^8.0.2",
     "eslint": "^10.10.0",
     "eslint-plugin-jsonc": "^3.4.2",
     "eslint-plugin-yml": "^3.8.1",
@@ -55,6 +82,7 @@
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.4.2",
     "langfuse": "^3.38.20",
+    "nodemailer": "^10.0.10",
     "p-retry": "^8.0.1",
     "rss-parser": "^3.13.0",
     "uuid": "^14.0.2",

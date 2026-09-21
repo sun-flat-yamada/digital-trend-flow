@@ -25,7 +25,7 @@ Strictly follow these boundaries when creating or modifying files:
 | `src/summarization`   | LLM API integrations (multi-provider)               | `gemini_map.ts`, `gemini_reduce.ts`, `prompts.ts`, `llm_gateway.ts`, `model_resolver.ts`                                                      |
 | `src/evaluation`      | Automated quality assessment of outputs             | `quality_checker.ts`                                                                                                                          |
 | `src/storage`         | Markdown file writing + Obsidian integration        | `markdown_builder.ts`, `obsidian_linker.ts`                                                                                                   |
-| `src/publishing`      | External platform integrations                      | `discord_notifier.ts`, `slack_notifier.ts`, `teams_notifier.ts`, `note_api.ts`, `feed_generator.ts`                                           |
+| `src/publishing`      | External platform integrations                      | `discord_notifier.ts`, `slack_notifier.ts`, `teams_notifier.ts`, `email_notifier.ts`, `note_api.ts`, `feed_generator.ts` |
 | `src/cli`             | Developer tooling                                   | `dry_run.ts`, `test_config.ts`                                                                                                                |
 | `prompts/`            | Versioned prompt templates (Markdown)               | `map_v1.md`, `judge_v1.md`, `monthly_reduce_v1.md`, `manifest.json`                                                                           |
 | `tests/`              | Unit tests, golden regression tests                 | `*.test.ts`, `golden/golden_dataset.json`                                                                                                     |
@@ -75,6 +75,7 @@ The pipeline ingests data from seven types of sources. Each module is designed t
     *   `RAINDROP_TEST_TOKEN`, `XAI_API_KEY`, `YOUTUBE_API_KEY` — Ingestion sources.
     *   `NOTE_API_TOKEN` — Publishing to note.com.
     *   `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`, `TEAMS_WEBHOOK_URL` — Notifications.
+    *   `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `MAIL_TO` — Email delivery.
     *   `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` — Multi-LLM fallback providers.
     *   `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` — Observability.
     *   `FIRECRAWL_API_KEY` — Alternative content extraction.
