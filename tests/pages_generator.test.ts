@@ -6,6 +6,7 @@ import {
   scanDailySummaries,
   scanAllSummaries,
   generatePagesSite,
+  CONTENT_SECURITY_POLICY,
 } from "../src/publishing/pages_generator";
 import { PATHS } from "../src/core/paths";
 
@@ -78,6 +79,33 @@ describe("pages_generator", () => {
       expect(html).toContain("<li><strong>コスト</strong>: $0.0035 (約 ¥0.54)</li>");
       expect(html).toContain("</ul>");
       expect(html).toContain("</details>");
+    });
+  });
+
+  describe("markdownToHtml HTML injection", () => {
+    it("should escape HTML-looking lines other than the metrics block", () => {
+      const md = [
+        '<details open ontoggle="alert(document.cookie)">',
+        "<summary><img src=x onerror=alert(1)>",
+        '<summary onclick="alert(2)"><b>Click</b></summary>',
+        "</details>",
+      ].join("\n");
+
+      const html = markdownToHtml(md);
+
+      // No element carries an event handler and no injected tag survives.
+      expect(html).not.toMatch(/<[a-z][^>]*\son\w+=/i);
+      expect(html).not.toContain("<details open");
+      expect(html).not.toContain("<img");
+      expect(html).toContain("&lt;details open ontoggle=");
+      expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+      expect(html).toContain("<summary>&lt;b&gt;Click&lt;/b&gt;</summary>");
+    });
+
+    it("should only keep a plain class name on <details>", () => {
+      expect(markdownToHtml("<details>")).toBe("<details>");
+      expect(markdownToHtml('<details class="pipeline-metrics">')).toBe('<details class="pipeline-metrics">');
+      expect(markdownToHtml('<details class="x" onclick="alert(1)">')).not.toContain("<details");
     });
   });
 
@@ -347,6 +375,21 @@ categories:
       expect(result.summaryCount).toBe(0);
       expect(result.latestDate).toBeNull();
       expect(fs.existsSync(path.join(emptyOut, "index.html"))).toBe(true);
+    });
+
+    it("should add a Content-Security-Policy that only allows the site's own scripts", () => {
+      const cspDir = path.join(testDir, "csp_artifacts");
+      const cspOut = path.join(testDir, "csp_site");
+      fs.mkdirSync(cspDir, { recursive: true });
+
+      generatePagesSite(cspDir, cspOut);
+
+      for (const page of ["index.html", "404.html"]) {
+        const html = fs.readFileSync(path.join(cspOut, page), "utf8");
+        expect(html).toContain(`<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">`);
+      }
+      expect(CONTENT_SECURITY_POLICY).toContain("script-src 'self'");
+      expect(CONTENT_SECURITY_POLICY).not.toMatch(/script-src[^;]*'unsafe-inline'/);
     });
   });
 });
