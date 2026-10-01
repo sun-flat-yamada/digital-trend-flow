@@ -178,6 +178,12 @@ export const ConfigSchema = z.object({
     }).default({ enabled: false, similarity_threshold: 0.92 }),
     // Output language (default: "en")
     language: z.string().default("en"),
+    // Publication gate: a run below these limits is "degraded" — it is not published,
+    // its URLs are not marked as processed, and the job fails (see evaluation/run_gate.ts).
+    quality_gate: z.object({
+      min_map_success_rate: z.number().min(0).max(1).default(0.5), // share of selected articles with extracted facts
+      min_quality_score: z.number().min(0).max(100).default(60), // evaluateQuality() overall score
+    }).default({ min_map_success_rate: 0.5, min_quality_score: 60 }),
   }),
   purposes: z.record(z.string(), PurposeSchema),
   exclude: ExcludeSchema,
