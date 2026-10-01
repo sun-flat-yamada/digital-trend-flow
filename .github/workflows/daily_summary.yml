@@ -54,6 +54,7 @@ jobs:
         run: npm run type-check
 
       - name: Run pipeline
+        id: pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RAINDROP_TEST_TOKEN: ${{ secrets.RAINDROP_TEST_TOKEN }}
@@ -94,6 +95,9 @@ jobs:
           path: '_site'
 
       - name: Commit and push generated summaries to artifacts repo
+        # A degraded run fails the pipeline step (nothing is published) but its run record —
+        # metrics JSON and pipeline_state.db — is still committed so the failure stays visible.
+        if: ${{ success() || steps.pipeline.outputs.run_status == 'degraded' }}
         run: |
           if [ -n "${{ secrets.PAT_GITHUB }}" ] && [ -d "artifacts" ]; then
             cd artifacts/

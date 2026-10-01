@@ -3,9 +3,10 @@
  * Implements all 36 improvement items across 8 categories.
  */
 
+import * as fs from "fs";
 import * as path from "path";
 import { config, env } from "./core/config";
-import { metrics } from "./core/metrics";
+import { metrics, type RunStatus } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
 import { fetchRss, ArticleItem } from "./ingestion/rss";
@@ -44,6 +45,7 @@ import { generateAtomFeed } from "./publishing/feed_generator";
 import { generatePagesSite } from "./publishing/pages_generator";
 import { generatePodcast } from "./publishing/podcast_generator";
 import { evaluateQuality } from "./evaluation/quality_checker";
+import { evaluateRunGate, RunGateResult } from "./evaluation/run_gate";
 import { analyzeTopicTrends, formatTrendAnalysis } from "./aggregation/trend_analyzer";
 import {
   markAsProcessed,
@@ -89,9 +91,9 @@ export async function mapWithConcurrency<T, R>(
 }
 
 /**
- * Main pipeline orchestrator.
+ * Main pipeline orchestrator. Resolves with the run status; a "degraded" run publishes nothing.
  */
-async function main() {
+async function main(): Promise<RunStatus> {
   const today = new Date().toISOString().split("T")[0] ?? "unknown-date";
   console.log(`\n🚀 Digital Trend Flow - Daily Pipeline Starting (${today})...`);
   console.log(`   ⚙️ API Concurrency: ${env.API_CONCURRENCY}, Interval: ${env.API_INTERVAL_MS}ms\n`);
@@ -267,7 +269,7 @@ async function main() {
 
   if (allNewItems.length === 0) {
     console.log("ℹ️ No new articles found today. Pipeline complete.");
-    return;
+    return "skipped";
   }
 
   // ==========================
@@ -364,7 +366,7 @@ async function main() {
 
   if (allScoredArticles.length === 0) {
     console.log("ℹ️ No articles met the quality threshold. Pipeline complete.");
-    return;
+    return "skipped";
   }
 
   // Item 2.4: Semantic deduplication
@@ -386,6 +388,11 @@ async function main() {
   metrics.setArticleCounts(allNewItems.length, allScoredArticles.length, selectedArticles.length);
   await registry.events.emit("scoring:complete", { selected: selectedArticles.length });
 
+  if (selectedArticles.length === 0) {
+    console.log("ℹ️ No articles were selected after quota balancing. Pipeline complete.");
+    return "skipped";
+  }
+
   // ==========================
   // Phase 3: Map Processing
   // ==========================
@@ -400,22 +407,42 @@ async function main() {
 
   const mapResults = await mapWithConcurrency(mapInputs, mapExtractFacts, env.API_CONCURRENCY, env.API_INTERVAL_MS);
 
+  // Only articles whose facts were extracted go on to Reduce, are published and are marked as
+  // processed. Failed ones are left unprocessed so the next run retries them.
   const allFacts: (MapOutput & { purpose: string; purposeLabel: string; score: number })[] = [];
+  const summarizedArticles: ScoredArticle[] = [];
   for (let i = 0; i < mapResults.length; i++) {
     const result = mapResults[i];
     const sa = selectedArticles[i];
-    if (result?.status === "fulfilled" && sa) {
+    if (!result || !sa) continue;
+    if (result.status === "fulfilled") {
       allFacts.push({
         ...result.value,
         purpose: sa.purpose,
         purposeLabel: sa.purposeLabel,
         score: sa.score,
       });
+      summarizedArticles.push(sa);
+    } else {
+      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      console.warn(`⚠️ Map extraction failed for ${sa.article.url}: ${reason}`);
+      metrics.recordError(`Map failed for ${sa.article.url}: ${reason}`);
     }
   }
 
-  console.log(`  → Extracted facts from ${allFacts.length} articles.`);
+  metrics.setMapResults(selectedArticles.length, allFacts.length);
+  console.log(`  → Extracted facts from ${allFacts.length}/${selectedArticles.length} articles.`);
   await registry.events.emit("map:complete", { factCount: allFacts.length });
+
+  const gateThresholds = {
+    minMapSuccessRate: config.settings.quality_gate.min_map_success_rate,
+    minQualityScore: config.settings.quality_gate.min_quality_score,
+  };
+
+  if (allFacts.length === 0) {
+    // Nothing grounded to summarize: skip Reduce instead of summarizing titles alone.
+    return finishDegraded(evaluateRunGate({ mapAttempted: selectedArticles.length, mapSucceeded: 0 }, gateThresholds));
+  }
 
   // ==========================
   // Phase 4: Reduce Summarization
@@ -436,8 +463,9 @@ async function main() {
     "en";
   console.log(`  🌐 Output language: ${targetLanguage}`);
 
-  const summaryMarkdown = await reduceSummarize(allFacts, today, activePurposes, targetLanguage);
-  console.log("  → Summary generated successfully.");
+  const reduceResult = await reduceSummarize(allFacts, today, activePurposes, targetLanguage);
+  const summaryMarkdown = reduceResult.markdown;
+  console.log(reduceResult.usedFallback ? "  → Reduce failed; raw-facts fallback produced." : "  → Summary generated successfully.");
   await registry.events.emit("reduce:complete", { length: summaryMarkdown.length });
 
   // ==========================
@@ -445,7 +473,7 @@ async function main() {
   // ==========================
   console.log("\n🔍 Phase 5: Quality Evaluation...");
 
-  const expectedUrls = selectedArticles.map((sa) => sa.article.url);
+  const expectedUrls = summarizedArticles.map((sa) => sa.article.url);
   const qualityResult = evaluateQuality(summaryMarkdown, expectedUrls, targetLanguage);
   metrics.setQualityScore(qualityResult.overallScore);
 
@@ -459,6 +487,21 @@ async function main() {
 
   await registry.events.emit("quality:complete", { score: qualityResult.overallScore });
 
+  // Publication gate: a degraded run is not published and leaves its URLs unprocessed.
+  const gate = evaluateRunGate(
+    {
+      mapAttempted: selectedArticles.length,
+      mapSucceeded: allFacts.length,
+      reduceUsedFallback: reduceResult.usedFallback,
+      qualityScore: qualityResult.overallScore,
+    },
+    gateThresholds
+  );
+  if (gate.status === "degraded") {
+    return finishDegraded(gate);
+  }
+  metrics.setRunStatus("success");
+
   // ==========================
   // Phase 6: Storage & Publishing
   // ==========================
@@ -471,14 +514,14 @@ async function main() {
 
   // Build enriched frontmatter (Items 6.3, 8.3)
   const allKeywords = new Set<string>();
-  for (const sa of selectedArticles) {
+  for (const sa of summarizedArticles) {
     sa.matchedKeywords.forEach((kw) => allKeywords.add(kw));
   }
   const previousDate = new Date(Date.now() - 86_400_000).toISOString().split("T")[0] ?? "";
 
   // Purpose distribution for metrics
   const purposeDistribution: Record<string, number> = {};
-  for (const sa of selectedArticles) {
+  for (const sa of summarizedArticles) {
     purposeDistribution[sa.purposeLabel] = (purposeDistribution[sa.purposeLabel] ?? 0) + 1;
   }
   metrics.setArticlesByPurpose(purposeDistribution);
@@ -490,11 +533,11 @@ async function main() {
   const frontmatterMeta: SummaryFrontmatter = {
     tags: Array.from(allKeywords).slice(0, 20),
     categories: activePurposes.map((p) => p.label),
-    sources: [...new Set(selectedArticles.map((sa) => sa.purpose))],
-    topStory: selectedArticles.sort((a, b) => b.score - a.score)[0]?.article.title,
+    sources: [...new Set(summarizedArticles.map((sa) => sa.purpose))],
+    topStory: summarizedArticles.sort((a, b) => b.score - a.score)[0]?.article.title,
     previousDate,
     // Item 6.3: DataView extensions
-    articleCount: selectedArticles.length,
+    articleCount: summarizedArticles.length,
     topPurpose,
     mentionedCompanies: extractMentionedCompanies(summaryMarkdown),
     mentionedTechnologies: extractMentionedTechnologies(summaryMarkdown),
@@ -506,14 +549,14 @@ async function main() {
   };
 
   const outputDir = path.join(PATHS.ARTIFACTS_DAILY.absolute, yyyy, mm);
-  saveMarkdownFile(outputDir, filename, title, summaryMarkdown, selectedArticles.length, config.settings.author, frontmatterMeta);
+  saveMarkdownFile(outputDir, filename, title, summaryMarkdown, summarizedArticles.length, config.settings.author, frontmatterMeta);
 
   // Item B: Generate and save Obsidian JSON Canvas
   try {
     const canvasPurposes = activePurposes.map((p) => ({
       key: p.key,
       label: p.label,
-      articles: selectedArticles
+      articles: summarizedArticles
         .filter((sa) => sa.purpose === p.key)
         .map((sa) => ({
           title: sa.article.title,
@@ -525,7 +568,7 @@ async function main() {
     saveDailyCanvas({
       date: today,
       topStory: frontmatterMeta.topStory ?? "Daily Tech Trend",
-      topStoryUrl: selectedArticles.sort((a, b) => b.score - a.score)[0]?.article.url,
+      topStoryUrl: summarizedArticles.sort((a, b) => b.score - a.score)[0]?.article.url,
       purposeGroups: canvasPurposes,
       mentionedCompanies: frontmatterMeta.mentionedCompanies,
       mentionedTechnologies: frontmatterMeta.mentionedTechnologies,
@@ -536,10 +579,10 @@ async function main() {
   }
 
   // Publishing (Items 6.4, 6.5)
-  await notifyDiscord(title, summaryMarkdown, selectedArticles.length);
-  await notifySlack(title, summaryMarkdown, selectedArticles.length);
-  await notifyTeams(title, summaryMarkdown, selectedArticles.length);
-  await notifyEmail(title, summaryMarkdown, selectedArticles.length);
+  await notifyDiscord(title, summaryMarkdown, summarizedArticles.length);
+  await notifySlack(title, summaryMarkdown, summarizedArticles.length);
+  await notifyTeams(title, summaryMarkdown, summarizedArticles.length);
+  await notifyEmail(title, summaryMarkdown, summarizedArticles.length);
 
   // Item 6.5: Generate RSS feed
   generateAtomFeed();
@@ -561,7 +604,7 @@ async function main() {
   await registry.events.emit("publish:complete", { channels: ["obsidian", "discord", "slack", "teams", "rss", "pages", "podcast"] });
 
   // Mark processed URLs
-  for (const sa of selectedArticles) {
+  for (const sa of summarizedArticles) {
     markAsProcessed(sa.article.url, sa.article.title, sa.score, sa.purpose);
   }
 
@@ -600,24 +643,59 @@ async function main() {
   }
 
   // Item 4.4: GitHub Actions job summary
-  if (process.env["GITHUB_STEP_SUMMARY"]) {
-    const summaryPath = process.env["GITHUB_STEP_SUMMARY"];
-    const fs = require("fs");
-    fs.appendFileSync(summaryPath, metrics.toGitHubSummary(), "utf8");
-    console.log("📊 GitHub Actions summary written.");
-  }
+  writeStepSummary();
 
   // Cost summary
   console.log(`\n💰 Total LLM Cost: $${finalMetrics.total_cost_usd.toFixed(4)}`);
   console.log(`   Tokens: ${finalMetrics.total_tokens.input.toLocaleString()} in / ${finalMetrics.total_tokens.output.toLocaleString()} out`);
 
   await registry.events.emit("pipeline:complete", {
-    articles: selectedArticles.length,
+    articles: summarizedArticles.length,
     cost: finalMetrics.total_cost_usd,
     quality: qualityResult.overallScore,
   });
 
-  console.log(`\n🎉 Pipeline complete! Processed ${selectedArticles.length} articles across ${activePurposes.length} categories.`);
+  console.log(`\n🎉 Pipeline complete! Processed ${summarizedArticles.length} articles across ${activePurposes.length} categories.`);
+  return "success";
+}
+
+// ── Degraded Run Handling ──
+
+/**
+ * Ends a run that failed the publication gate: nothing is published, no URL is marked as
+ * processed (so the articles are retried by the next run) and Raindrop items stay in the inbox.
+ * The metrics and the run record are still saved so the failure is visible.
+ */
+async function finishDegraded(gate: RunGateResult): Promise<RunStatus> {
+  console.error("\n🚫 Run degraded — nothing was published and no URL was marked as processed:");
+  for (const reason of gate.reasons) {
+    console.error(`   - ${reason}`);
+  }
+
+  metrics.setRunStatus("degraded", gate.reasons);
+  savePipelineRun(metrics.finalize());
+  metrics.persist();
+  writeStepSummary();
+
+  await registry.events.emit("pipeline:error", { status: "degraded", reasons: gate.reasons });
+  return "degraded";
+}
+
+// ── GitHub Actions Integration ──
+
+/** Appends the metrics summary to the GitHub Actions job summary, when running in Actions. */
+function writeStepSummary(): void {
+  const summaryPath = process.env["GITHUB_STEP_SUMMARY"];
+  if (!summaryPath) return;
+  fs.appendFileSync(summaryPath, metrics.toGitHubSummary(), "utf8");
+  console.log("📊 GitHub Actions summary written.");
+}
+
+/** Exposes a step output (e.g. `run_status`) to later workflow steps, when running in Actions. */
+function writeGitHubOutput(key: string, value: string): void {
+  const outputPath = process.env["GITHUB_OUTPUT"];
+  if (!outputPath) return;
+  fs.appendFileSync(outputPath, `${key}=${value}\n`, "utf8");
 }
 
 // ── Two-Pass Quota Selection ──
@@ -703,15 +781,21 @@ async function cleanup(): Promise<void> {
   }
 }
 
+// A degraded run exits non-zero so the job fails visibly; the workflow reads the `run_status`
+// step output to still commit the run record (see .github/workflows/daily_summary.yml).
+const EXIT_CODE_DEGRADED = 2;
+
 main()
-  .then(async () => {
+  .then(async (status) => {
     await cleanup();
-    process.exit(0);
+    writeGitHubOutput("run_status", status);
+    process.exit(status === "degraded" ? EXIT_CODE_DEGRADED : 0);
   })
   .catch(async (err) => {
     await cleanup();
     console.error("💀 Fatal pipeline error:", err);
     metrics.recordError(`Fatal: ${err.message ?? err}`);
     registry.events.emit("pipeline:error", { error: String(err) }).catch(() => {});
+    writeGitHubOutput("run_status", "failed");
     process.exit(1);
   });

@@ -13,6 +13,12 @@ import { MapOutput } from "./gemini_map";
 // Token management: conservative character limit for reduce input.
 const MAX_REDUCE_INPUT_CHARS = 200_000;
 
+export interface ReduceResult {
+  markdown: string;
+  // True when the LLM call failed and the raw-facts fallback document was returned instead.
+  usedFallback: boolean;
+}
+
 /**
  * Reduce phase: Synthesize all extracted facts into a purpose-sectioned
  * Markdown summary using the high-performance model via LLM Gateway.
@@ -22,7 +28,7 @@ export async function reduceSummarize(
   date: string,
   activePurposes: { key: string; label: string }[] = [],
   targetLanguage: string = "en"
-): Promise<string> {
+): Promise<ReduceResult> {
   try {
     // Build dynamic purpose-aware prompt
     const systemPrompt = buildReducePrompt(activePurposes, targetLanguage);
@@ -83,7 +89,7 @@ Based on these facts, generate the daily briefing with purpose-sectioned format.
       maxOutputTokens: 8192,
     });
 
-    return response.text;
+    return { markdown: response.text, usedFallback: false };
   } catch (error: any) {
     console.error(`❌ Reduce summarization failed: ${error.message}`);
     // Fallback: generate a purpose-grouped raw fact dump
@@ -108,6 +114,9 @@ Based on these facts, generate the daily briefing with purpose-sectioned format.
       )
       .join("\n\n---\n\n");
 
-    return `# Daily Summary (${date}) - Fallback Mode\n\n> ⚠️ LLM summarization failed. Raw facts are listed below.\n\n${sections}`;
+    return {
+      markdown: `# Daily Summary (${date}) - Fallback Mode\n\n> ⚠️ LLM summarization failed. Raw facts are listed below.\n\n${sections}`,
+      usedFallback: true,
+    };
   }
 }

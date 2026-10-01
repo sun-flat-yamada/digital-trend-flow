@@ -24,6 +24,9 @@ export interface LLMCallMetrics {
 
 // ── Pipeline Run Metrics ──
 
+/** Outcome of a pipeline run. A "degraded" run is not published (see evaluation/run_gate.ts). */
+export type RunStatus = "success" | "degraded" | "skipped" | "failed";
+
 export interface SourceStatus {
   name: string;
   type: string;
@@ -48,6 +51,10 @@ export interface PipelineRunMetrics {
   errors: string[];
   sources_status: SourceStatus[];
   quality_score?: number;
+  run_status?: RunStatus;
+  status_reasons?: string[];
+  map_attempted?: number; // selected articles sent to the Map phase
+  map_succeeded?: number; // articles whose facts were extracted
 }
 
 // ── Pricing Table (per 1M tokens, approximate as of 2026-04) ──
@@ -151,6 +158,18 @@ class MetricsCollector {
     this.metrics.quality_score = score;
   }
 
+  /** Records how many selected articles went through Map and how many yielded facts. */
+  setMapResults(attempted: number, succeeded: number): void {
+    this.metrics.map_attempted = attempted;
+    this.metrics.map_succeeded = succeeded;
+  }
+
+  /** Records the run outcome and, for a non-success outcome, why. */
+  setRunStatus(status: RunStatus, reasons: string[] = []): void {
+    this.metrics.run_status = status;
+    this.metrics.status_reasons = reasons;
+  }
+
   /** Finalizes metrics and returns the complete record. */
   finalize(): PipelineRunMetrics {
     const now = new Date();
@@ -187,21 +206,30 @@ class MetricsCollector {
       .map(([purpose, count]) => `| ${purpose} | ${count} |`)
       .join("\n");
 
+    const statusIcons: Record<RunStatus, string> = { success: "✅", degraded: "⚠️", skipped: "⏭️", failed: "❌" };
+    const runStatus = m.run_status ? `${statusIcons[m.run_status]} ${m.run_status}` : "N/A";
+    const mapSuccess = m.map_attempted !== undefined ? `${m.map_succeeded ?? 0}/${m.map_attempted}` : "N/A";
+    const reasonsSection = m.status_reasons && m.status_reasons.length > 0
+      ? `\n### ⚠️ Run Status Reasons\n${m.status_reasons.map((r) => `- ${r}`).join("\n")}\n`
+      : "";
+
     return `## 📊 Daily Pipeline Summary — ${m.date}
 
 | Metric | Value |
 |:---|:---|
+| Run Status | ${runStatus} |
 | Run ID | \`${m.run_id.slice(0, 8)}\` |
 | Duration | ${m.duration_ms ? `${(m.duration_ms / 1000).toFixed(1)}s` : "N/A"} |
 | Articles Ingested | ${m.articles_ingested} |
 | Articles Scored | ${m.articles_scored} |
 | Articles Selected | ${m.articles_selected} |
+| Map Success (Articles) | ${mapSuccess} |
 | LLM Calls (Map/Reduce/Judge) | ${mapCalls}/${reduceCalls}/${judgeCalls} |
 | Total Tokens (In/Out) | ${m.total_tokens.input.toLocaleString()} / ${m.total_tokens.output.toLocaleString()} |
 | Estimated Cost | $${m.total_cost_usd.toFixed(4)} |
 | Quality Score | ${m.quality_score?.toFixed(1) ?? "N/A"} |
 | Errors | ${m.errors.length} |
-
+${reasonsSection}
 ### Sources
 | Source | Type | Status | Articles |
 |:---|:---|:---|:---|

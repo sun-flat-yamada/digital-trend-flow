@@ -102,5 +102,18 @@ describe("Config Schema Validation", () => {
     // State TTL
     expect(config.settings.state_ttl_days).toBeDefined();
     expect(config.settings.state_ttl_days).toBeGreaterThan(0);
+
+    // Publication gate
+    expect(config.settings.quality_gate.min_map_success_rate).toBeGreaterThan(0);
+    expect(config.settings.quality_gate.min_map_success_rate).toBeLessThanOrEqual(1);
+    expect(config.settings.quality_gate.min_quality_score).toBeGreaterThan(0);
+  });
+
+  test("quality_gate falls back to defaults when omitted", () => {
+    const raw = yaml.parse(fs.readFileSync(path.join(process.cwd(), "config.yml"), "utf8"));
+    delete raw.settings.quality_gate;
+    const config = ConfigSchema.parse(raw);
+
+    expect(config.settings.quality_gate).toEqual({ min_map_success_rate: 0.5, min_quality_score: 60 });
   });
 });

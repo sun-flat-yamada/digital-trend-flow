@@ -53,6 +53,11 @@ settings:
   # 出力言語設定 (デフォルトは英語 "en"、GitHub Actions Variables や環境変数 OUTPUT_LANGUAGE / SUMMARY_LANGUAGE で上書き可能)
   language: en
 
+  # 公開ゲート: いずれかを下回った実行は「劣化 (degraded)」と判定し、外部配信・処理済み登録を行わずにジョブを失敗させる
+  quality_gate:
+    min_map_success_rate: 0.5  # 選定記事のうち Map (事実抽出) に成功した割合の下限 (0〜1)
+    min_quality_score: 60      # 品質スコア (0〜100) の下限
+
 # ==========================================
 # PURPOSES & SOURCES (第一レベルカテゴリと情報源)
 # ==========================================

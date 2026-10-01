@@ -2,7 +2,20 @@
  * Tests for metrics.ts — LLM cost estimation and GitHub summary generation.
  */
 
-import { estimateCost } from "../src/core/metrics";
+import { estimateCost, metrics } from "../src/core/metrics";
+
+describe("toGitHubSummary run status", () => {
+  test("shows the run status, map success and the reasons of a degraded run", () => {
+    metrics.setMapResults(10, 3);
+    metrics.setRunStatus("degraded", ["Map success rate 30% (3/10 articles) is below the minimum of 50%"]);
+
+    const summary = metrics.toGitHubSummary();
+
+    expect(summary).toContain("| Run Status | ⚠️ degraded |");
+    expect(summary).toContain("| Map Success (Articles) | 3/10 |");
+    expect(summary).toContain("### ⚠️ Run Status Reasons\n- Map success rate 30% (3/10 articles) is below the minimum of 50%");
+  });
+});
 
 describe("estimateCost", () => {
   test("calculates Gemini Flash cost correctly", () => {
