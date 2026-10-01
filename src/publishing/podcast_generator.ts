@@ -6,7 +6,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { PATHS } from "../core/paths";
 
 export interface DialogueTurn {
@@ -152,7 +152,7 @@ export function buildDialogueScript(summaryMarkdown: string, date: string): Podc
  */
 export function isEdgeTtsAvailable(): boolean {
   try {
-    execSync("edge-tts --version", { stdio: "ignore" });
+    execFileSync("edge-tts", ["--version"], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -194,10 +194,13 @@ export async function generatePodcast(
     try {
       // Synthesize combined audio or host A voice
       const fullText = script.turns.map((t) => `${t.speakerName}。${t.text}`).join(" ");
-      const escapedText = fullText.replace(/"/g, '\\"');
-      execSync(`edge-tts --voice ja-JP-KeitaNeural --text "${escapedText}" --write-media "${audioPath}"`, {
-        timeout: 60000,
-      });
+      // The text derives from LLM output over scraped articles, so it is passed as a plain
+      // argument without a shell: `$(...)`, backticks and quotes are never interpreted.
+      execFileSync(
+        "edge-tts",
+        ["--voice", "ja-JP-KeitaNeural", "--text", fullText, "--write-media", audioPath],
+        { timeout: 60000 }
+      );
       console.log(`🔊 Podcast audio synthesized: ${audioPath}`);
       return {
         scriptPath: jsonPath,
