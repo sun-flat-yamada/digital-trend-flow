@@ -303,12 +303,13 @@ function getProviderConfigs(phase: "map" | "reduce"): ProviderConfig[] {
     { platform: primary.platform, model: primary[phase] },
   ];
 
-  // If reduce phase uses a distinct model on Google (e.g. Pro),
-  // add an in-provider fallback to the Map model (Flash / Flash-Lite).
-  // This ensures Free Tier users whose Pro model hits "limit: 0" will gracefully
-  // fall back to a working Flash model without failing the pipeline.
-  if (phase === "reduce" && primary.platform === "google" && primary.reduce !== primary.map) {
-    providers.push({ platform: "google", model: primary.map });
+  // In-provider fallback: when this phase's Google model is rejected or unavailable, retry with
+  // the other phase's model before moving to an external provider. For Reduce this covers Free
+  // Tier keys whose Pro model hits "limit: 0"; for Map it covers a map model that cannot serve the
+  // request at all (e.g. an auto-resolved model that rejects system instructions with a 400).
+  const alternateModel = phase === "reduce" ? primary.map : primary.reduce;
+  if (primary.platform === "google" && alternateModel !== primary[phase]) {
+    providers.push({ platform: "google", model: alternateModel });
   }
 
   // Add fallback providers if configured
@@ -393,6 +394,7 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
     || request.phase === "trend_detection"
     ? "map" : request.phase;
   const providers = getProviderConfigs(phase as "map" | "reduce");
+  let lastError: string | undefined;
 
   for (const provider of providers) {
     if (isCircuitOpen(provider.platform)) {
@@ -418,19 +420,21 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
       return response;
     } catch (error: any) {
       const originalError = error instanceof AbortError ? error.originalError : error;
-      const status = (originalError as any)?.status ?? (originalError as any)?.response?.status;
-      // Only fallback on transient errors (rate limit, server error, timeout)
-      if (status === 400 || status === 401 || status === 403) {
-        // Client errors — don't fallback, re-throw
-        throw originalError;
+      // Only infrastructure failures (5xx, timeouts, network) count toward the circuit breaker.
+      // Client errors such as a 400 from a model that cannot serve this request are specific to
+      // that model, so they must not lock out the other models on the same platform.
+      if (isTransientError(originalError)) {
+        recordFailure(provider.platform, originalError);
       }
-      recordFailure(provider.platform, originalError);
-      console.warn(
-        `  ⚠️ ${provider.platform}/${provider.model} failed after retries: ${(originalError as any)?.message ?? originalError}. Trying next provider...`
-      );
-      metrics.recordError(`${provider.platform}/${provider.model}: ${(originalError as any)?.message ?? originalError}`);
+      // Every failure is recorded and the next candidate is tried: a client error from one model
+      // (e.g. "Developer instruction is not enabled for this model") says nothing about the others.
+      lastError = `${provider.platform}/${provider.model}: ${(originalError as any)?.message ?? originalError}`;
+      metrics.recordError(`[${request.phase}] ${lastError}`);
+      console.warn(`  ⚠️ ${lastError}. Trying next provider...`);
     }
   }
 
-  throw new Error(`All LLM providers failed for phase: ${request.phase}`);
+  throw new Error(
+    `All LLM providers failed for phase: ${request.phase} (last error: ${lastError ?? "every provider was skipped by its circuit breaker"})`
+  );
 }
