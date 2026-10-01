@@ -28,7 +28,12 @@ settings:
     enabled: true
     similarity_threshold: 0.75      # タイトル類似度閾値
   language: "en"                    # 出力言語 (デフォルト: "en", GitHub Variables で上書き可能)
+  quality_gate:                     # 公開ゲート (下回ると degraded: 配信・処理済み登録をせずジョブ失敗)
+    min_map_success_rate: 0.5       # Map で事実を抽出できた記事の割合の下限 (0〜1)
+    min_quality_score: 60           # 品質スコアの下限 (0〜100)
 ```
+
+> degraded の扱いは [Architecture の Quality Gate](architecture.md#quality-gate) を参照。
 
 ### Fallback Models (Optional)
 
