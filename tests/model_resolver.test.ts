@@ -1,4 +1,4 @@
-import { resolveModel, clearResolvedCache } from "../src/summarization/model_resolver";
+import { resolveModel, clearResolvedCache, isTextGenerationModel } from "../src/summarization/model_resolver";
 
 describe("Model Resolver", () => {
   const originalFetch = global.fetch;
@@ -73,6 +73,53 @@ describe("Model Resolver", () => {
 
     const result = await resolveModel("latest-flash", "google");
     expect(result).toBe("gemini-3.8-flash");
+  });
+
+  test("skips speech, image, audio and Live variants when resolving latest-flash-lite", async () => {
+    // Reproduces the 2026-09-23 incident: a TTS-only model outranked the text model by version
+    // and every Map call failed with "400 Developer instruction is not enabled for this model".
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        models: [
+          { name: "models/gemini-3.5-flash-lite", supportedGenerationMethods: ["generateContent", "countTokens"] },
+          { name: "models/gemini-3.8-flash-lite-tts", supportedGenerationMethods: ["generateContent", "countTokens"] },
+          { name: "models/gemini-3.8-flash-lite-image", supportedGenerationMethods: ["generateContent"] },
+          { name: "models/gemini-3.8-flash-lite-native-audio", supportedGenerationMethods: ["generateContent"] },
+          { name: "models/gemini-3.8-flash-lite-live", supportedGenerationMethods: ["bidiGenerateContent"] },
+        ],
+      }),
+    } as any);
+
+    const result = await resolveModel("latest-flash-lite", "google");
+    expect(result).toBe("gemini-3.5-flash-lite");
+  });
+
+  test("skips models that do not support generateContent", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        models: [
+          { name: "models/gemini-3.5-flash", supportedGenerationMethods: ["generateContent"] },
+          { name: "models/gemini-3.9-flash", supportedGenerationMethods: ["countTokens"] },
+        ],
+      }),
+    } as any);
+
+    const result = await resolveModel("latest-flash", "google");
+    expect(result).toBe("gemini-3.5-flash");
+  });
+
+  test("isTextGenerationModel classifies model variants", () => {
+    expect(isTextGenerationModel({ name: "models/gemini-3.5-flash-lite" })).toBe(true);
+    expect(isTextGenerationModel({ name: "models/gemini-2.5-flash-lite-preview-09-2025" })).toBe(true);
+    expect(isTextGenerationModel({ name: "models/gemini-3.8-flash-lite-tts" })).toBe(false);
+    expect(isTextGenerationModel({ name: "models/gemini-2.5-flash-preview-native-audio-dialog" })).toBe(false);
+    expect(isTextGenerationModel({ name: "models/gemini-2.0-flash-preview-image-generation" })).toBe(false);
+    expect(isTextGenerationModel({ name: "models/gemini-embedding-001" })).toBe(false);
+    expect(
+      isTextGenerationModel({ name: "models/gemini-3.5-flash", supportedGenerationMethods: ["embedContent"] })
+    ).toBe(false);
   });
 
   test("falls back gracefully when API returns error", async () => {

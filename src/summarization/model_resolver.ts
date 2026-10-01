@@ -3,6 +3,24 @@ import { env } from "../core/config";
 // Cache the resolved models to avoid repeated API calls
 const resolvedCache: Record<string, string> = {};
 
+// Model ID tokens that mark modality-specific variants (speech synthesis, image generation,
+// native audio, Live API, embeddings, ...). These reject ordinary text requests: a TTS model,
+// for example, answers a system instruction with "400 Developer instruction is not enabled".
+const NON_TEXT_VARIANT_TOKENS = new Set(["tts", "image", "audio", "live", "embedding", "computer", "robotics"]);
+
+/**
+ * Returns true if a model from the `models.list` response can serve plain-text
+ * `generateContent` requests (the only kind this pipeline makes).
+ */
+export function isTextGenerationModel(model: { name?: string; supportedGenerationMethods?: unknown }): boolean {
+  const methods = model.supportedGenerationMethods;
+  if (Array.isArray(methods) && !methods.includes("generateContent")) {
+    return false;
+  }
+  const modelId = (model.name ?? "").toLowerCase().replace(/^models\//, "");
+  return !modelId.split("-").some((token) => NON_TEXT_VARIANT_TOKENS.has(token));
+}
+
 export function clearResolvedCache(): void {
   for (const key of Object.keys(resolvedCache)) {
     delete resolvedCache[key];
@@ -63,6 +81,7 @@ export async function resolveModel(configuredModel: string, platform: string = "
     // Filter models based on target category: flash-lite / flash / pro
     const geminiModels = data.models
       .filter((m: any) => m.name && m.name.startsWith("models/gemini-"))
+      .filter((m: any) => isTextGenerationModel(m))
       .filter((m: any) => {
         const name = m.name.toLowerCase();
         if (isFlashLite) {
