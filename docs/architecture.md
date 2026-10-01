@@ -516,13 +516,13 @@ Provider A (primary) → 失敗 3 回 → Circuit OPEN → Provider B にフォ�
                        Circuit CLOSED → Provider A に復帰
 ```
 
-- **閾値**: 連続 3 回失敗で回路 OPEN
+- **閾値**: 連続 3 回失敗で回路 OPEN（5xx・タイムアウト・ネットワーク障害のみを数える）
 - **Cooldown**: 5 分で自動復帰
-- **非フォールバック**: 400/401/403 (クライアントエラー) は即座に re-throw
+- **クライアントエラー** (400/401/403 など): 再試行せずにエラーを記録し、次の候補（同一プラットフォーム上のもう一方のフェーズのモデル → `fallback_models`）へフォールバックする。モデル固有の失敗で同じプラットフォームの健全なモデルまで遮断しないよう、サーキットブレーカーには数えない
 
 ### Auto Model Resolution
 
-`config.yml` で `latest-flash` / `latest-pro` を指定すると、Gemini API の `models` エンドポイントから最新の安定モデルを自動解決します。実験的モデル (`-exp`) は自動除外。
+`config.yml` で `latest-flash` / `latest-pro` を指定すると、Gemini API の `models` エンドポイントから最新の安定モデルを自動解決します。実験的モデル (`-exp`) に加え、`generateContent` 非対応のモデルと、音声合成 (`-tts`)・画像生成 (`-image`)・ネイティブ音声 (`-audio`)・Live API (`-live`)・埋め込み (`embedding`) などの派生モデルも除外します。
 
 ## Plugin Architecture
 
@@ -557,20 +557,38 @@ interface PublishingPlugin {
 | `quality:complete`   | 品質評価完了             |
 | `publish:complete`   | 全チャンネル配信完了     |
 | `pipeline:complete`  | パイプライン正常終了     |
-| `pipeline:error`     | 致命的エラー発生         |
+| `pipeline:error`     | 致命的エラー発生、または degraded 判定 |
 
 ## Quality Gate
 
-`src/evaluation/quality_checker.ts` が 6 項目で出力品質を自動評価します（100 点満点）:
+公開の可否は `src/evaluation/run_gate.ts` が判定します。次のいずれかに該当する実行は **degraded（劣化）** となります。
 
-| Check              | Weight | Criteria                              |
-| :----------------- | :----- | :------------------------------------ |
-| Format Compliance  | 均等   | 🔥 トップニュース + カテゴリセクション |
-| Length Compliance  | 均等   | 2,000-8,000 字                        |
-| Citation Accuracy  | 均等   | 期待 URL の 50% 以上が出現            |
-| Language Check     | 均等   | 日本語文字比率 15% 以上               |
-| Markdown Structure | 均等   | 壊れたリンク・未閉じフォーマットなし  |
-| No Empty Sections  | 均等   | 空セクションなし                      |
+| 条件 | 既定値（`config.yml` の `settings.quality_gate`） |
+| :-- | :-- |
+| Map で事実を抽出できた記事の割合が下限未満 | `min_map_success_rate: 0.5` |
+| Reduce が失敗し、事実の羅列（Fallback Mode）になった | — |
+| 品質スコアが下限未満 | `min_quality_score: 60` |
+
+degraded の実行は次のように扱われます。
+
+- Markdown 保存・Discord / Slack / Teams / Email・Atom フィード・Pages・Podcast を一切行わない
+- URL を処理済みにせず、Raindrop もアーカイブしない（次回の実行で再試行される）
+- `pipeline_runs`・メトリクス JSON・Job Summary には `run_status` と理由を記録する
+- 終了コード 2 でジョブを失敗させる。ワークフローはステップ出力 `run_status` を見て、状態 DB とメトリクスだけをコミットする
+
+Map で失敗した記事は、degraded でない実行でも Reduce に渡さず（タイトルだけで要約させない）、処理済みにもしません。
+
+品質スコアは `src/evaluation/quality_checker.ts` が次の 7 項目で評価します（100 点満点、各項目の平均）:
+
+| Check               | Criteria                                                 |
+| :------------------ | :------------------------------------------------------- |
+| Format Compliance   | 🔥 トップニュース + カテゴリセクション                    |
+| Length Compliance   | 1,200-8,000 字                                           |
+| Citation Accuracy   | 期待 URL の 50% 以上が出現                               |
+| Language Check      | `ja`: 日本語文字比率 15% 以上 / `en`: 英字比率 40% 以上   |
+| Markdown Structure  | 壊れたリンク・未閉じフォーマットなし                     |
+| No Empty Sections   | 空セクションなし                                         |
+| Actionable Insights | 技術的な進歩とエンジニア向けアクションへの言及           |
 
 ## Observability
 

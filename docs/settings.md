@@ -138,7 +138,10 @@ To prevent temporary rate-limiting from shutting down the entire pipeline, the c
 2. **Infrastructure Failures (`500`, `502`, `503`, network disconnects)**:
    - If 3 consecutive requests fail across all retries (`CIRCUIT_THRESHOLD = 3`), the circuit breaker opens (`isOpen = true`).
    - Requests to that provider are skipped during the 5-minute cooldown (`CIRCUIT_COOLDOWN_MS = 300,000 ms`) before probing again.
-3. **Success Reset**:
+3. **Client Errors (`400`, `401`, `403`, unusable responses)**:
+   - Specific to the model or request, so they are **NOT** counted as outages and never open the circuit (a model that rejects a request must not lock out healthy models on the same platform).
+   - The error is recorded in the run metrics and the request moves to the next candidate: the other phase's model on the same platform (Map ↔ Reduce), then `fallback_models` if configured.
+4. **Success Reset**:
    - Any successful API response resets the provider's failure counter to 0.
 
 ---

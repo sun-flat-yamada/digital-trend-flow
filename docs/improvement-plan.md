@@ -321,15 +321,22 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 
 - [ ] 0-1 リポジトリ変数 `AI_MODEL_MAP=gemini-3.5-flash-lite` を設定する（コード変更不要。09-22 まで正常に動作していたモデル）
 - [ ] 0-2 9 月の月次ダイジェスト（10-01 19:30 UTC に定期実行）は劣化日を含む。修正後に `workflow_dispatch` で再生成するか、劣化期間の注記を付ける
-- [ ] 0-3 `model_resolver` を、`supportedGenerationMethods` に `generateContent` を含むモデルに限定し、`-tts`・`-image`・`-audio`・`-live`・`embedding` 系を除外するよう直す。派生モデルが混在するテストを追加する
-- [ ] 0-4 ゲートウェイで 4xx も `metrics.errors` に記録する。モデル非互換系の 400 は次の候補へフォールバックする
-- [ ] 0-5 Map 失敗時のプレースホルダーを廃止し、成功した記事だけを Reduce に渡す。`map_success_rate` を算出する
-- [ ] 0-6 実行ステータス `degraded` を導入する。Map 成功率が閾値（初期値 80%）未満、または Reduce が fallback の場合は次のようにする
+- [x] 0-3 `model_resolver` を、`supportedGenerationMethods` に `generateContent` を含むモデルに限定し、`-tts`・`-image`・`-audio`・`-live`・`embedding` 系を除外するよう直す。派生モデルが混在するテストを追加する
+- [x] 0-4 ゲートウェイで 4xx も `metrics.errors` に記録する。モデル非互換系の 400 は次の候補へフォールバックする
+- [x] 0-5 Map 失敗時のプレースホルダーを廃止し、成功した記事だけを Reduce に渡す。`map_success_rate` を算出する
+- [x] 0-6 実行ステータス `degraded` を導入する。Map 成功率が閾値（初期値 50%）未満、Reduce が fallback、または品質スコアが閾値（初期値 60）未満の場合は次のようにする
   - 外部配信（Discord・Slack・Teams・Email）を止める
   - `markAsProcessed` をしない（翌日に再試行できる）
   - 非 0 で終了してジョブを失敗させる
-- [ ] 0-7 Podcast を `execFileSync`（シェルを経由しない）に変える
-- [ ] 0-8 `markdownToHtml` の生 HTML 素通しをやめ（固定行の完全一致のみ許可）、CSP を付ける
+- [x] 0-7 Podcast を `execFileSync`（シェルを経由しない）に変える
+- [x] 0-8 `markdownToHtml` の生 HTML 素通しをやめ（固定行の完全一致のみ許可）、CSP を付ける
+
+> **進捗（2026-10-01）**: 0-3〜0-8 を実装した。実装時に決めた点は次のとおり。
+>
+> - 0-6 の Map 成功率の初期値は 80% から 50% に変えた。失敗した記事は Reduce に渡らず（タイトルだけの要約は起きない）、翌日に再試行されるため、ゲートは全体的な障害の検出に絞った。値は `config.yml` の `settings.quality_gate` で変更できる
+> - 0-4 では、Map でも Reduce と同様に同一プラットフォーム上のもう一方のモデルへフォールバックするようにした。また、クライアントエラーはサーキットブレーカーに数えないようにした
+> - degraded の実行でも状態 DB とメトリクスはコミットされる（ワークフローがステップ出力 `run_status` を参照する）
+> - 0-1・0-2 はリポジトリ設定とワークフローの手動実行が必要なため、未完了のまま残す
 
 **完了条件**: 劣化条件（TTS モデルの混入、Map の全失敗、Reduce の失敗）を再現するテストで、「配信されない」「処理済みにならない」「終了コードが 0 以外」を確認できること。
 
