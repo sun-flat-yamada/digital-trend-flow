@@ -179,6 +179,13 @@ export function getI18n(lang: string = "en"): PagesI18n {
   return isJa ? I18N_JA : I18N_EN;
 }
 
+// Content Security Policy for the generated pages. Every asset is served by the site itself and
+// only ./app.js may run; inline style attributes stay allowed (404 page, empty-state messages).
+// This blocks script execution even if injected markup ever reached the rendered summaries.
+export const CONTENT_SECURITY_POLICY =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+  "object-src 'none'; base-uri 'none'; form-action 'none'";
+
 /**
  * Escapes HTML entities.
  */
@@ -290,12 +297,11 @@ export function markdownToHtml(md: string): string {
       continue;
     }
 
-    // Foldable details block (e.g. <details class="pipeline-metrics">, <summary>...</summary>, </details>)
-    if (
-      line.startsWith("<details") ||
-      line.startsWith("</details>") ||
-      line.startsWith("<summary")
-    ) {
+    // Foldable details block (e.g. <details class="pipeline-metrics">, <summary>...</summary>, </details>).
+    // Only these shapes are rebuilt as HTML; any other HTML-looking line (e.g. from LLM output)
+    // falls through to the paragraph below and is escaped.
+    const detailsTag = toSafeDetailsTag(line);
+    if (detailsTag !== null) {
       if (inList) {
         htmlParts.push("</ul>");
         inList = false;
@@ -304,26 +310,8 @@ export function markdownToHtml(md: string): string {
         htmlParts.push("</blockquote>");
         inBlockquote = false;
       }
-
-      if (line.startsWith("<details")) {
-        htmlParts.push(line);
-        continue;
-      }
-      if (line.startsWith("</details>")) {
-        htmlParts.push("</details>");
-        continue;
-      }
-      if (line.startsWith("<summary")) {
-        const summaryMatch = line.match(
-          /^<summary(?:\s+[^>]*)?>([\s\S]*?)<\/summary>$/,
-        );
-        if (summaryMatch && summaryMatch[1]) {
-          htmlParts.push(`<summary>${formatInline(summaryMatch[1])}</summary>`);
-        } else {
-          htmlParts.push(line);
-        }
-        continue;
-      }
+      htmlParts.push(detailsTag);
+      continue;
     }
 
     // Regular paragraph
@@ -334,6 +322,26 @@ export function markdownToHtml(md: string): string {
   if (inBlockquote) htmlParts.push("</blockquote>");
 
   return htmlParts.join("\n");
+}
+
+/**
+ * Rebuilds an allowed `<details>` / `<summary>` / `</details>` line as safe HTML, or returns null.
+ * The input is never echoed: only a plain `class` name is kept on `<details>`, and the
+ * `<summary>` text is escaped like any other inline content.
+ */
+function toSafeDetailsTag(line: string): string | null {
+  const detailsOpen = line.match(/^<details(?:\s+class="([\w-]+)")?\s*>$/);
+  if (detailsOpen) {
+    return detailsOpen[1] ? `<details class="${detailsOpen[1]}">` : "<details>";
+  }
+  if (line === "</details>") {
+    return "</details>";
+  }
+  const summary = line.match(/^<summary(?:\s+[^>]*)?>([\s\S]*?)<\/summary>$/);
+  if (summary && summary[1]) {
+    return `<summary>${formatInline(summary[1])}</summary>`;
+  }
+  return null;
 }
 
 /**
@@ -792,6 +800,7 @@ function generateHtml(
 <html lang="${i18n.langCode}">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(i18n.pageTitle)}</title>
   <meta name="description" content="${escapeHtml(i18n.pageDescription)}">
@@ -949,6 +958,7 @@ function generate404Html(i18n: PagesI18n = I18N_EN): string {
 <html lang="${i18n.langCode}">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">
   <title>${escapeHtml(i18n.notFoundTitle)}</title>
   <meta http-equiv="refresh" content="2;url=./">
   <link rel="stylesheet" href="./styles.css">
