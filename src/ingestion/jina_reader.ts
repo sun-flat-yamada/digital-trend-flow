@@ -54,7 +54,9 @@ export async function extractMarkdown(url: string): Promise<string> {
     hostFailures.delete(host);
     return markdown;
   } catch (error) {
-    hostFailures.set(host, failures + 1);
+    // Read the count again: extractions run concurrently, and other requests to this host may
+    // have failed while this one was in flight.
+    hostFailures.set(host, (hostFailures.get(host) ?? 0) + 1);
     throw error;
   }
 }

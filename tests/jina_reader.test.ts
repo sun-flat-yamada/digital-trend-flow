@@ -67,6 +67,18 @@ describe("extractMarkdown", () => {
     await expect(extractMarkdown("https://other.example/1")).resolves.toBe("Body");
     expect(mockedAxios.get).toHaveBeenCalledTimes(3);
   });
+
+  test("counts failures that finish concurrently, as the pipeline runs extractions in parallel", async () => {
+    mockedAxios.get.mockRejectedValue(httpError(403));
+
+    const results = await Promise.allSettled(
+      ["https://slow.example/1", "https://slow.example/2", "https://slow.example/3"].map(extractMarkdown)
+    );
+    expect(results.every((r) => r.status === "rejected")).toBe(true);
+
+    await expect(extractMarkdown("https://slow.example/4")).rejects.toThrow("3 consecutive extraction failures");
+    expect(mockedAxios.get).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("isRetryableStatus", () => {
