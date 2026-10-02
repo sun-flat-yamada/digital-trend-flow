@@ -63,6 +63,7 @@ import {
 import { Purpose, Source } from "./core/types";
 import { PATHS } from "./core/paths";
 import { dedupeByUrl } from "./core/url";
+import { mapWithConcurrency } from "./core/concurrency";
 
 // ── Types for pipeline internal state ──
 
@@ -73,28 +74,6 @@ interface ScoredArticle {
   purpose: string;
   purposeLabel: string;
   matchedKeywords: string[];
-}
-
-// ── Concurrency & Rate Limiting utility ──
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-export async function mapWithConcurrency<T, R>(
-  items: T[],
-  fn: (item: T) => Promise<R>,
-  concurrency: number = env.API_CONCURRENCY,
-  intervalMs: number = env.API_INTERVAL_MS
-): Promise<PromiseSettledResult<R>[]> {
-  const results: PromiseSettledResult<R>[] = [];
-  for (let i = 0; i < items.length; i += concurrency) {
-    if (i > 0 && intervalMs > 0) {
-      await sleep(intervalMs);
-    }
-    const chunk = items.slice(i, i + concurrency);
-    const chunkResults = await Promise.allSettled(chunk.map(fn));
-    results.push(...chunkResults);
-  }
-  return results;
 }
 
 const errorMessageOf = (reason: unknown): string => (reason instanceof Error ? reason.message : String(reason));

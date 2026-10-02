@@ -2,7 +2,7 @@
  * Unit tests for mapWithConcurrency rate limiting and concurrency execution.
  */
 
-import { mapWithConcurrency } from "../src/main";
+import { mapWithConcurrency } from "../src/core/concurrency";
 
 describe("mapWithConcurrency", () => {
   test("processes items respecting concurrency limits", async () => {
