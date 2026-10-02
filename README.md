@@ -41,7 +41,7 @@ cp .env.example .env   # Configure GEMINI_API_KEY
 ```
 
 ```bash
-npm test                                          # Type check + Config validation + Tests (75+ tests)
+npm test                                          # Type check + Config validation + Tests (200+ tests)
 npm run debug:filter "https://example.com/ai/"    # Dry-run (No LLM required)
 npm run build && npm start                        # Full pipeline execution
 ```
@@ -65,12 +65,11 @@ npm run build && npm start                        # Full pipeline execution
 
 ## Automation
 
-| Workflow             | Schedule (JST)     | Description                                 |
-| :------------------- | :----------------- | :------------------------------------------ |
-| `daily_summary.yml`  | Daily 04:00        | Daily summary + push to artifacts repo      |
-| `monthly_digest.yml` | 1st of month 04:30 | Monthly digest + Trend analysis             |
-| `yearly_report.yml`  | Jan 1st 05:00      | Yearly report                               |
-| `on_demand.yml`      | —                  | `workflow_dispatch` / `repository_dispatch` |
+| Workflow             | Schedule (JST)     | Description                                                         |
+| :------------------- | :----------------- | :------------------------------------------------------------------ |
+| `daily_summary.yml`  | Daily 03:47        | Daily summary + push to artifacts repo (also `repository_dispatch`) |
+| `monthly_digest.yml` | 2nd of month 04:30 | Monthly digest of the previous month + Trend analysis               |
+| `yearly_report.yml`  | Jan 1st 05:00      | Yearly report                                                       |
 
 ## Project Structure
 

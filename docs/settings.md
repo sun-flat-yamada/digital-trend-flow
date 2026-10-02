@@ -103,7 +103,7 @@ You can customize these parameters directly in your GitHub repository without mo
    - **Name**: `OUTPUT_LANGUAGE` / **Value**: e.g., `en` (or `ja` for Japanese)
 6. Click **Add variable**.
 
-The scheduled workflow (`daily_summary.yml`), static site workflow (`pages.yml`), and manual workflow (`on_demand.yml`) automatically bind these variables into the execution environment:
+The scheduled workflow (`daily_summary.yml`, which also handles manual and `repository_dispatch` runs) and the static site workflow (`pages.yml`) automatically bind these variables into the execution environment:
 ```yaml
 env:
   API_CONCURRENCY: ${{ vars.API_CONCURRENCY }}
