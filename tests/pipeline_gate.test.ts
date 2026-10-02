@@ -315,4 +315,19 @@ describe("daily pipeline publication gate", () => {
     expect(run.stepSummary).toContain("### 🚨 Source Alerts");
     expect(run.stepSummary).toContain("Status code 404");
   });
+
+  test("a dry run stops after selection without calling the LLM or publishing", async () => {
+    const run = await runPipeline(() => {
+      require("../src/core/config").env.DRY_RUN = true;
+    });
+
+    expect(run.exitCode).toBe(0);
+    expect(run.mocks["mapExtractFacts"]).not.toHaveBeenCalled();
+    for (const publisher of PUBLISHERS) {
+      expect(run.mocks[publisher]).not.toHaveBeenCalled();
+    }
+    expect(run.mocks["markAsProcessed"]).not.toHaveBeenCalled();
+    expect(run.githubOutput).toContain("run_status=skipped");
+    expect(run.stepSummary).toContain("Dry run: stopped after selecting 2 articles");
+  });
 });

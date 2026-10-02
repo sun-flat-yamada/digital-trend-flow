@@ -25,6 +25,7 @@ interface DailySummaryMeta {
 
 /**
  * Generates a monthly digest by aggregating daily summaries.
+ * Resolves with null when the month has no daily summaries; throws when generation fails.
  * @param yearMonth Format: "2026-04"
  */
 export async function generateMonthlyDigest(yearMonth: string): Promise<string | null> {
@@ -99,7 +100,6 @@ Generate a comprehensive monthly trend analysis.`;
     });
 
     // Save monthly digest
-    // Save monthly digest
     const today = new Date().toISOString().split("T")[0] ?? yearMonth + "-01";
     const filename = `${today}_digital-trend_monthly_report.md`;
     const title = `Monthly Digest ${yearMonth}`;
@@ -124,7 +124,8 @@ Generate a comprehensive monthly trend analysis.`;
     console.log(`✅ Monthly digest generated: ${outputPath}`);
     return outputPath;
   } catch (error: any) {
-    console.error(`❌ Monthly digest generation failed: ${error.message}`);
-    return null;
+    // Throw rather than return null: null means "no daily summaries", which the workflow treats
+    // as success, so an LLM failure would otherwise go unnoticed.
+    throw new Error(`Monthly digest generation failed for ${yearMonth}: ${error.message}`, { cause: error });
   }
 }
