@@ -6,12 +6,17 @@
 
 | Workflow | Cron (UTC) | JST | Trigger |
 |:---|:---|:---|:---|
-| `daily_summary.yml` | `0 19 * * *` | 毎日 04:00 | Full pipeline + git push |
-| `monthly_digest.yml` | `30 19 1 * *` | 毎月 1 日 04:30 | 月次ダイジェスト |
+| `daily_summary.yml` | `47 18 * * *` | 毎日 03:47 | Full pipeline + git push。`repository_dispatch`（`trigger-digest`）にも対応 |
+| `monthly_digest.yml` | `30 19 1 * *` | 毎月 2 日 04:30 | 前月の月次ダイジェスト |
 | `yearly_report.yml` | `0 20 1 1 *` | 1/1 05:00 | 年次レポート |
-| `on_demand.yml` | — | — | `workflow_dispatch` / `repository_dispatch` |
 
 全ワークフローは `workflow_dispatch` による手動トリガーも可能。
+
+- 日次の起動時刻は毎時 0 分を避けている（GitHub の定時実行は 0 分に集中し、遅延・欠落しやすい）。
+- 日次を手動実行するときは `dry_run` を選べる。記事の選定まで行って停止し、LLM による要約・配信・コミット・Pages デプロイは行わない。
+- 日次と月次は同じ concurrency グループ（`pipeline-state`）に属し、`pipeline_state.db` と artifacts リポジトリを更新する実行が重ならない。
+- push はリモートが進んでいれば rebase して最大 3 回再試行し、それでも失敗したらジョブを失敗させる。
+- Atom フィードは Pages サイトの `feed.xml` として公開される。リンク先は `vars.PAGES_BASE_URL`、未設定なら `https://<owner>.github.io/<repo>/`。
 
 ### 手動実行
 

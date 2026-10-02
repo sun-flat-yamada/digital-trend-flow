@@ -94,6 +94,11 @@ exclude:
 | `XAI_API_KEY` | X/Twitter 検索 (Grok) | [xAI Console](https://console.x.ai/) |
 | `YOUTUBE_API_KEY` | YouTube Data API v3 | [Google Cloud Console](https://console.cloud.google.com/) |
 | `FIRECRAWL_API_KEY` | 代替コンテンツ抽出 | [Firecrawl](https://firecrawl.dev/) |
+| `JINA_API_KEY` | Jina Reader のレート制限緩和（未設定でも動作する） | [Jina AI](https://jina.ai/reader/) |
+
+X/Grok（`xai_grok`）は、検索ツール（`x_search`）を使う実装に直すまでコードで無効化している。`XAI_API_KEY` を設定しても取得しない。
+
+ソースは `config.yml` の `enabled: false` で一時停止できる。停止中・キー未設定のソースは、失敗ではなく `disabled` としてジョブサマリーに記録される。
 
 ### Optional — LLM Fallback
 

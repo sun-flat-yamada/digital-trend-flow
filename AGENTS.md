@@ -30,7 +30,7 @@ Strictly follow these boundaries when creating or modifying files:
 | `prompts/`            | Versioned prompt templates (Markdown)               | `map_v1.md`, `judge_v1.md`, `monthly_reduce_v1.md`, `manifest.json`                                                                           |
 | `tests/`              | Unit tests, golden regression tests                 | `*.test.ts`, `golden/golden_dataset.json`                                                                                                     |
 | `artifacts/contents/` | Generated output (git-ignored; local working copy of external `sun-flat-yamada/artifacts` repo) | `digital-trend/collection/{daily,monthly,yearly,metrics}/`, `publish/{note,zenn}/`                                                            |
-| `.github/workflows/`  | CI/CD automation                                    | `daily_summary.yml`, `monthly_digest.yml`, `yearly_report.yml`, `on_demand.yml`                                                               |
+| `.github/workflows/`  | CI/CD automation                                    | `daily_summary.yml`, `monthly_digest.yml`, `yearly_report.yml`, `pages.yml`                                                                   |
 
 ## 3. Information Sources
 
@@ -79,23 +79,24 @@ The pipeline ingests data from seven types of sources. Each module is designed t
     *   `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` — Multi-LLM fallback providers.
     *   `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` — Observability.
     *   `FIRECRAWL_API_KEY` — Alternative content extraction.
+    *   `JINA_API_KEY` — Higher Jina Reader rate limit.
+    *   `PAGES_BASE_URL` (variable) — Public Pages URL used in the Atom feed (default: derived from `GITHUB_REPOSITORY`).
 
 ## 6. Automation Schedule
 
 | Workflow             | Cron (UTC)    | JST           | Trigger                                     |
 | -------------------- | ------------- | ------------- | ------------------------------------------- |
-| `daily_summary.yml`  | `0 19 * * *`  | 04:00         | Full pipeline + git push to artifacts repo  |
-| `monthly_digest.yml` | `30 19 1 * *` | 毎月1日 04:30 | Monthly aggregation from daily summaries    |
+| `daily_summary.yml`  | `47 18 * * *` | 03:47         | Full pipeline + git push to artifacts repo; also `repository_dispatch` (`trigger-digest`) |
+| `monthly_digest.yml` | `30 19 1 * *` | 毎月2日 04:30 | Monthly aggregation of the previous month   |
 | `yearly_report.yml`  | `0 20 1 1 *`  | 1/1 05:00     | Yearly aggregation (placeholder)            |
-| `on_demand.yml`      | —             | —             | `repository_dispatch` / `workflow_dispatch` |
 
-All scheduled workflows also support manual trigger via `workflow_dispatch`.
+All scheduled workflows also support manual trigger via `workflow_dispatch`. A manual daily run can be a dry run (`DRY_RUN=true`: stops after article selection, publishes and commits nothing). The daily and monthly workflows share the `pipeline-state` concurrency group, so runs that write `pipeline_state.db` or the artifacts repo never overlap.
 
 ## 7. Verification & Testing Instructions
 
 When an AI agent finishes a task or refactor, verify via:
 
-1.  **Type-checking & Config Validation**: `npm run test` — runs `tsc --noEmit`, MECE config validation (`test:config`), and the full Jest test suite (`test:unit`: 11 suites, 75+ tests).
+1.  **Type-checking & Config Validation**: `npm run test` — runs `tsc --noEmit`, MECE config validation (`test:config`), and the full Jest test suite (`test:unit`: 30+ suites, 200+ tests). Never import `src/main.ts` from a test without mocking every dependency: importing it starts the real pipeline.
 2.  **Golden Regression**: `npm run test:golden` — validates output quality against reference datasets in `tests/golden/`.
 3.  **Dry-run Testing**: `npm run debug:filter <URL>` — validates ingestion + scoring logic without LLM/API costs.
 4.  **Build Check**: `npm run build` — ensures `tsc` compilation to `dist/` succeeds.

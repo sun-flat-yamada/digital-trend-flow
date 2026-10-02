@@ -41,7 +41,7 @@ cp .env.example .env   # GEMINI_API_KEY を設定
 ```
 
 ```bash
-npm test                                          # 型チェック + 設定検証 + テスト (75+ tests)
+npm test                                          # 型チェック + 設定検証 + テスト (200+ tests)
 npm run debug:filter "https://example.com/ai/"    # Dry-run (LLM 不要)
 npm run build && npm start                        # フルパイプライン実行
 ```
@@ -65,12 +65,11 @@ npm run build && npm start                        # フルパイプライン実�
 
 ## Automation
 
-| Workflow             | Schedule (JST)  | Description                                 |
-| :------------------- | :-------------- | :------------------------------------------ |
-| `daily_summary.yml`  | 毎日 04:00      | 日次サマリー + artifacts repo へ push       |
-| `monthly_digest.yml` | 毎月 1 日 04:30 | 月次ダイジェスト + トレンド分析             |
-| `yearly_report.yml`  | 1/1 05:00       | 年次レポート                                |
-| `on_demand.yml`      | —               | `workflow_dispatch` / `repository_dispatch` |
+| Workflow             | Schedule (JST)  | Description                                                             |
+| :------------------- | :-------------- | :---------------------------------------------------------------------- |
+| `daily_summary.yml`  | 毎日 03:47      | 日次サマリー + artifacts repo へ push（`repository_dispatch` にも対応） |
+| `monthly_digest.yml` | 毎月 2 日 04:30 | 前月の月次ダイジェスト + トレンド分析                                   |
+| `yearly_report.yml`  | 1/1 05:00       | 年次レポート                                                            |
 
 ## Project Structure
 

@@ -71,7 +71,7 @@ Category Breakdown:
 
 ## Test Suite
 
-11 テストスイート、75+ テストケース:
+30 以上のテストスイート、200 以上のテストケース。主なもの:
 
 | Suite | Coverage |
 |:---|:---|
@@ -84,7 +84,11 @@ Category Breakdown:
 | `obsidian_linker.test.ts` | Obsidian Wiki リンク |
 | `plugin_registry.test.ts` | プラグインレジストリ + Event Bus |
 | `metrics.test.ts` | メトリクス収集 + コスト計算 |
-| `feed_generator.test.ts` | Atom フィード生成 |
+| `feed_generator.test.ts` | Atom フィード生成（Pages の `feed.xml`） |
+| `url.test.ts` | URL 正規化と重複排除 |
+| `source_health.test.ts` | ソースの無効化判定と連続失敗の集計 |
+| `jina_reader.test.ts` | 本文抽出の再試行方針とホスト単位の打ち切り |
+| `pipeline_gate.test.ts` | パイプライン全体（依存はすべてモック）: 公開ゲート、説明文へのフォールバック、dry run |
 | `golden_regression.test.ts` | 出力品質の回帰テスト |
 
 ## Troubleshooting
@@ -92,7 +96,7 @@ Category Breakdown:
 | Problem | Solution |
 |:---|:---|
 | `GEMINI_API_KEY must be set` | `.env` に API キーを設定 |
-| Jina Reader タイムアウト | ネットワーク確認。自動 3 回リトライ |
+| Jina Reader タイムアウト | ネットワーク確認。一時的な失敗（タイムアウト・408・429・5xx）は最大 2 回再試行し、4xx は再試行しない。同じホストで 2 回続けて失敗すると、その実行ではそのホストを飛ばす。抽出に失敗した記事はソースの説明文で採点・要約する |
 | 全記事がフィルタされる | `daily_threshold_score` を下げる or `threshold` を調整 |
 | GitHub Actions で push 失敗 | `PAT_GITHUB` に `repo` スコープがあるか確認 |
 | Raindrop 重複処理 | `archive_collection_id` を設定 |
