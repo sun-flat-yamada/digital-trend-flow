@@ -17,6 +17,24 @@ describe("toGitHubSummary run status", () => {
   });
 });
 
+describe("toGitHubSummary source alerts", () => {
+  test("lists failing sources and long empty streaks, but not disabled or healthy ones", () => {
+    metrics.recordSourceStatus({ name: "Dead Feed", type: "rss", status: "error", article_count: 0, failure_streak: 1, error_message: "Status code 404" });
+    metrics.recordSourceStatus({ name: "Quiet Feed", type: "rss", status: "empty", article_count: 0, failure_streak: 3 });
+    metrics.recordSourceStatus({ name: "Paused Feed", type: "reddit", status: "disabled", article_count: 0, error_message: "enabled: false in config.yml" });
+    metrics.recordSourceStatus({ name: "Good Feed", type: "rss", status: "ok", article_count: 5, failure_streak: 0 });
+
+    const summary = metrics.toGitHubSummary();
+    const alerts = summary.slice(summary.indexOf("### 🚨 Source Alerts"), summary.indexOf("### Sources"));
+
+    expect(alerts).toContain("- **Dead Feed** (rss): error, failing or empty for 1 consecutive runs — Status code 404");
+    expect(alerts).toContain("- **Quiet Feed** (rss): empty, failing or empty for 3 consecutive runs");
+    expect(alerts).not.toContain("Paused Feed");
+    expect(alerts).not.toContain("Good Feed");
+    expect(summary).toContain("| Paused Feed | reddit | disabled | 0 | — |");
+  });
+});
+
 describe("estimateCost", () => {
   test("calculates Gemini Flash cost correctly", () => {
     // gemini-2.5-flash: $0.15/M input, $0.60/M output

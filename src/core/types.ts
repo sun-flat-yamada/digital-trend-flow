@@ -22,18 +22,21 @@ export const SourceSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("rss"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     url: z.string().url(),
     language: z.string().optional(),
   }),
   z.object({
     type: z.literal("xai_grok"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     query: z.string(),
     language: z.string().optional(),
   }),
   z.object({
     type: z.literal("raindrop"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     collection_id: z.number().default(0),
     archive_collection_id: z.number().optional(),
     lookback_hours: z.number().default(48),
@@ -42,6 +45,7 @@ export const SourceSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("hackernews"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     min_score: z.number().default(100),
     max_items: z.number().default(30),
     language: z.string().optional(),
@@ -49,6 +53,7 @@ export const SourceSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("arxiv"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     query: z.string(),
     max_results: z.number().default(20),
     language: z.string().optional(),
@@ -56,6 +61,7 @@ export const SourceSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("youtube"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     channel_id: z.string().optional(),
     query: z.string().optional(),
     max_results: z.number().default(10),
@@ -64,12 +70,14 @@ export const SourceSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("github_trending"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     language_filter: z.string().optional(), // programming language
     since: z.enum(["daily", "weekly", "monthly"]).default("daily"),
   }),
   z.object({
     type: z.literal("reddit"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     subreddit: z.string(),
     min_score: z.number().default(50),
     max_items: z.number().default(15),
@@ -78,6 +86,7 @@ export const SourceSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("bluesky"),
     name: z.string(),
+    enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     query: z.string(),
     min_likes: z.number().default(20),
     max_items: z.number().default(15),

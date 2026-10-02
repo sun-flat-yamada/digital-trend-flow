@@ -43,7 +43,7 @@ jest.mock("../src/ingestion/state_manager", () => ({
   flushState: jest.fn(),
   savePipelineRun: jest.fn(),
   recordSourceHealth: jest.fn(),
-  getSourceEmptyStreak: jest.fn(() => 0),
+  getSourceFailureStreak: jest.fn(() => 0),
   closeDb: jest.fn(),
 }));
 jest.mock("../src/ingestion/rss", () => ({ fetchRss: jest.fn() }));

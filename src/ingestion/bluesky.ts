@@ -109,7 +109,7 @@ export async function fetchBluesky(
     console.log(`  🦋 Bluesky [${query}]: ${articles.length} posts (likes ≥ ${minLikes})`);
     return articles;
   } catch (error: any) {
-    console.warn(`⚠️ Bluesky fetch failed for query "${query}": ${error.message}`);
-    return [];
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`Bluesky fetch failed for query "${query}": ${error.message}`, { cause: error });
   }
 }

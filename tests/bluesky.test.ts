@@ -56,10 +56,9 @@ describe("fetchBluesky", () => {
     expect(articles[0]?.url).toBe("https://arxiv.org/abs/2609.12345");
   });
 
-  test("handles API errors gracefully", async () => {
+  test("propagates API errors so the source is recorded as failing", async () => {
     mockedAxios.get.mockRejectedValueOnce(new Error("Network Error"));
 
-    const articles = await fetchBluesky("LLM", 20, 10, "ai_research");
-    expect(articles).toEqual([]);
+    await expect(fetchBluesky("LLM", 20, 10, "ai_research")).rejects.toThrow("Network Error");
   });
 });

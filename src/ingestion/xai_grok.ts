@@ -7,34 +7,33 @@ const XAI_API_BASE = "https://api.x.ai/v1";
 
 /**
  * ======================================================================
- * X (Twitter) Ingestion Module via xAI Grok API
+ * X (Twitter) Ingestion Module via xAI Grok API — currently DISABLED
  * ======================================================================
  *
- * ## Strategy
- *   Uses xAI's native `x_search` tool through the `/v1/responses` endpoint.
- *   Grok has privileged, real-time access to the X (Twitter) corpus, making
- *   it the most reliable and official way to search X content programmatically
- *   as of 2026 (the old Twitter API v2 requires expensive Enterprise tier).
+ * ## Current implementation
+ *   Sends a plain chat completion request (`/v1/chat/completions`, model
+ *   `grok-3-fast`) asking Grok to list trending posts as JSON. No search tool
+ *   is attached, so the model answers from its own knowledge and can return
+ *   post URLs that do not exist; only the URL format is checked.
  *
- * ## How it works
- *   1. Send a chat completion request to the `/v1/responses` endpoint with
- *      a system prompt instructing Grok to search X and return structured JSON.
- *   2. Grok internally uses its `x_search` tool to query the X corpus.
- *   3. The response contains a structured list of trending posts with URLs.
+ * ## Why it is disabled
+ *   Until the request uses xAI's server-side `x_search` tool (`/v1/responses`)
+ *   and the returned citations, the results cannot be trusted as sources.
+ *   `XAI_GROK_DISABLED_REASON` makes the pipeline skip every `xai_grok`
+ *   source and record it as "disabled" (improvement plan ING-4).
  *
  * ## Authentication
  *   Bearer token via `XAI_API_KEY` environment variable.
- *   Generate at: https://console.x.ai/
  *
  * ## Deduplication
- *   Each X post URL (e.g., https://x.com/user/status/123) is checked against
- *   the state_manager to skip previously processed posts.
- *
- * ## Rate Limits
- *   xAI API allows generous rate limits for standard tier.
- *   We make exactly 1 request per query per pipeline run.
+ *   Each X post URL is checked against the state_manager to skip previously
+ *   processed posts.
  * ======================================================================
  */
+
+/** Non-null while the module must not be used; see the header comment. */
+export const XAI_GROK_DISABLED_REASON: string | null =
+  "X/Grok ingestion is disabled until it uses the x_search tool (generated post URLs cannot be verified)";
 
 interface XSearchResult {
   title: string;
@@ -119,8 +118,7 @@ export async function fetchXViGrok(
     try {
       parsed = JSON.parse(cleanedJson);
     } catch (parseErr) {
-      console.warn(`⚠️ Failed to parse Grok x_search JSON response for "${sourceName}".`);
-      return [];
+      throw new Error(`Failed to parse Grok JSON response for "${sourceName}"`, { cause: parseErr });
     }
 
     const newItems: ArticleItem[] = [];
@@ -152,8 +150,7 @@ export async function fetchXViGrok(
     console.log(`  🐦 X/Grok [${sourceName}]: ${newItems.length} new posts (${parsed.results.length} total found).`);
     return newItems;
   } catch (error: any) {
-    // Non-fatal: pipeline continues even if X search fails
-    console.error(`⚠️ X/Grok search failed for "${sourceName}": ${error.message}`);
-    return [];
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`X/Grok search failed for "${sourceName}": ${error.message}`, { cause: error });
   }
 }

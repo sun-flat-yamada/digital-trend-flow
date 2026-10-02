@@ -73,7 +73,7 @@ export async function fetchArxiv(
     console.log(`  📄 arXiv [${sourceName}]: ${newItems.length} new papers`);
     return newItems;
   } catch (error: any) {
-    console.error(`⚠️ arXiv fetch failed: ${error.message}`);
-    return [];
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`arXiv fetch failed: ${error.message}`, { cause: error });
   }
 }

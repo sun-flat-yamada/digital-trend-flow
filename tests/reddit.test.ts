@@ -70,10 +70,9 @@ describe("fetchReddit", () => {
     expect(articles[0]?.url).toBe("https://github.com/deepseek-ai/DeepSeek-R1");
   });
 
-  test("handles API errors gracefully", async () => {
+  test("propagates API errors so the source is recorded as failing", async () => {
     mockedAxios.get.mockRejectedValueOnce(new Error("Network Timeout"));
 
-    const articles = await fetchReddit("LocalLLaMA", 50, 10, "ai_dev_tools");
-    expect(articles).toEqual([]);
+    await expect(fetchReddit("LocalLLaMA", 50, 10, "ai_dev_tools")).rejects.toThrow("Network Timeout");
   });
 });

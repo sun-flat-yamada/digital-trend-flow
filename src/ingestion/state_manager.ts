@@ -71,7 +71,7 @@ function getDb(): Database.Database {
       source_name TEXT NOT NULL,
       source_type TEXT NOT NULL,
       check_date TEXT NOT NULL,
-      status TEXT NOT NULL, -- 'ok' | 'empty' | 'error'
+      status TEXT NOT NULL, -- 'ok' | 'empty' | 'error' | 'disabled'
       article_count INTEGER NOT NULL DEFAULT 0,
       error_message TEXT,
       PRIMARY KEY (source_name, check_date)
@@ -231,7 +231,7 @@ export function savePipelineRun(metrics: PipelineRunMetrics): void {
 export function recordSourceHealth(
   sourceName: string,
   sourceType: string,
-  status: "ok" | "empty" | "error",
+  status: SourceHealthStatus,
   articleCount: number,
   errorMessage?: string
 ): void {
@@ -244,10 +244,27 @@ export function recordSourceHealth(
   `).run(sourceName, sourceType, today, status, articleCount, errorMessage ?? null);
 }
 
+export type SourceHealthStatus = "ok" | "empty" | "error" | "disabled";
+
 /**
- * Gets consecutive days a source has returned 0 articles (for health alerting).
+ * Counts the leading run of failed or empty checks in rows ordered newest first.
+ * A successful or disabled check ends the streak.
  */
-export function getSourceEmptyStreak(sourceName: string): number {
+export function computeFailureStreak(rows: ReadonlyArray<{ status: string; article_count: number }>): number {
+  let streak = 0;
+  for (const row of rows) {
+    const failed = row.status === "error" || row.status === "empty" || (row.status === "ok" && row.article_count === 0);
+    if (!failed) break;
+    streak++;
+  }
+  return streak;
+}
+
+/**
+ * Gets the number of consecutive checks (newest first, up to 14) in which a source failed or
+ * returned no articles, for health alerting.
+ */
+export function getSourceFailureStreak(sourceName: string): number {
   const database = getDb();
   const rows = database.prepare(`
     SELECT status, article_count FROM source_health
@@ -255,16 +272,7 @@ export function getSourceEmptyStreak(sourceName: string): number {
     ORDER BY check_date DESC
     LIMIT 14
   `).all(sourceName) as Array<{ status: string; article_count: number }>;
-
-  let streak = 0;
-  for (const row of rows) {
-    if (row.status === "error" || (row.status === "ok" && row.article_count === 0)) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-  return streak;
+  return computeFailureStreak(rows);
 }
 
 /**

@@ -77,6 +77,7 @@ settings:
 # - sources: このカテゴリに関連する情報収集元のリストです。
 #     type: 情報源の種類（rss: 従来型RSSフィード, xai_grok: xAI Grokによる検索経由, raindrop: Raindrop.ioの手動ブックマーク 等）
 #     name: 情報源を表す任意の識別用・表示用ネーム。
+#     enabled: false にすると取得を止め、ソース状態を "disabled" として記録します（省略時 true。障害中のフィードの一時停止用）。
 #     [各type固有のパラメータ]:
 #       url (rss等): クロール先のURL。
 #       query (xai_grok): GrokのAPIで検索対象を絞り込むための検索式（各種演算子可）。
@@ -106,6 +107,7 @@ purposes:
       - type: rss
         name: Hugging Face Daily Papers
         url: "https://huggingface.co/papers/rss.xml"
+        enabled: false # 2026-09 時点でフィードが応答しない。代替フィードが見つかるまで停止
       # Item 2.3: arXiv ソース
       - type: arxiv
         name: arXiv AI Papers
@@ -117,6 +119,7 @@ purposes:
         query: AI OR LLM
         min_likes: 30
         max_items: 15
+        enabled: false # GitHub Actions からの未認証アクセスは 403。App Password 認証を実装するまで停止
 
   ai_dev_tools:
     label: 🛠️ 開発ツール・IDE統合
@@ -161,6 +164,7 @@ purposes:
         subreddit: LocalLLaMA
         min_score: 100
         max_items: 15
+        enabled: false # GitHub Actions からの未認証アクセスは 403。OAuth 認証を実装するまで停止
 
   business:
     label: 💼 ビジネス動向
@@ -187,6 +191,7 @@ purposes:
       - type: rss
         name: Reuters Technology
         url: "https://feeds.reuters.com/reuters/technologyNews"
+        enabled: false # フィード提供終了（ドメインが解決できない）
       - type: rss
         name: VentureBeat
         url: "https://venturebeat.com/feed/"
@@ -196,6 +201,7 @@ purposes:
       - type: rss
         name: Ledge.ai (LEDGE)
         url: "https://ledge.ai/feed/"
+        enabled: false # フィードが応答しない。代替フィードが見つかるまで停止
 
   geopolitics:
     label: 🌍 政治・地政学
