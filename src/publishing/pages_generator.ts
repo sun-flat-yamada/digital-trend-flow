@@ -12,6 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "yaml";
 import { PATHS } from "../core/paths";
+import { buildAtomFeed, resolveSiteUrl } from "./feed_generator";
 
 export type ReportType = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -745,6 +746,15 @@ export function generatePagesSite(
     generate404Html(i18n),
     "utf8",
   );
+  fs.writeFileSync(
+    path.join(outDir, "feed.xml"),
+    buildAtomFeed(
+      daily.map((d) => ({ date: d.date, title: d.title, topStory: d.topStory, articleCount: d.articleCount })),
+      resolveSiteUrl(),
+      new Date().toISOString(),
+    ),
+    "utf8",
+  );
 
   console.log(
     `🌐 GitHub Pages site generated at: ${outDir} (${daily.length} daily summaries, ${reports.length} periodic reports, lang: ${i18n.langCode})`,
@@ -805,6 +815,7 @@ function generateHtml(
   <title>${escapeHtml(i18n.pageTitle)}</title>
   <meta name="description" content="${escapeHtml(i18n.pageDescription)}">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="alternate" type="application/atom+xml" title="Digital Trend Flow" href="./feed.xml">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
 </head>
 <body data-theme="dark">

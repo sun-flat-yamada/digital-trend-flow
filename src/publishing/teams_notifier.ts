@@ -59,7 +59,7 @@ export async function notifyTeams(
           },
         },
       ],
-    });
+    }, { timeout: 15000 }); // a hung webhook must not stall the run
 
     console.log("✅ Teams notification sent successfully.");
   } catch (error: any) {

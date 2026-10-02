@@ -1,97 +1,71 @@
 /**
- * [Role] RSS/Atom feed generation for output syndication.
- * [Mechanism] Generates an Atom feed XML from daily summaries so that
- * users can subscribe to pipeline output via RSS readers.
+ * [Role] Atom feed of the daily summaries, published with the GitHub Pages site.
+ * [Mechanism] `buildAtomFeed` is a pure function from summary entries to Atom XML. Each entry
+ * links to the summary's deep link on the site (`<site>#YYYY-MM-DD`). `generatePagesSite`
+ * writes the result to `feed.xml` next to `index.html`.
  *
  * Item: 6.5 RSS 出力 (feed.xml)
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { PATHS } from "../core/paths";
-
-interface FeedEntry {
+export interface FeedEntry {
+  date: string; // YYYY-MM-DD
   title: string;
-  date: string;
-  filename: string;
+  topStory: string;
   articleCount: number;
 }
 
+/** Number of most recent summaries included in the feed. */
+export const FEED_ENTRY_LIMIT = 30;
+
 /**
- * Generates an Atom feed XML from existing daily summaries.
- * @param outputDir Directory containing daily summary files
- * @param baseUrl Base URL for the feed (e.g., GitHub Pages URL)
+ * Returns the public URL of the Pages site, ending with "/".
+ * `PAGES_BASE_URL` wins; otherwise the URL is derived from `GITHUB_REPOSITORY` (owner/repo).
+ * Returns null when neither is set (e.g. local runs), in which case links stay relative.
  */
-export function generateAtomFeed(
-  outputDir: string = PATHS.ARTIFACTS_DAILY.absolute,
-  baseUrl: string = "https://github.com"
-): string {
-  const absoluteDir = path.resolve(process.cwd(), outputDir);
-  if (!fs.existsSync(absoluteDir)) {
-    fs.mkdirSync(absoluteDir, { recursive: true });
-  }
+export function resolveSiteUrl(env: NodeJS.ProcessEnv = process.env): string | null {
+  const explicit = env["PAGES_BASE_URL"]?.trim();
+  if (explicit) return explicit.endsWith("/") ? explicit : `${explicit}/`;
+  const [owner, repo] = (env["GITHUB_REPOSITORY"] ?? "").split("/");
+  if (!owner || !repo) return null;
+  return repo.toLowerCase() === `${owner.toLowerCase()}.github.io`
+    ? `https://${owner.toLowerCase()}.github.io/`
+    : `https://${owner.toLowerCase()}.github.io/${repo}/`;
+}
 
-  // Scan for past 30 days
-  const entries: FeedEntry[] = [];
-  try {
-    for (let i = 0; i < 30; i++) {
-        const d = new Date(Date.now() - i * 86400000);
-        const yyyy = d.getFullYear().toString();
-        const mm = (d.getMonth() + 1).toString().padStart(2, "0");
-        const dd = d.getDate().toString().padStart(2, "0");
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-        const relativeFile = `${yyyy}/${mm}/${dateStr}_digital-trend_daily_summary.md`;
-        const filePath = path.join(absoluteDir, yyyy, mm, `${dateStr}_digital-trend_daily_summary.md`);
+/**
+ * Builds the Atom feed XML for the given entries (newest first).
+ * @param siteUrl Public site URL ending with "/", or null for relative links.
+ * @param updated Feed update time (ISO 8601).
+ */
+export function buildAtomFeed(entries: readonly FeedEntry[], siteUrl: string | null, updated: string): string {
+  const base = siteUrl ?? "";
+  const items = entries
+    .slice(0, FEED_ENTRY_LIMIT)
+    .map(
+      (entry) => `  <entry>
+    <title>${escapeXml(entry.title)}</title>
+    <link href="${escapeXml(`${base}#${entry.date}`)}" rel="alternate" type="text/html"/>
+    <id>urn:digital-trend-flow:${escapeXml(entry.date)}</id>
+    <updated>${escapeXml(entry.date)}T04:00:00+09:00</updated>
+    <summary>${escapeXml(entry.topStory ? `${entry.topStory} (${entry.articleCount} articles)` : `${entry.articleCount} articles`)}</summary>
+  </entry>`
+    )
+    .join("\n");
 
-        if (fs.existsSync(filePath)) {
-          const content = fs.readFileSync(filePath, "utf8");
-          const dateMatch = path.basename(filePath).match(/^(\d{4}-\d{2}-\d{2})/);
-          const titleMatch = content.match(/^title:\s*(.+)$/m);
-          const countMatch = content.match(/^articles_processed:\s*(\d+)$/m);
-
-          entries.push({
-            title: titleMatch?.[1]?.replace(/["']/g, "") ?? `Daily Summary ${dateMatch?.[1] ?? ""}`,
-            date: dateMatch?.[1] ?? dateStr,
-            filename: relativeFile,
-            articleCount: parseInt(countMatch?.[1] ?? "0", 10),
-          });
-        }
-    }
-  } catch {
-    // Directory may not exist yet
-  }
-
-  const now = new Date().toISOString();
-  const feedXml = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>Digital Trend Flow — Daily Summaries</title>
   <subtitle>AI-powered daily technology trend analysis</subtitle>
-  <link href="${baseUrl}/${PATHS.ARTIFACTS_DAILY.relative}/feed.xml" rel="self" type="application/atom+xml"/>
-  <link href="${baseUrl}" rel="alternate" type="text/html"/>
+  <link href="${escapeXml(`${base}feed.xml`)}" rel="self" type="application/atom+xml"/>
+  <link href="${escapeXml(base || "./")}" rel="alternate" type="text/html"/>
   <id>urn:digital-trend-flow:feed</id>
-  <updated>${now}</updated>
+  <updated>${escapeXml(updated)}</updated>
   <author>
     <name>Digital Trend Flow</name>
   </author>
   <generator>Digital Trend Flow Pipeline</generator>
-${entries
-  .map(
-    (entry) => `  <entry>
-    <title>${escapeXml(entry.title)}</title>
-    <link href="${baseUrl}/${PATHS.ARTIFACTS_DAILY.relative}/${entry.filename}" rel="alternate" type="text/html"/>
-    <id>urn:digital-trend-flow:${entry.date}</id>
-    <updated>${entry.date}T04:00:00+09:00</updated>
-    <summary>${entry.articleCount} articles processed</summary>
-  </entry>`
-  )
-  .join("\n")}
-</feed>
+${items}${items ? "\n" : ""}</feed>
 `;
-
-  const feedPath = path.join(absoluteDir, "feed.xml");
-  fs.writeFileSync(feedPath, feedXml, "utf8");
-  console.log(`📡 Atom feed generated: ${feedPath}`);
-  return feedPath;
 }
 
 function escapeXml(text: string): string {

@@ -36,6 +36,12 @@ describe("toGitHubSummary source alerts", () => {
 });
 
 describe("estimateCost", () => {
+  test("uses the most specific pricing key", () => {
+    // gpt-4.1-mini: $0.40/M input, $1.60/M output (not gpt-4.1's $2.00/$8.00)
+    expect(estimateCost("gpt-4.1-mini", 1_000_000, 1_000_000)).toBeCloseTo(2.0, 5);
+    expect(estimateCost("gpt-4.1-nano-2026-01", 1_000_000, 0)).toBeCloseTo(0.1, 5);
+  });
+
   test("calculates Gemini Flash cost correctly", () => {
     // gemini-2.5-flash: $0.15/M input, $0.60/M output
     const cost = estimateCost("gemini-2.5-flash", 1000, 500);

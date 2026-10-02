@@ -49,7 +49,7 @@ export async function notifySlack(
           ],
         },
       ],
-    });
+    }, { timeout: 15000 }); // a hung webhook must not stall the run
 
     console.log("✅ Slack notification sent successfully.");
   } catch (error: any) {

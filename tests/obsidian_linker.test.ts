@@ -74,7 +74,7 @@ describe("buildEnrichedFrontmatter", () => {
     expect(fm.mentioned_technologies).toContain("LLM");
     expect(fm.estimated_cost_usd).toBe(0.0123);
     expect(fm.quality_score).toBe(85.5);
-    expect(fm.previous).toBe("2026-04-17_summary");
+    expect(fm.previous).toBe("2026-04-17_digital-trend_daily_summary");
   });
 
   test("limits tags to 20", () => {
