@@ -78,7 +78,7 @@ export async function fetchYouTube(
     console.log(`  📹 YouTube [${sourceName}]: ${newItems.length} new videos`);
     return newItems;
   } catch (error: any) {
-    console.error(`⚠️ YouTube fetch failed: ${error.message}`);
-    return [];
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`YouTube fetch failed: ${error.message}`, { cause: error });
   }
 }

@@ -152,8 +152,8 @@ export async function fetchRaindropBookmarks(
 
     return { articles: newArticles, raindropIds: processedRaindropIds };
   } catch (error: any) {
-    console.error(`⚠️ Failed to fetch Raindrop bookmarks for "${collectionName}": ${error.message}`);
-    return { articles: [], raindropIds: [] };
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`Failed to fetch Raindrop bookmarks for "${collectionName}": ${error.message}`, { cause: error });
   }
 }
 

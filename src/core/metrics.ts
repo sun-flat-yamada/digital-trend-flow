@@ -30,10 +30,15 @@ export type RunStatus = "success" | "degraded" | "skipped" | "failed";
 export interface SourceStatus {
   name: string;
   type: string;
-  status: "ok" | "empty" | "error";
+  status: "ok" | "empty" | "error" | "disabled";
   article_count: number;
   error_message?: string;
+  /** Consecutive runs (including this one) in which the source failed or returned nothing. */
+  failure_streak?: number;
 }
+
+/** Streak length at which a source is listed under "Source Alerts" in the job summary. */
+export const SOURCE_ALERT_STREAK = 3;
 
 export interface PipelineRunMetrics {
   run_id: string;
@@ -199,8 +204,18 @@ class MetricsCollector {
     const judgeCalls = m.llm_calls.filter((c) => c.phase === "judge").length;
 
     const sourceRows = m.sources_status
-      .map((s) => `| ${s.name} | ${s.type} | ${s.status} | ${s.article_count} |`)
+      .map((s) => `| ${s.name} | ${s.type} | ${s.status} | ${s.article_count} | ${s.failure_streak ?? "—"} |`)
       .join("\n");
+    const alertedSources = m.sources_status.filter(
+      (s) => s.status === "error" || (s.failure_streak ?? 0) >= SOURCE_ALERT_STREAK
+    );
+    const sourceAlertsSection = alertedSources.length > 0
+      ? `\n### 🚨 Source Alerts\n${alertedSources
+          .map((s) => `- **${s.name}** (${s.type}): ${s.status}` +
+            (s.failure_streak ? `, failing or empty for ${s.failure_streak} consecutive runs` : "") +
+            (s.error_message ? ` — ${s.error_message.replace(/\s+/g, " ").slice(0, 200)}` : ""))
+          .join("\n")}\n`
+      : "";
 
     const purposeRows = Object.entries(m.articles_by_purpose)
       .map(([purpose, count]) => `| ${purpose} | ${count} |`)
@@ -229,11 +244,11 @@ class MetricsCollector {
 | Estimated Cost | $${m.total_cost_usd.toFixed(4)} |
 | Quality Score | ${m.quality_score?.toFixed(1) ?? "N/A"} |
 | Errors | ${m.errors.length} |
-${reasonsSection}
+${reasonsSection}${sourceAlertsSection}
 ### Sources
-| Source | Type | Status | Articles |
-|:---|:---|:---|:---|
-${sourceRows || "| (none) | — | — | — |"}
+| Source | Type | Status | Articles | Failure Streak |
+|:---|:---|:---|:---|:---|
+${sourceRows || "| (none) | — | — | — | — |"}
 
 ### Purpose Distribution
 | Purpose | Count |

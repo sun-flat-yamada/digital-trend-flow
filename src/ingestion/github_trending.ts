@@ -82,7 +82,7 @@ export async function fetchGitHubTrending(
     console.log(`  🐙 GitHub [${sourceName}]: ${newItems.length} trending repos`);
     return newItems;
   } catch (error: any) {
-    console.error(`⚠️ GitHub Trending fetch failed: ${error.message}`);
-    return [];
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`GitHub Trending fetch failed: ${error.message}`, { cause: error });
   }
 }

@@ -17,7 +17,14 @@ export interface ArticleItem {
   description?: string; // Plain-text summary from the source; used when content extraction fails
 }
 
-const parser = new Parser();
+// Some publishers reject requests without a browser-like User-Agent (HTTP 403).
+const parser = new Parser({
+  timeout: 20000,
+  headers: {
+    "User-Agent": "Mozilla/5.0 (compatible; DigitalTrendFlow/1.0; +https://github.com/sun-flat-yamada/digital-trend-flow)",
+    Accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8",
+  },
+});
 
 /**
  * [Role] Fetches an RSS feed and filters for new, unprocessed items.
@@ -63,7 +70,7 @@ export async function fetchRss(
 
     return newItems;
   } catch (error: any) {
-    console.error(`⚠️ Failed to fetch RSS feed [${sourceName}]: ${error.message}`);
-    return [];
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`Failed to fetch RSS feed [${sourceName}]: ${error.message}`, { cause: error });
   }
 }

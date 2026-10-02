@@ -75,7 +75,7 @@ export async function fetchHackerNews(
     console.log(`  📰 HN [${sourceName}]: ${newItems.length} stories (score ≥ ${minScore})`);
     return newItems;
   } catch (error: any) {
-    console.error(`⚠️ Hacker News fetch failed: ${error.message}`);
-    return [];
+    // Propagate, so the run records the source as failing rather than empty.
+    throw new Error(`Hacker News fetch failed: ${error.message}`, { cause: error });
   }
 }

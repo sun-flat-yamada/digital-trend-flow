@@ -6,12 +6,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import { config, env } from "./core/config";
-import { metrics, type RunStatus } from "./core/metrics";
+import { metrics, SOURCE_ALERT_STREAK, type RunStatus } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
 import { fetchRss, ArticleItem } from "./ingestion/rss";
 import { fetchRaindropBookmarks, archiveProcessedRaindrops } from "./ingestion/raindrop";
 import { fetchXViGrok } from "./ingestion/xai_grok";
+import { sourceDisabledReason } from "./ingestion/source_availability";
 import { extractMarkdown } from "./ingestion/jina_reader";
 import { fetchHackerNews } from "./ingestion/hackernews";
 import { fetchArxiv } from "./ingestion/arxiv";
@@ -52,7 +53,7 @@ import {
   flushState,
   savePipelineRun,
   recordSourceHealth,
-  getSourceEmptyStreak,
+  getSourceFailureStreak,
   closeDb,
 } from "./ingestion/state_manager";
 import { Purpose, Source } from "./core/types";
@@ -91,6 +92,8 @@ export async function mapWithConcurrency<T, R>(
   return results;
 }
 
+const errorMessageOf = (reason: unknown): string => (reason instanceof Error ? reason.message : String(reason));
+
 /**
  * Main pipeline orchestrator. Resolves with the run status; a "degraded" run publishes nothing.
  */
@@ -119,151 +122,77 @@ async function main(): Promise<RunStatus> {
     }
   }
 
-  // 1a. RSS Sources
-  const rssSources = flatSources.filter((s) => s.type === "rss");
-  const rssResults = await Promise.allSettled(
-    rssSources.map((s) => {
-      if (s.type === "rss") return fetchRss(s.name, s.url, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
+  // Disabled sources are recorded as such, so they do not count as failing feeds.
+  const activeSources: typeof flatSources = [];
+  for (const source of flatSources) {
+    const reason = sourceDisabledReason(source);
+    if (reason === null) {
+      activeSources.push(source);
+      continue;
+    }
+    console.log(`  ⏸️ Source "${source.name}" disabled: ${reason}`);
+    recordSourceHealth(source.name, source.type, "disabled", 0, reason);
+    metrics.recordSourceStatus({ name: source.name, type: source.type, status: "disabled", article_count: 0, error_message: reason });
+  }
 
-  // 1b. Raindrop Sources
-  const raindropSources = flatSources.filter((s) => s.type === "raindrop");
   const raindropResultSets: { articles: ArticleItem[]; raindropIds: number[]; collectionId: number; archiveId: number | undefined }[] = [];
-  const raindropResults = await Promise.allSettled(
-    raindropSources.map(async (s) => {
-      if (s.type === "raindrop") {
+  const fetchSource = async (s: Source & { purpose: string }): Promise<ArticleItem[]> => {
+    switch (s.type) {
+      case "rss":
+        return fetchRss(s.name, s.url, s.purpose);
+      case "raindrop": {
         const result = await fetchRaindropBookmarks(s.collection_id, s.name, s.lookback_hours, s.purpose);
-        raindropResultSets.push({
-          ...result,
-          collectionId: s.collection_id,
-          archiveId: s.archive_collection_id,
-        });
+        raindropResultSets.push({ ...result, collectionId: s.collection_id, archiveId: s.archive_collection_id });
         return result.articles;
       }
-      return [] as ArticleItem[];
-    })
-  );
+      case "xai_grok":
+        return fetchXViGrok(s.query, s.name, s.purpose);
+      case "hackernews":
+        return fetchHackerNews(s.name, s.min_score, s.max_items, s.purpose);
+      case "arxiv":
+        return fetchArxiv(s.query, s.name, s.max_results, s.purpose);
+      case "youtube":
+        return fetchYouTube(s.name, s.query, s.channel_id, s.max_results, s.purpose);
+      case "github_trending":
+        return fetchGitHubTrending(s.name, s.language_filter, s.since, s.purpose);
+      case "reddit":
+        return fetchReddit(s.subreddit, s.min_score, s.max_items, s.purpose);
+      case "bluesky":
+        return fetchBluesky(s.query, s.min_likes, s.max_items, s.purpose);
+    }
+  };
 
-  // 1c. X/Grok Sources
-  const grokSources = flatSources.filter((s) => s.type === "xai_grok");
-  const grokResults = await Promise.allSettled(
-    grokSources.map((s) => {
-      if (s.type === "xai_grok") return fetchXViGrok(s.query, s.name, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
-
-  // 1d. Hacker News Sources (Item 2.3)
-  const hnSources = flatSources.filter((s) => s.type === "hackernews");
-  const hnResults = await Promise.allSettled(
-    hnSources.map((s) => {
-      if (s.type === "hackernews") return fetchHackerNews(s.name, s.min_score, s.max_items, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
-
-  // 1e. arXiv Sources (Item 2.3)
-  const arxivSources = flatSources.filter((s) => s.type === "arxiv");
-  const arxivResults = await Promise.allSettled(
-    arxivSources.map((s) => {
-      if (s.type === "arxiv") return fetchArxiv(s.query, s.name, s.max_results, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
-
-  // 1f. YouTube Sources (Item 2.3)
-  const ytSources = flatSources.filter((s) => s.type === "youtube");
-  const ytResults = await Promise.allSettled(
-    ytSources.map((s) => {
-      if (s.type === "youtube") return fetchYouTube(s.name, s.query, s.channel_id, s.max_results, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
-
-  // 1g. GitHub Trending Sources (Item 2.3)
-  const ghSources = flatSources.filter((s) => s.type === "github_trending");
-  const ghResults = await Promise.allSettled(
-    ghSources.map((s) => {
-      if (s.type === "github_trending") return fetchGitHubTrending(s.name, s.language_filter, s.since, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
-
-  // 1h. Reddit Sources (Item D)
-  const redditSources = flatSources.filter((s) => s.type === "reddit");
-  const redditResults = await Promise.allSettled(
-    redditSources.map((s) => {
-      if (s.type === "reddit") return fetchReddit(s.subreddit, s.min_score, s.max_items, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
-
-  // 1i. Bluesky Sources (Item D)
-  const bskySources = flatSources.filter((s) => s.type === "bluesky");
-  const bskyResults = await Promise.allSettled(
-    bskySources.map((s) => {
-      if (s.type === "bluesky") return fetchBluesky(s.query, s.min_likes, s.max_items, s.purpose);
-      return Promise.resolve([] as ArticleItem[]);
-    })
-  );
-
-  // Flatten all results with source health tracking (Item 2.2)
-  const allResultSets: Array<{ results: PromiseSettledResult<ArticleItem[]>[]; sources: typeof flatSources }> = [
-    { results: rssResults, sources: rssSources },
-    { results: raindropResults, sources: raindropSources },
-    { results: grokResults, sources: grokSources },
-    { results: hnResults, sources: hnSources },
-    { results: arxivResults, sources: arxivSources },
-    { results: ytResults, sources: ytSources },
-    { results: ghResults, sources: ghSources },
-    { results: redditResults, sources: redditSources },
-    { results: bskyResults, sources: bskySources },
-  ];
+  // Fetchers throw on failure, so a broken feed is reported as an error rather than as "empty".
+  const fetchResults = await Promise.allSettled(activeSources.map(fetchSource));
 
   const allNewItems: ArticleItem[] = [];
-  for (const { results, sources } of allResultSets) {
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i]!;
-      const source = sources[i]!;
-      if (result.status === "fulfilled") {
-        allNewItems.push(...result.value);
-        // Item 2.2: Record source health
-        recordSourceHealth(
-          source.name,
-          source.type,
-          result.value.length > 0 ? "ok" : "empty",
-          result.value.length
-        );
-        metrics.recordSourceStatus({
-          name: source.name,
-          type: source.type,
-          status: result.value.length > 0 ? "ok" : "empty",
-          article_count: result.value.length,
-        });
-        // Item 2.2: Alert on consecutive empty feeds
-        if (result.value.length === 0) {
-          const streak = getSourceEmptyStreak(source.name);
-          if (streak >= 3) {
-            console.warn(`⚠️ ALERT: "${source.name}" has returned 0 articles for ${streak} consecutive days!`);
-            metrics.recordError(`Source "${source.name}" empty for ${streak} days`);
-          }
-        }
-      } else {
-        console.warn(`⚠️ Source "${source.name}" failed: ${result.reason}`);
-        recordSourceHealth(source.name, source.type, "error", 0, String(result.reason));
-        metrics.recordSourceStatus({
-          name: source.name,
-          type: source.type,
-          status: "error",
-          article_count: 0,
-          error_message: String(result.reason),
-        });
-        metrics.recordError(`Source "${source.name}": ${result.reason}`);
-      }
+  fetchResults.forEach((result, i) => {
+    const source = activeSources[i]!;
+    const status = result.status === "rejected" ? "error" : result.value.length > 0 ? "ok" : "empty";
+    const articleCount = result.status === "fulfilled" ? result.value.length : 0;
+    const errorMessage = result.status === "rejected" ? errorMessageOf(result.reason) : undefined;
+    if (result.status === "fulfilled") {
+      allNewItems.push(...result.value);
+    } else {
+      console.warn(`⚠️ Source "${source.name}" failed: ${errorMessage}`);
+      metrics.recordError(`Source "${source.name}": ${errorMessage}`);
     }
-  }
+
+    // Item 2.2: Record source health and alert on consecutive failures (error or empty)
+    recordSourceHealth(source.name, source.type, status, articleCount, errorMessage);
+    const failureStreak = status === "ok" ? 0 : getSourceFailureStreak(source.name);
+    if (failureStreak >= SOURCE_ALERT_STREAK) {
+      console.warn(`⚠️ ALERT: "${source.name}" has failed or returned 0 articles for ${failureStreak} consecutive runs!`);
+    }
+    metrics.recordSourceStatus({
+      name: source.name,
+      type: source.type,
+      status,
+      article_count: articleCount,
+      failure_streak: failureStreak,
+      ...(errorMessage !== undefined ? { error_message: errorMessage } : {}),
+    });
+  });
 
   // The same story often arrives from several sources (RSS + HN + Raindrop) or with different
   // tracking parameters; extract and score each canonical URL only once.
