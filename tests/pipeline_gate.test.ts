@@ -135,6 +135,7 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
 
   const mocks: Record<string, jest.Mock> = {
     fetchRss: require("../src/ingestion/rss").fetchRss,
+    extractMarkdown: require("../src/ingestion/jina_reader").extractMarkdown,
     mapExtractFacts: require("../src/summarization/gemini_map").mapExtractFacts,
     reduceSummarize: require("../src/summarization/gemini_reduce").reduceSummarize,
     saveMarkdownFile: require("../src/storage/markdown_builder").saveMarkdownFile,
@@ -270,5 +271,46 @@ describe("daily pipeline publication gate", () => {
     expect(run.mocks["markAsProcessed"]).toHaveBeenCalledTimes(1);
     expect(run.mocks["markAsProcessed"]!.mock.calls[0][0]).toBe("https://example.com/a");
     expect(run.mocks["reduceSummarize"]!.mock.calls[0][0]).toHaveLength(1);
+  });
+
+  test("an article whose body cannot be extracted is summarized from the source description", async () => {
+    const description = "The source's own summary of article B. ".repeat(10);
+    const run = await runPipeline((mocks) => {
+      mocks["fetchRss"]!.mockResolvedValue(
+        ARTICLES.map((a) => ({
+          ...a,
+          sourceName: "Test Feed",
+          sourceType: "rss",
+          purpose: "tech",
+          publishedAt: new Date().toISOString(),
+          ...(a.url.endsWith("/b") ? { description } : {}),
+        }))
+      );
+      mocks["extractMarkdown"]!.mockImplementation(async (url: string) => {
+        if (url.endsWith("/b")) throw new Error("Jina returned HTTP 403");
+        return "Article body. ".repeat(50);
+      });
+      mocks["mapExtractFacts"]!.mockImplementation(async (input: { url: string; title: string }) =>
+        mapOutput(input.url, input.title)
+      );
+      mocks["reduceSummarize"]!.mockResolvedValue({ markdown: GOOD_SUMMARY, usedFallback: false });
+    });
+
+    expect(run.exitCode).toBe(0);
+    const mapInputB = run.mocks["mapExtractFacts"]!.mock.calls
+      .map((call) => call[0] as { url: string; content: string })
+      .find((input) => input.url.endsWith("/b"));
+    expect(mapInputB?.content).toContain(description.trim());
+    expect(run.stepSummary).toContain("| Content Extraction (Failed / Description Fallback) | 0 / 1 of 2 |");
+  });
+
+  test("a failing source is reported as an error and listed under Source Alerts", async () => {
+    const run = await runPipeline((mocks) => {
+      mocks["fetchRss"]!.mockRejectedValue(new Error("Failed to fetch RSS feed [Test Feed]: Status code 404"));
+    });
+
+    expect(run.stepSummary).toContain("| Test Feed | rss | error | 0 |");
+    expect(run.stepSummary).toContain("### 🚨 Source Alerts");
+    expect(run.stepSummary).toContain("Status code 404");
   });
 });

@@ -101,6 +101,7 @@ export async function fetchBluesky(
         title,
         url: targetUrl,
         publishedAt,
+        ...(postText ? { description: postText } : {}),
       });
 
       if (articles.length >= maxItems) break;

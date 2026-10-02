@@ -235,6 +235,7 @@ export const EnvSchema = z.object({
   LANGFUSE_HOST: z.string().optional(),
   // Firecrawl (Item 2.1)
   FIRECRAWL_API_KEY: z.string().optional(),
+  JINA_API_KEY: z.string().optional(), // Optional: higher Jina Reader rate limit
   // YouTube (Item 2.3)
   YOUTUBE_API_KEY: z.string().optional(),
   // Concurrency & Rate Limiting (Defaults configured for Free Tier: 5 RPM)

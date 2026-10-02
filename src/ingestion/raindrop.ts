@@ -2,6 +2,7 @@ import axios from "axios";
 import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
+import { normalizeUrl } from "../core/url";
 
 const RAINDROP_API_BASE = "https://api.raindrop.io/rest/v1";
 const MAX_PER_PAGE = 50; // API maximum
@@ -53,6 +54,27 @@ interface RaindropItem {
   tags: string[];
 }
 
+export interface RaindropFetchResult {
+  articles: ArticleItem[];
+  /** IDs of bookmarks already processed in an earlier run. */
+  processedIds: number[];
+  /** IDs of the new bookmarks, keyed by canonical URL. */
+  idByUrl: Record<string, number>;
+}
+
+/**
+ * Returns the bookmark IDs to move to the archive: those processed in earlier runs plus the new
+ * ones whose URL was summarized in this run.
+ */
+export function archivableRaindropIds(result: RaindropFetchResult, summarizedUrls: readonly string[]): number[] {
+  const ids = [...result.processedIds];
+  for (const url of summarizedUrls) {
+    const id = result.idByUrl[normalizeUrl(url)];
+    if (id !== undefined) ids.push(id);
+  }
+  return ids;
+}
+
 /**
  * Fetches new (unprocessed) bookmarks from a Raindrop.io collection,
  * with pagination and date-based filtering.
@@ -67,17 +89,18 @@ export async function fetchRaindropBookmarks(
   collectionName: string = "Inbox",
   lookbackHours: number = 48,
   purpose: string = "curated"
-): Promise<{ articles: ArticleItem[]; raindropIds: number[] }> {
+): Promise<RaindropFetchResult> {
   const token = env.RAINDROP_TEST_TOKEN;
 
   if (!token) {
     console.log("ℹ️ Raindrop ingestion skipped (RAINDROP_TEST_TOKEN not set).");
-    return { articles: [], raindropIds: [] };
+    return { articles: [], processedIds: [], idByUrl: {} };
   }
 
   const cutoffDate = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
   const newArticles: ArticleItem[] = [];
   const processedRaindropIds: number[] = [];
+  const idByUrl: Record<string, number> = {};
 
   try {
     let page = 0;
@@ -118,8 +141,7 @@ export async function fetchRaindropBookmarks(
 
         // --- Layer 2: State DB deduplication ---
         if (isProcessed(item.link)) {
-          // Already processed in a previous run. Track its ID for archiving
-          // but don't add it to the article list.
+          // Already processed in a previous run: safe to archive now.
           processedRaindropIds.push(item._id);
           continue;
         }
@@ -133,8 +155,9 @@ export async function fetchRaindropBookmarks(
           publishedAt: item.created || new Date().toISOString(),
         });
 
-        // Track ID so we can archive it after successful processing
-        processedRaindropIds.push(item._id);
+        // Archived only if this run summarizes it (see archivableRaindropIds); a bookmark that is
+        // excluded or fails extraction stays in the inbox.
+        idByUrl[normalizeUrl(item.link)] = item._id;
       }
 
       // If we received fewer than MAX_PER_PAGE, we've reached the last page
@@ -150,7 +173,7 @@ export async function fetchRaindropBookmarks(
       `(scanned ${page} page(s), cutoff: ${lookbackHours}h)`
     );
 
-    return { articles: newArticles, raindropIds: processedRaindropIds };
+    return { articles: newArticles, processedIds: processedRaindropIds, idByUrl };
   } catch (error: any) {
     // Propagate, so the run records the source as failing rather than empty.
     throw new Error(`Failed to fetch Raindrop bookmarks for "${collectionName}": ${error.message}`, { cause: error });

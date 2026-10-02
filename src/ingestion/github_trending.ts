@@ -74,6 +74,7 @@ export async function fetchGitHubTrending(
         title: `⭐ ${repoPath} — ${description || "Trending repo"} (★${stars}/day)`,
         url: repoUrl,
         publishedAt: new Date().toISOString(),
+        ...(description ? { description } : {}),
       });
 
       if (newItems.length >= 25) break;

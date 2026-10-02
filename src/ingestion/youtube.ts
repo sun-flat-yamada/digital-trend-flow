@@ -72,6 +72,7 @@ export async function fetchYouTube(
         title: `🎬 ${item.snippet.title} — ${item.snippet.channelTitle}`,
         url: videoUrl,
         publishedAt: item.snippet.publishedAt,
+        ...(item.snippet.description?.trim() ? { description: item.snippet.description.trim() } : {}),
       });
     }
 

@@ -65,6 +65,7 @@ export async function fetchRss(
         title: item.title,
         url: item.link,
         publishedAt: publishedAt || new Date().toISOString(),
+        ...(item.contentSnippet?.trim() ? { description: item.contentSnippet.trim() } : {}),
       });
     }
 
