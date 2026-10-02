@@ -14,6 +14,7 @@ export interface ArticleItem {
   url: string;
   publishedAt: string;
   language?: string; // Item 2.6: Multi-language ingestion
+  description?: string; // Plain-text summary from the source; used when content extraction fails
 }
 
 const parser = new Parser();
