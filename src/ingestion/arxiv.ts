@@ -47,10 +47,14 @@ export async function fetchArxiv(
       const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
       const linkMatch = entry.match(/<id>([\s\S]*?)<\/id>/);
       const publishedMatch = entry.match(/<published>([\s\S]*?)<\/published>/);
+      const summaryMatch = entry.match(/<summary>([\s\S]*?)<\/summary>/);
 
       const title = titleMatch?.[1]?.replace(/\s+/g, " ").trim() ?? "";
-      const url = linkMatch?.[1]?.trim() ?? "";
+      // The API returns http:// IDs; switch to https before the processed-URL check, because
+      // that is the form recorded as processed.
+      const url = (linkMatch?.[1]?.trim() ?? "").replace(/^http:\/\//, "https://");
       const publishedAt = publishedMatch?.[1]?.trim() ?? new Date().toISOString();
+      const abstract = summaryMatch?.[1]?.replace(/\s+/g, " ").trim();
 
       if (!title || !url) continue;
       if (isProcessed(url)) continue;
@@ -60,8 +64,9 @@ export async function fetchArxiv(
         sourceType: "arxiv",
         purpose,
         title,
-        url: url.replace("http://", "https://"),
+        url,
         publishedAt,
+        ...(abstract ? { description: abstract } : {}),
       });
     }
 

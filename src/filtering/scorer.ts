@@ -7,6 +7,7 @@
  */
 
 import { config } from "../core/config";
+import { canonicalizeUrl } from "../core/url";
 import { ExcludeRules, PurposeScoring, ExcludeKeyword } from "../core/types";
 import { llmCall } from "../summarization/llm_gateway";
 import { getJudgePrompt, JUDGE_RESPONSE_SCHEMA } from "../summarization/prompts";
@@ -60,17 +61,10 @@ function getTfIdfMultiplier(keyword: string): number {
 
 /**
  * Sanitizes URLs for consistent deduplication by stripping tracking parameters.
+ * Delegates to core/url so ingestion, scoring and the processed-URL state share one definition.
  */
 export function normalizeUrl(rawUrl: string, excludeRules: ExcludeRules = config.exclude): string {
-  try {
-    const urlObj = new URL(rawUrl);
-    excludeRules.url_strip_parameters.forEach((param) => {
-      urlObj.searchParams.delete(param);
-    });
-    return urlObj.toString();
-  } catch (e) {
-    return rawUrl;
-  }
+  return canonicalizeUrl(rawUrl, excludeRules.url_strip_parameters);
 }
 
 // ── Exclude Keyword Matching (Item 3.4: Enhanced) ──

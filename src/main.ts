@@ -57,6 +57,7 @@ import {
 } from "./ingestion/state_manager";
 import { Purpose, Source } from "./core/types";
 import { PATHS } from "./core/paths";
+import { dedupeByUrl } from "./core/url";
 
 // ── Types for pipeline internal state ──
 
@@ -264,10 +265,17 @@ async function main(): Promise<RunStatus> {
     }
   }
 
-  console.log(`  → Found ${allNewItems.length} new (unprocessed) articles.`);
-  await registry.events.emit("ingestion:complete", { count: allNewItems.length });
+  // The same story often arrives from several sources (RSS + HN + Raindrop) or with different
+  // tracking parameters; extract and score each canonical URL only once.
+  const uniqueItems = dedupeByUrl(allNewItems);
+  const duplicateCount = allNewItems.length - uniqueItems.length;
+  console.log(
+    `  → Found ${uniqueItems.length} new (unprocessed) articles` +
+      (duplicateCount > 0 ? ` (${duplicateCount} duplicate URLs dropped).` : ".")
+  );
+  await registry.events.emit("ingestion:complete", { count: uniqueItems.length });
 
-  if (allNewItems.length === 0) {
+  if (uniqueItems.length === 0) {
     console.log("ℹ️ No new articles found today. Pipeline complete.");
     return "skipped";
   }
@@ -286,7 +294,7 @@ async function main(): Promise<RunStatus> {
     .filter((_, i) => i < 10);
 
   const extractionResults = await mapWithConcurrency(
-    allNewItems,
+    uniqueItems,
     async (item) => {
       const normalizedUrl = normalizeUrl(item.url);
 
@@ -385,7 +393,7 @@ async function main(): Promise<RunStatus> {
   const selectedArticles = twoPassSelect(dedupedArticles);
   console.log(`  → ${selectedArticles.length} articles selected after quota balancing.`);
 
-  metrics.setArticleCounts(allNewItems.length, allScoredArticles.length, selectedArticles.length);
+  metrics.setArticleCounts(uniqueItems.length, allScoredArticles.length, selectedArticles.length);
   await registry.events.emit("scoring:complete", { selected: selectedArticles.length });
 
   if (selectedArticles.length === 0) {

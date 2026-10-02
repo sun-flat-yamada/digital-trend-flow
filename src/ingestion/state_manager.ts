@@ -12,8 +12,10 @@
 
 import Database from "better-sqlite3";
 import * as fs from "fs";
+import { config } from "../core/config";
 import type { PipelineRunMetrics } from "../core/metrics";
 import { PATHS } from "../core/paths";
+import { normalizeUrl } from "../core/url";
 
 const DB_PATH = PATHS.DB;
 const LEGACY_JSON_PATH = PATHS.LEGACY_JSON;
@@ -147,17 +149,21 @@ function purgeExpired(): void {
 
 /**
  * Checks if a given URL has already been processed.
+ * The URL is canonicalized first, so callers may pass the raw link from a feed. The raw form is
+ * checked too: entries recorded before canonicalization was widened can still carry tracking
+ * parameters (e.g. the BBC's at_medium) that the canonical form now drops.
  */
 export function isProcessed(url: string): boolean {
   const database = getDb();
   const row = database.prepare(
-    `SELECT 1 FROM processed_urls WHERE url = ? AND expires_at > datetime('now')`
-  ).get(url);
+    `SELECT 1 FROM processed_urls WHERE url IN (?, ?) AND expires_at > datetime('now')`
+  ).get(normalizeUrl(url), url);
   return !!row;
 }
 
 /**
- * Records a URL as successfully processed with metadata.
+ * Records a URL (in canonical form) as successfully processed with metadata.
+ * The entry expires after `settings.state_ttl_days`.
  */
 export function markAsProcessed(
   url: string,
@@ -168,8 +174,8 @@ export function markAsProcessed(
   const database = getDb();
   database.prepare(`
     INSERT OR REPLACE INTO processed_urls (url, title, score, purpose, processed_at, expires_at)
-    VALUES (?, ?, ?, ?, datetime('now'), datetime('now', '+${DEFAULT_TTL_DAYS} days'))
-  `).run(url, title, score, purpose ?? null);
+    VALUES (?, ?, ?, ?, datetime('now'), datetime('now', ?))
+  `).run(normalizeUrl(url), title, score, purpose ?? null, `+${config.settings.state_ttl_days} days`);
 }
 
 /**
