@@ -10,7 +10,12 @@ import { metrics, SOURCE_ALERT_STREAK, type RunStatus } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
 import { fetchRss, ArticleItem } from "./ingestion/rss";
-import { fetchRaindropBookmarks, archiveProcessedRaindrops } from "./ingestion/raindrop";
+import {
+  fetchRaindropBookmarks,
+  archiveProcessedRaindrops,
+  archivableRaindropIds,
+  type RaindropFetchResult,
+} from "./ingestion/raindrop";
 import { fetchXViGrok } from "./ingestion/xai_grok";
 import { sourceDisabledReason } from "./ingestion/source_availability";
 import { extractMarkdown } from "./ingestion/jina_reader";
@@ -135,7 +140,7 @@ async function main(): Promise<RunStatus> {
     metrics.recordSourceStatus({ name: source.name, type: source.type, status: "disabled", article_count: 0, error_message: reason });
   }
 
-  const raindropResultSets: { articles: ArticleItem[]; raindropIds: number[]; collectionId: number; archiveId: number | undefined }[] = [];
+  const raindropResultSets: (RaindropFetchResult & { collectionId: number; archiveId: number | undefined })[] = [];
   const fetchSource = async (s: Source & { purpose: string }): Promise<ArticleItem[]> => {
     switch (s.type) {
       case "rss":
@@ -205,8 +210,7 @@ async function main(): Promise<RunStatus> {
   await registry.events.emit("ingestion:complete", { count: uniqueItems.length });
 
   if (uniqueItems.length === 0) {
-    console.log("ℹ️ No new articles found today. Pipeline complete.");
-    return "skipped";
+    return finishSkipped("No new articles found today.");
   }
 
   // ==========================
@@ -240,12 +244,27 @@ async function main(): Promise<RunStatus> {
         return null;
       }
 
-      const markdown = await extractMarkdown(normalizedUrl);
+      let content: string;
+      try {
+        content = await extractMarkdown(normalizedUrl);
+        metrics.recordExtraction("ok");
+      } catch (error) {
+        const reason = errorMessageOf(error);
+        if (!item.description) {
+          metrics.recordExtraction("failed");
+          console.log(`  ⚠️ Extraction failed: "${item.title}" (${reason})`);
+          return null;
+        }
+        // Score and summarize from the source's own summary instead of dropping the article.
+        metrics.recordExtraction("fallback");
+        console.log(`  ↩️ Extraction failed, using the source description: "${item.title}" (${reason})`);
+        content = `${item.title}\n\n${item.description}`;
+      }
 
       const articleData: ArticleData = {
         url: normalizedUrl,
         title: item.title,
-        content: markdown,
+        content,
         publishedAt: item.publishedAt, // Item 2.5: freshness
         ...(item.language !== undefined ? { language: item.language } : {}), // Item 2.6
       };
@@ -302,8 +321,8 @@ async function main(): Promise<RunStatus> {
   console.log(`  → ${allScoredArticles.length} articles passed scoring.`);
 
   if (allScoredArticles.length === 0) {
-    console.log("ℹ️ No articles met the quality threshold. Pipeline complete.");
-    return "skipped";
+    metrics.setArticleCounts(uniqueItems.length, 0, 0);
+    return finishSkipped("No articles met the quality threshold.");
   }
 
   // Item 2.4: Semantic deduplication
@@ -326,8 +345,7 @@ async function main(): Promise<RunStatus> {
   await registry.events.emit("scoring:complete", { selected: selectedArticles.length });
 
   if (selectedArticles.length === 0) {
-    console.log("ℹ️ No articles were selected after quota balancing. Pipeline complete.");
-    return "skipped";
+    return finishSkipped("No articles were selected after quota balancing.");
   }
 
   // ==========================
@@ -546,9 +564,11 @@ async function main(): Promise<RunStatus> {
   }
 
   // Archive Raindrop items
+  const summarizedUrls = summarizedArticles.map((sa) => sa.article.url);
   for (const rs of raindropResultSets) {
-    if (rs.raindropIds.length > 0) {
-      await archiveProcessedRaindrops(rs.collectionId, rs.raindropIds, rs.archiveId);
+    const archiveIds = archivableRaindropIds(rs, summarizedUrls);
+    if (archiveIds.length > 0) {
+      await archiveProcessedRaindrops(rs.collectionId, archiveIds, rs.archiveId);
     }
   }
 
@@ -616,6 +636,18 @@ async function finishDegraded(gate: RunGateResult): Promise<RunStatus> {
 
   await registry.events.emit("pipeline:error", { status: "degraded", reasons: gate.reasons });
   return "degraded";
+}
+
+/**
+ * Ends a run that had nothing to summarize. The run record and the job summary are still
+ * written, because a skipped run is often the symptom of failing sources.
+ */
+function finishSkipped(reason: string): RunStatus {
+  console.log(`ℹ️ ${reason} Pipeline complete.`);
+  metrics.setRunStatus("skipped", [reason]);
+  savePipelineRun(metrics.finalize());
+  writeStepSummary();
+  return "skipped";
 }
 
 // ── GitHub Actions Integration ──

@@ -55,6 +55,8 @@ export interface PipelineRunMetrics {
   total_cost_usd: number;
   errors: string[];
   sources_status: SourceStatus[];
+  /** Article body extraction: "fallback" means the source's description was used instead. */
+  extraction: { attempted: number; failed: number; fallback: number };
   quality_score?: number;
   run_status?: RunStatus;
   status_reasons?: string[];
@@ -125,6 +127,7 @@ class MetricsCollector {
       total_cost_usd: 0,
       errors: [],
       sources_status: [],
+      extraction: { attempted: 0, failed: 0, fallback: 0 },
     };
   }
 
@@ -137,6 +140,13 @@ class MetricsCollector {
   }
 
   /** Records the status of a source fetch. */
+  recordExtraction(outcome: "ok" | "failed" | "fallback"): void {
+    const e = this.metrics.extraction;
+    e.attempted++;
+    if (outcome === "failed") e.failed++;
+    if (outcome === "fallback") e.fallback++;
+  }
+
   recordSourceStatus(status: SourceStatus): void {
     this.metrics.sources_status.push(status);
   }
@@ -238,6 +248,7 @@ class MetricsCollector {
 | Articles Ingested | ${m.articles_ingested} |
 | Articles Scored | ${m.articles_scored} |
 | Articles Selected | ${m.articles_selected} |
+| Content Extraction (Failed / Description Fallback) | ${m.extraction.failed} / ${m.extraction.fallback} of ${m.extraction.attempted} |
 | Map Success (Articles) | ${mapSuccess} |
 | LLM Calls (Map/Reduce/Judge) | ${mapCalls}/${reduceCalls}/${judgeCalls} |
 | Total Tokens (In/Out) | ${m.total_tokens.input.toLocaleString()} / ${m.total_tokens.output.toLocaleString()} |
