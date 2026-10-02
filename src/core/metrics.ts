@@ -97,10 +97,14 @@ export function estimateCost(
   inputTokens: number,
   outputTokens: number
 ): number {
-  // Find best match in pricing table
-  const pricing = Object.entries(PRICING).find(([key]) =>
-    model.toLowerCase().includes(key.toLowerCase())
-  )?.[1] ?? PRICING["default"]!;
+  // Use the most specific (longest) matching key, so "gpt-4.1-mini" is not priced as "gpt-4.1".
+  const name = model.toLowerCase();
+  const pricing = Object.entries(PRICING)
+    .filter(([key]) => key !== "default" && name.includes(key.toLowerCase()))
+    .reduce<[string, { input: number; output: number }] | undefined>(
+      (best, entry) => (best === undefined || entry[0].length > best[0].length ? entry : best),
+      undefined
+    )?.[1] ?? PRICING["default"]!;
 
   const inputCost = (inputTokens / 1_000_000) * pricing.input;
   const outputCost = (outputTokens / 1_000_000) * pricing.output;

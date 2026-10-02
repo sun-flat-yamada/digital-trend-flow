@@ -67,7 +67,7 @@ export async function notifyDiscord(
           timestamp: new Date().toISOString(),
         },
       ],
-    });
+    }, { timeout: 15000 }); // a hung webhook must not stall the run
 
     console.log("✅ Discord notification sent successfully.");
   } catch (error: any) {

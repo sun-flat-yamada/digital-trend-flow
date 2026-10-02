@@ -40,14 +40,13 @@ import { semanticDedup } from "./filtering/semantic_dedup";
 import { discoverCandidateKeywords, formatSuggestionReport } from "./filtering/keyword_expansion";
 import { mapExtractFacts, MapInput, MapOutput } from "./summarization/gemini_map";
 import { reduceSummarize } from "./summarization/gemini_reduce";
-import { saveMarkdownFile, SummaryFrontmatter } from "./storage/markdown_builder";
+import { saveMarkdownFile, extractTopStoryTitle, SummaryFrontmatter } from "./storage/markdown_builder";
 import { saveDailyCanvas } from "./storage/canvas_builder";
 import { extractMentionedCompanies, extractMentionedTechnologies } from "./storage/obsidian_linker";
 import { notifyDiscord } from "./publishing/discord_notifier";
 import { notifySlack } from "./publishing/slack_notifier";
 import { notifyTeams } from "./publishing/teams_notifier";
 import { notifyEmail } from "./publishing/email_notifier";
-import { generateAtomFeed } from "./publishing/feed_generator";
 import { generatePagesSite } from "./publishing/pages_generator";
 import { generatePodcast } from "./publishing/podcast_generator";
 import { evaluateQuality } from "./evaluation/quality_checker";
@@ -69,6 +68,7 @@ import { dedupeByUrl } from "./core/url";
 
 interface ScoredArticle {
   article: ArticleData;
+  sourceName: string;
   score: number;
   purpose: string;
   purposeLabel: string;
@@ -302,6 +302,7 @@ async function main(): Promise<RunStatus> {
       console.log(`  ✅ [${scoreResult.purposeLabel}] "${item.title}" (score: ${finalScore.toFixed(1)})`);
       return {
         article: articleData,
+        sourceName: item.sourceName,
         score: finalScore,
         purpose: scoreResult.assignedPurpose,
         purposeLabel: scoreResult.purposeLabel,
@@ -483,13 +484,19 @@ async function main(): Promise<RunStatus> {
 
   // Find top purpose
   const topPurpose = Object.entries(purposeDistribution)
-    .sort(([, a], [, b]) => b - a)[0]?.[0] ?? "";
+    .reduce<[string, number] | undefined>((best, entry) => (best === undefined || entry[1] > best[1] ? entry : best), undefined)?.[0] ?? "";
+  // Highest-scoring article, without reordering summarizedArticles
+  const topArticle = summarizedArticles.reduce<ScoredArticle | undefined>(
+    (best, sa) => (best === undefined || sa.score > best.score ? sa : best),
+    undefined
+  );
 
   const frontmatterMeta: SummaryFrontmatter = {
     tags: Array.from(allKeywords).slice(0, 20),
     categories: activePurposes.map((p) => p.label),
-    sources: [...new Set(summarizedArticles.map((sa) => sa.purpose))],
-    topStory: summarizedArticles.sort((a, b) => b.score - a.score)[0]?.article.title,
+    sources: [...new Set(summarizedArticles.map((sa) => sa.sourceName))],
+    // The headline the summary actually leads with; the top-scored title if it has none.
+    topStory: extractTopStoryTitle(summaryMarkdown) ?? topArticle?.article.title,
     previousDate,
     // Item 6.3: DataView extensions
     articleCount: summarizedArticles.length,
@@ -523,7 +530,7 @@ async function main(): Promise<RunStatus> {
     saveDailyCanvas({
       date: today,
       topStory: frontmatterMeta.topStory ?? "Daily Tech Trend",
-      topStoryUrl: summarizedArticles.sort((a, b) => b.score - a.score)[0]?.article.url,
+      topStoryUrl: topArticle?.article.url,
       purposeGroups: canvasPurposes,
       mentionedCompanies: frontmatterMeta.mentionedCompanies,
       mentionedTechnologies: frontmatterMeta.mentionedTechnologies,
@@ -539,10 +546,7 @@ async function main(): Promise<RunStatus> {
   await notifyTeams(title, summaryMarkdown, summarizedArticles.length);
   await notifyEmail(title, summaryMarkdown, summarizedArticles.length);
 
-  // Item 6.5: Generate RSS feed
-  generateAtomFeed();
-
-  // GitHub Pages static site generation
+  // GitHub Pages static site generation (also writes the Atom feed, Item 6.5)
   try {
     generatePagesSite(undefined, undefined, targetLanguage);
   } catch (pagesErr: any) {

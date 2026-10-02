@@ -4,7 +4,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { saveMarkdownFile, SummaryFrontmatter } from "../src/storage/markdown_builder";
+import { saveMarkdownFile, extractTopStoryTitle, SummaryFrontmatter } from "../src/storage/markdown_builder";
 import { PATHS } from "../src/core/paths";
 
 describe("saveMarkdownFile", () => {
@@ -67,7 +67,7 @@ describe("saveMarkdownFile", () => {
     expect(content).toContain("OpenAI");
     expect(content).toContain("transformer");
     // Check Obsidian backlink
-    expect(content).toContain("[[2026-04-17_summary|前日のサマリー]]");
+    expect(content).toContain("[[2026-04-17_digital-trend_daily_summary|前日のサマリー]]");
   });
 
   test("includes language in frontmatter and English backlink when language is en", () => {
@@ -88,7 +88,7 @@ describe("saveMarkdownFile", () => {
 
     const content = fs.readFileSync(filePath, "utf8");
     expect(content).toContain("language: en");
-    expect(content).toContain("[[2026-09-07_summary|Previous Summary]]");
+    expect(content).toContain("[[2026-09-07_digital-trend_daily_summary|Previous Summary]]");
   });
 
   test("creates parent directories automatically", () => {
@@ -140,7 +140,7 @@ describe("saveMarkdownFile", () => {
     // Verify ordering: content -> metrics -> navigation link
     const contentIdx = content.indexOf("ニュース内容です。");
     const metricsIdx = content.indexOf('<details class="pipeline-metrics">');
-    const footerIdx = content.indexOf("[[2026-09-10_summary|前日のサマリー]]");
+    const footerIdx = content.indexOf("[[2026-09-10_digital-trend_daily_summary|前日のサマリー]]");
     expect(contentIdx).toBeLessThan(metricsIdx);
     expect(metricsIdx).toBeLessThan(footerIdx);
   });
@@ -169,5 +169,21 @@ describe("saveMarkdownFile", () => {
     expect(content).toContain("- **Execution Time**: 15.2s");
     expect(content).toContain("- **Tokens Used**: Input 5,000 / Output 800 (Total: 5,800)");
     expect(content).toContain("- **Estimated Cost**: $0.0012 (approx. ¥0.19)");
+  });
+});
+
+describe("extractTopStoryTitle", () => {
+  test("returns the first heading under the top story section", () => {
+    const md = "## 📌 Intro\n### Not this\n## 🔥 本日の最重要ニュース\n### **Gemini 4 released**\nBody\n### Second\n";
+    expect(extractTopStoryTitle(md)).toBe("Gemini 4 released");
+  });
+
+  test("does not take a heading from the next section", () => {
+    expect(extractTopStoryTitle("## 🔥 Today's Top Story\nNo heading\n## Trends\n### Trend A\n")).toBeUndefined();
+  });
+
+  test("falls back to the first heading when there is no top story section", () => {
+    expect(extractTopStoryTitle("# Title\n### First heading\n")).toBe("First heading");
+    expect(extractTopStoryTitle("plain text")).toBeUndefined();
   });
 });

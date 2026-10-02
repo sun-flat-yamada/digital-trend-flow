@@ -164,10 +164,12 @@ export function resetCircuits(): void {
 // ── Provider Implementations ──
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+const GEMINI_TIMEOUT_MS = 180_000;
 
 async function callGemini(request: LLMRequest, modelAlias: string): Promise<LLMResponse> {
   const modelName = await resolveModel(modelAlias, "google");
-  const model = genAI.getGenerativeModel({ model: modelName });
+  // Without a timeout a stalled request hangs the run until the job times out.
+  const model = genAI.getGenerativeModel({ model: modelName }, { timeout: GEMINI_TIMEOUT_MS });
 
   // Item 1.1: Build generation config with optional Structured Output
   const generationConfig: Record<string, unknown> = {};
@@ -269,7 +271,7 @@ async function callAnthropic(request: LLMRequest, model: string): Promise<LLMRes
     {
       headers: {
         "x-api-key": apiKey,
-        "anthropic-version": "2024-10-22",
+        "anthropic-version": "2023-06-01", // the only version the Messages API accepts
         "Content-Type": "application/json",
       },
       timeout: 60000,

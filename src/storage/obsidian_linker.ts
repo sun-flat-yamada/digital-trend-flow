@@ -7,6 +7,7 @@
  */
 
 import { config } from "../core/config";
+import { dailySummaryNoteName } from "./markdown_builder";
 
 export interface EnrichedFrontmatter {
   // Standard fields
@@ -76,7 +77,7 @@ export function generateRelatedLinks(
   // Generate navigation links
   const links: string[] = [];
   const prevDate = getPreviousDate(currentDate);
-  links.push(`[[${prevDate}_summary|← 前日]]`);
+  links.push(`[[${dailySummaryNoteName(prevDate)}|← 前日]]`);
 
   // Topic-based MOC links
   for (const topic of currentTopics.slice(0, 3)) {
@@ -96,7 +97,7 @@ export function generateObsidianFooter(
   const prevDate = getPreviousDate(currentDate);
   const parts: string[] = [
     "\n\n---\n",
-    `← [[${prevDate}_summary|前日のサマリー]]`,
+    `← [[${dailySummaryNoteName(prevDate)}|前日のサマリー]]`,
   ];
 
   if (topics.length > 0) {
@@ -148,7 +149,7 @@ export function buildEnrichedFrontmatter(params: {
     execution_time_sec: Math.round(params.executionTimeSec),
     quality_score: Math.round(params.qualityScore * 10) / 10,
     top_story: params.topStory,
-    previous: `${params.previousDate}_summary`,
+    previous: dailySummaryNoteName(params.previousDate),
     related_notes: [],
   };
 }

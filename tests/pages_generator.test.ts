@@ -313,6 +313,12 @@ categories:
       expect(indexHtml).toContain('src="./app.js"');
       expect(appJs).toContain("./data/summaries.json");
 
+      // The Atom feed is published with the site and linked from the page
+      const feedXml = fs.readFileSync(path.join(testOutputDir, "feed.xml"), "utf8");
+      expect(indexHtml).toContain('<link rel="alternate" type="application/atom+xml" title="Digital Trend Flow" href="./feed.xml">');
+      expect(feedXml).toMatch(/<link href="[^"]*#2026-09-03" rel="alternate"/);
+      expect(feedXml.indexOf("#2026-09-03")).toBeLessThan(feedXml.indexOf("#2026-09-02"));
+
       // Verify English default UI elements
       expect(indexHtml).toContain('<html lang="en">');
       expect(indexHtml).toContain("Calendar");

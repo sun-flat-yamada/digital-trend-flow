@@ -1,103 +1,64 @@
 /**
- * Tests for feed_generator.ts — Atom feed XML generation.
+ * Tests for feed_generator.ts — Atom feed XML for the Pages site.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { generateAtomFeed } from "../src/publishing/feed_generator";
-import { PATHS } from "../src/core/paths";
+import { buildAtomFeed, resolveSiteUrl, FEED_ENTRY_LIMIT } from "../src/publishing/feed_generator";
 
-describe("generateAtomFeed", () => {
-  const testDir = path.join(PATHS.TMP_AI, "test_feed");
+const SITE = "https://owner.github.io/repo/";
+const UPDATED = "2026-10-02T00:00:00.000Z";
 
-  beforeAll(() => {
-    const now = new Date();
-    const d1 = new Date(now.getTime() - 86400000);
-    const d2 = new Date(now.getTime() - 2 * 86400000);
+describe("buildAtomFeed", () => {
+  const entries = [
+    { date: "2026-10-01", title: "Daily Summary 2026-10-01", topStory: "Model <X> & friends", articleCount: 4 },
+    { date: "2026-09-30", title: "Daily Summary 2026-09-30", topStory: "", articleCount: 7 },
+  ];
 
-    const ds1 = d1.toISOString().split("T")[0];
-    const y1 = d1.getFullYear().toString();
-    const m1 = (d1.getMonth() + 1).toString().padStart(2, "0");
-    const dir1 = path.join(testDir, y1, m1);
-    fs.mkdirSync(dir1, { recursive: true });
+  test("links each entry to its deep link on the site", () => {
+    const xml = buildAtomFeed(entries, SITE, UPDATED);
 
-    fs.writeFileSync(
-      path.join(dir1, `${ds1}_digital-trend_daily_summary.md`),
-      `---
-title: "Daily Summary ${ds1}"
-articles_processed: 12
-categories:
-  - AI Research
-  - Business
----
+    expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+    expect(xml).toContain('<link href="https://owner.github.io/repo/feed.xml" rel="self" type="application/atom+xml"/>');
+    expect(xml).toContain('<link href="https://owner.github.io/repo/#2026-10-01" rel="alternate" type="text/html"/>');
+    expect(xml).toContain(`<updated>${UPDATED}</updated>`);
+    expect((xml.match(/<entry>/g) ?? []).length).toBe(2);
+  });
 
-## 🔥 Top News
-Test content for day 1.
-`,
-      "utf8"
-    );
+  test("escapes text and falls back to the article count as summary", () => {
+    const xml = buildAtomFeed(entries, SITE, UPDATED);
 
-    const ds2 = d2.toISOString().split("T")[0];
-    const y2 = d2.getFullYear().toString();
-    const m2 = (d2.getMonth() + 1).toString().padStart(2, "0");
-    const dir2 = path.join(testDir, y2, m2);
-    fs.mkdirSync(dir2, { recursive: true });
+    expect(xml).toContain("<summary>Model &lt;X&gt; &amp; friends (4 articles)</summary>");
+    expect(xml).toContain("<summary>7 articles</summary>");
+  });
 
-    fs.writeFileSync(
-      path.join(dir2, `${ds2}_digital-trend_daily_summary.md`),
-      `---
-title: "Daily Summary ${ds2}"
-articles_processed: 8
----
+  test("uses relative links without a site URL", () => {
+    const xml = buildAtomFeed(entries, null, UPDATED);
 
-## 🔥 Top News
-Test content for day 2.
-`,
-      "utf8"
+    expect(xml).toContain('<link href="feed.xml" rel="self"');
+    expect(xml).toContain('<link href="#2026-10-01" rel="alternate"');
+  });
+
+  test("keeps the newest entries only, and handles no entries", () => {
+    const many = Array.from({ length: FEED_ENTRY_LIMIT + 5 }, (_, i) => ({ ...entries[0]!, date: `2026-01-${i}` }));
+    expect((buildAtomFeed(many, SITE, UPDATED).match(/<entry>/g) ?? []).length).toBe(FEED_ENTRY_LIMIT);
+    expect(buildAtomFeed([], SITE, UPDATED)).not.toContain("<entry>");
+  });
+});
+
+describe("resolveSiteUrl", () => {
+  test("prefers PAGES_BASE_URL and adds a trailing slash", () => {
+    expect(resolveSiteUrl({ PAGES_BASE_URL: "https://example.com/trends", GITHUB_REPOSITORY: "o/r" })).toBe(
+      "https://example.com/trends/"
     );
   });
 
-  afterAll(() => {
-    // Clean up
-    try {
-      fs.rmSync(testDir, { recursive: true, force: true });
-    } catch {
-      // Ignore cleanup errors
-    }
+  test("derives the project site URL from GITHUB_REPOSITORY", () => {
+    expect(resolveSiteUrl({ GITHUB_REPOSITORY: "Sun-Flat-Yamada/digital-trend-flow" })).toBe(
+      "https://sun-flat-yamada.github.io/digital-trend-flow/"
+    );
   });
 
-  test("generates valid Atom XML", () => {
-    const feedPath = generateAtomFeed(testDir);
-    expect(fs.existsSync(feedPath)).toBe(true);
-
-    const content = fs.readFileSync(feedPath, "utf8");
-    expect(content).toContain('<?xml version="1.0"');
-    expect(content).toContain("<feed xmlns=");
-    expect(content).toContain("<entry>");
-    expect(content).toContain("Digital Trend Flow");
-  });
-
-  test("includes entries for each summary file", () => {
-    const feedPath = generateAtomFeed(testDir);
-    const content = fs.readFileSync(feedPath, "utf8");
-
-    // Should have 2 entries
-    const entryCount = (content.match(/<entry>/g) || []).length;
-    expect(entryCount).toBe(2);
-  });
-
-  test("handles empty directory", () => {
-    const emptyDir = path.join(PATHS.TMP_AI, "test_feed_empty");
-    fs.mkdirSync(emptyDir, { recursive: true });
-
-    const feedPath = generateAtomFeed(emptyDir);
-    expect(fs.existsSync(feedPath)).toBe(true);
-
-    const content = fs.readFileSync(feedPath, "utf8");
-    expect(content).toContain("<feed xmlns=");
-    // No entries
-    expect(content).not.toContain("<entry>");
-
-    fs.rmSync(emptyDir, { recursive: true, force: true });
+  test("handles a user site repository and missing variables", () => {
+    expect(resolveSiteUrl({ GITHUB_REPOSITORY: "owner/owner.github.io" })).toBe("https://owner.github.io/");
+    expect(resolveSiteUrl({})).toBeNull();
   });
 });

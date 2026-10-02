@@ -70,7 +70,10 @@ jest.mock("../src/filtering/keyword_expansion", () => ({
 }));
 jest.mock("../src/summarization/gemini_map", () => ({ mapExtractFacts: jest.fn() }));
 jest.mock("../src/summarization/gemini_reduce", () => ({ reduceSummarize: jest.fn() }));
-jest.mock("../src/storage/markdown_builder", () => ({ saveMarkdownFile: jest.fn() }));
+jest.mock("../src/storage/markdown_builder", () => ({
+  ...jest.requireActual("../src/storage/markdown_builder"),
+  saveMarkdownFile: jest.fn(),
+}));
 jest.mock("../src/storage/canvas_builder", () => ({ saveDailyCanvas: jest.fn() }));
 jest.mock("../src/storage/obsidian_linker", () => ({
   extractMentionedCompanies: () => [],
@@ -80,7 +83,6 @@ jest.mock("../src/publishing/discord_notifier", () => ({ notifyDiscord: jest.fn(
 jest.mock("../src/publishing/slack_notifier", () => ({ notifySlack: jest.fn() }));
 jest.mock("../src/publishing/teams_notifier", () => ({ notifyTeams: jest.fn() }));
 jest.mock("../src/publishing/email_notifier", () => ({ notifyEmail: jest.fn() }));
-jest.mock("../src/publishing/feed_generator", () => ({ generateAtomFeed: jest.fn() }));
 jest.mock("../src/publishing/pages_generator", () => ({ generatePagesSite: jest.fn() }));
 jest.mock("../src/publishing/podcast_generator", () => ({ generatePodcast: jest.fn() }));
 jest.mock("../src/aggregation/trend_analyzer", () => ({
@@ -143,7 +145,6 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
     notifySlack: require("../src/publishing/slack_notifier").notifySlack,
     notifyTeams: require("../src/publishing/teams_notifier").notifyTeams,
     notifyEmail: require("../src/publishing/email_notifier").notifyEmail,
-    generateAtomFeed: require("../src/publishing/feed_generator").generateAtomFeed,
     generatePagesSite: require("../src/publishing/pages_generator").generatePagesSite,
     generatePodcast: require("../src/publishing/podcast_generator").generatePodcast,
     markAsProcessed: require("../src/ingestion/state_manager").markAsProcessed,
@@ -186,7 +187,6 @@ const PUBLISHERS = [
   "notifySlack",
   "notifyTeams",
   "notifyEmail",
-  "generateAtomFeed",
   "generatePagesSite",
   "generatePodcast",
 ];
@@ -255,6 +255,8 @@ describe("daily pipeline publication gate", () => {
     expect(run.mocks["saveMarkdownFile"]).toHaveBeenCalledTimes(1);
     expect(run.mocks["markAsProcessed"]).toHaveBeenCalledTimes(2);
     expect(run.githubOutput).toContain("run_status=success");
+    // Frontmatter lists source names and the headline the summary leads with.
+    expect(run.mocks["saveMarkdownFile"]!.mock.calls[0][6]).toMatchObject({ sources: ["Test Feed"], topStory: "Article A" });
   });
 
   test("an article whose Map phase failed is left unprocessed so the next run retries it", async () => {

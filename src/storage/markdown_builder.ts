@@ -27,6 +27,27 @@ export interface SummaryFrontmatter {
   language?: string | undefined;
 }
 
+/** Obsidian note name (file name without ".md") of the daily summary for a date. */
+export function dailySummaryNoteName(date: string): string {
+  return `${date}_digital-trend_daily_summary`;
+}
+
+/**
+ * Returns the headline of the summary's top story: the first "###" heading under the "🔥"
+ * section, or the first "###" heading when there is no such section.
+ */
+export function extractTopStoryTitle(markdown: string): string | undefined {
+  const lines = markdown.split("\n");
+  const topSection = lines.findIndex((line) => /^##\s.*🔥/.test(line));
+  const candidates = topSection >= 0 ? lines.slice(topSection + 1) : lines;
+  for (const line of candidates) {
+    if (topSection >= 0 && /^##\s/.test(line)) break; // next section reached
+    const heading = line.match(/^###\s+(.+)$/);
+    if (heading?.[1]) return heading[1].replace(/\*\*/g, "").trim();
+  }
+  return undefined;
+}
+
 /**
  * Generates a Markdown file with safely-serialized YAML Frontmatter and saves it to disk.
  */
@@ -64,7 +85,7 @@ export function saveMarkdownFile(
     frontmatterObj["top_story"] = metadata.topStory;
   }
   if (metadata?.previousDate) {
-    frontmatterObj["previous"] = `${metadata.previousDate}_summary`;
+    frontmatterObj["previous"] = dailySummaryNoteName(metadata.previousDate);
   }
   // Item 6.3: DataView-optimized fields
   if (metadata?.articleCount !== undefined) {
@@ -128,7 +149,7 @@ export function saveMarkdownFile(
   if (metadata?.previousDate) {
     const isEn = metadata.language?.toLowerCase() === "en" || metadata.language?.toLowerCase() === "english";
     const prevText = isEn ? "Previous Summary" : "前日のサマリー";
-    footer = `\n\n---\n\n← [[${metadata.previousDate}_summary|${prevText}]]`;
+    footer = `\n\n---\n\n← [[${dailySummaryNoteName(metadata.previousDate)}|${prevText}]]`;
   }
 
   const fullContent = frontmatter + content + metricsBlock + footer;
