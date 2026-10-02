@@ -256,6 +256,11 @@ export const EnvSchema = z.object({
   AI_MODEL_PLATFORM: z.string().optional(),
   GEMINI_MAP_MODEL: z.string().optional(),
   GEMINI_REDUCE_MODEL: z.string().optional(),
+  // Dry run: ingest, extract and score, then stop before the Map phase (no publishing)
+  DRY_RUN: z.preprocess(
+    (val) => (val === "true" || val === true ? true : false),
+    z.boolean().default(false)
+  ),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;

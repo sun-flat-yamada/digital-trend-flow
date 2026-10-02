@@ -1,13 +1,18 @@
 name: Monthly Trend Digest
 
 on:
-  # 毎月1日の JST 04:30 (UTC 19:30 前日) に実行
+  # 毎月1日 UTC 19:30 (= JST 2日 04:30) に実行。前月分を集計する
   schedule:
     - cron: "30 19 1 * *"
   workflow_dispatch:
 
+# 日次パイプラインと artifacts リポジトリへの push が競合しないよう直列化する
+concurrency:
+  group: pipeline-state
+  cancel-in-progress: false
+
 env:
-  ARTIFACTS_REPO: "sun-flat-yamada/artifacts"
+  ARTIFACTS_REPO: ${{ vars.ARTIFACTS_REPO || format('{0}/artifacts', github.repository_owner) }}
 
 permissions:
   contents: write
@@ -48,6 +53,10 @@ jobs:
       - name: Generate monthly digest
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_MODEL_REDUCE: ${{ vars.AI_MODEL_REDUCE || '' }}
+          AI_MODEL_PLATFORM: ${{ vars.AI_MODEL_PLATFORM || '' }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

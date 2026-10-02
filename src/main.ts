@@ -349,6 +349,13 @@ async function main(): Promise<RunStatus> {
     return finishSkipped("No articles were selected after quota balancing.");
   }
 
+  if (env.DRY_RUN) {
+    for (const sa of selectedArticles) {
+      console.log(`  🧪 [${sa.purposeLabel}] ${sa.article.title} (score: ${sa.score.toFixed(1)}) ${sa.article.url}`);
+    }
+    return finishSkipped(`Dry run: stopped after selecting ${selectedArticles.length} articles; no LLM summary was generated and nothing was published.`);
+  }
+
   // ==========================
   // Phase 3: Map Processing
   // ==========================

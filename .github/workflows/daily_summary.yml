@@ -1,19 +1,28 @@
 name: Daily Trend Summary
 
 on:
-  # 毎日JST 04:00 (UTC 19:00 前日) に実行
+  # 毎日 JST 03:47 (UTC 18:47 前日) に実行。毎時 0 分は GitHub 側の混雑で遅延・欠落しやすいため外している
   schedule:
-    - cron: "0 19 * * *"
+    - cron: "47 18 * * *"
   # 手動トリガー (デバッグ・テスト用)
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry-run mode (skip LLM + publishing)"
+        description: "Dry-run mode (stop after article selection: no LLM summary, no publishing, no commit)"
         type: boolean
         default: false
+  # 外部イベントからの実行 (Item 8.4。旧 on_demand.yml)
+  repository_dispatch:
+    types: [trigger-digest]
+
+# pipeline_state.db と artifacts リポジトリを更新する実行は直列化する (月次集計とも共有)
+concurrency:
+  group: pipeline-state
+  cancel-in-progress: false
 
 env:
   ARTIFACTS_REPO: ${{ vars.ARTIFACTS_REPO || format('{0}/artifacts', github.repository_owner) }}
+  DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
 
 permissions:
   contents: write # content/ への git push に必要
@@ -59,6 +68,14 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RAINDROP_TEST_TOKEN: ${{ secrets.RAINDROP_TEST_TOKEN }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_HOST: ${{ vars.LANGFUSE_HOST || '' }}
           NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -77,12 +94,15 @@ jobs:
           AI_MODEL_MAP: ${{ vars.AI_MODEL_MAP || '' }}
           AI_MODEL_REDUCE: ${{ vars.AI_MODEL_REDUCE || '' }}
           AI_MODEL_PLATFORM: ${{ vars.AI_MODEL_PLATFORM || '' }}
+          PAGES_BASE_URL: ${{ vars.PAGES_BASE_URL || '' }}
         run: npm run build && npm start
 
       - name: Ensure Pages static site is generated
+        if: ${{ env.DRY_RUN != 'true' }}
         env:
           OUTPUT_LANGUAGE: ${{ vars.OUTPUT_LANGUAGE || 'en' }}
           SUMMARY_LANGUAGE: ${{ vars.SUMMARY_LANGUAGE || '' }}
+          PAGES_BASE_URL: ${{ vars.PAGES_BASE_URL || '' }}
         run: |
           if [ ! -f "_site/index.html" ]; then
             echo "Building pages static site..."
@@ -90,6 +110,7 @@ jobs:
           fi
 
       - name: Upload Pages artifact
+        if: ${{ env.DRY_RUN != 'true' }}
         uses: actions/upload-pages-artifact@v5
         with:
           path: '_site'
@@ -97,8 +118,23 @@ jobs:
       - name: Commit and push generated summaries to artifacts repo
         # A degraded run fails the pipeline step (nothing is published) but its run record —
         # metrics JSON and pipeline_state.db — is still committed so the failure stays visible.
-        if: ${{ success() || steps.pipeline.outputs.run_status == 'degraded' }}
+        # A dry run commits nothing.
+        if: ${{ env.DRY_RUN != 'true' && (success() || steps.pipeline.outputs.run_status == 'degraded') }}
         run: |
+          # Pushes the current branch, rebasing onto the remote when it moved. Fails after 3 attempts.
+          push_with_retry() {
+            local branch="$1"
+            for attempt in 1 2 3; do
+              if git push -u origin "HEAD:${branch}"; then
+                return 0
+              fi
+              echo "Push attempt ${attempt} failed; rebasing onto origin/${branch} and retrying..."
+              git pull --rebase origin "${branch}" || { git rebase --abort || true; return 1; }
+              sleep $((attempt * 5))
+            done
+            return 1
+          }
+
           if [ -n "${{ secrets.PAT_GITHUB }}" ] && [ -d "artifacts" ]; then
             cd artifacts/
             if [ ! -d .git ]; then
@@ -110,23 +146,28 @@ jobs:
             git config --local user.name "github-actions[bot]"
             git add .
             git diff --staged --quiet || git commit -m "chore: daily summary $(date -u '+%Y-%m-%d')"
-            git push -u origin main || echo "Push to artifacts repo skipped or failed"
+            push_with_retry main || { echo "::error::Push to the artifacts repo failed"; exit 1; }
             cd ..
           else
-            echo "PAT_GITHUB not set or artifacts dir not present, skipping external artifacts push."
+            echo "::warning::PAT_GITHUB not set or artifacts dir not present, skipping external artifacts push."
           fi
 
+          # pipeline_state.db is a binary file: a rebase that touches it would conflict, so the
+          # concurrency group above keeps runs from racing on it.
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add -f pipeline_state.db || true
           git diff --staged --quiet || git commit -m "chore: update pipeline state $(date -u '+%Y-%m-%d')"
-          git push || true
+          push_with_retry "${GITHUB_REF_NAME}" || { echo "::error::Push of pipeline_state.db failed"; exit 1; }
 
   deploy-pages:
     name: Deploy to GitHub Pages
     needs: daily-summary
-    if: always() && needs.daily-summary.result == 'success'
+    if: ${{ always() && needs.daily-summary.result == 'success' && inputs.dry_run != true }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
