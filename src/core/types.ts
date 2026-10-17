@@ -181,6 +181,8 @@ export const ConfigSchema = z.object({
       .default({ enabled: true, decay_lambda: 0.02, max_age_hours: 72 }),
     // Item 5.2: State TTL
     state_ttl_days: z.number().default(90),
+    // Plan ST-2: articles evaluated but not summarized are not re-fetched for this many days
+    evaluated_ttl_days: z.number().int().positive().default(7),
     // Plan 2-1: batch LLM triage of titles/descriptions before any body is fetched
     // (see filtering/llm_triage.ts). When it fails, the run falls back to the keyword pre-screen.
     triage: z

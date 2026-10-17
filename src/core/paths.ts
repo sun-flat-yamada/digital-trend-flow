@@ -74,3 +74,9 @@ export const PATHS = {
   // Tmp files (used usually by AI or tests, but kept for reference)
   TMP_AI: path.resolve(PROJECT_ROOT, "_tmp_ai"),
 };
+
+/**
+ * The state DB file: `PIPELINE_STATE_DB` when set (e.g. `:memory:` in tests), else PATHS.DB.
+ * Read on each call, so a test can set the variable after this module is loaded.
+ */
+export const stateDbPath = (): string => process.env["PIPELINE_STATE_DB"] || PATHS.DB;

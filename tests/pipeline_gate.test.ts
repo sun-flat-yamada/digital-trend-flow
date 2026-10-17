@@ -39,7 +39,9 @@ jest.mock("../src/core/langfuse", () => ({
 }));
 jest.mock("../src/ingestion/state_manager", () => ({
   isProcessed: jest.fn(() => false),
+  isEvaluated: jest.fn(() => false),
   markAsProcessed: jest.fn(),
+  markAsEvaluated: jest.fn(),
   flushState: jest.fn(),
   savePipelineRun: jest.fn(),
   recordSourceHealth: jest.fn(),
@@ -148,6 +150,8 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
     generatePagesSite: require("../src/publishing/pages_generator").generatePagesSite,
     generatePodcast: require("../src/publishing/podcast_generator").generatePodcast,
     markAsProcessed: require("../src/ingestion/state_manager").markAsProcessed,
+    isEvaluated: require("../src/ingestion/state_manager").isEvaluated,
+    markAsEvaluated: require("../src/ingestion/state_manager").markAsEvaluated,
     savePipelineRun: require("../src/ingestion/state_manager").savePipelineRun,
   };
   // Keep metrics JSON out of the working tree.
@@ -236,6 +240,7 @@ describe("daily pipeline publication gate", () => {
       expect(run.mocks[publisher]).not.toHaveBeenCalled();
     }
     expect(run.mocks["markAsProcessed"]).not.toHaveBeenCalled();
+    expect(run.mocks["markAsEvaluated"]).not.toHaveBeenCalled();
     expect(run.mocks["savePipelineRun"]).toHaveBeenCalledTimes(1);
     expect(run.mocks["savePipelineRun"]!.mock.calls[0][0]).toMatchObject({
       run_status: "degraded",
@@ -327,6 +332,76 @@ describe("daily pipeline publication gate", () => {
     ).find((input) => input.url.endsWith("/b"));
     expect(mapInputB?.content).toContain(description.trim());
     expect(run.stepSummary).toContain("| Content Extraction (Failed / Description Fallback) | 0 / 1 of 2 |");
+  });
+
+  describe("articles evaluated but not summarized", () => {
+    const healthy = (mocks: Record<string, jest.Mock>) => {
+      mocks["mapExtractFacts"]!.mockImplementation(async (input: { url: string; title: string }) =>
+        mapOutput(input.url, input.title),
+      );
+      mocks["reduceSummarize"]!.mockResolvedValue({ markdown: GOOD_SUMMARY, usedFallback: false });
+    };
+
+    test("an article a recent run evaluated is dropped before its body is fetched", async () => {
+      const run = await runPipeline((mocks) => {
+        healthy(mocks);
+        mocks["isEvaluated"]!.mockImplementation((url: string) => url.endsWith("/b"));
+      });
+
+      expect(run.mocks["extractMarkdown"]).toHaveBeenCalledTimes(1);
+      expect(run.mocks["extractMarkdown"]).toHaveBeenCalledWith("https://example.com/a");
+      expect(run.mocks["savePipelineRun"]!.mock.calls[0][0]).toMatchObject({
+        articles_ingested: 1,
+        articles_skipped_evaluated: 1,
+      });
+      expect(run.stepSummary).toContain("| Skipped (Evaluated Recently) | 1 |");
+    });
+
+    test("an article below the threshold is recorded, unless it was scored from a fallback description", async () => {
+      const threshold = mockConfig.purposes.tech.scoring.threshold;
+      mockConfig.purposes.tech.scoring.threshold = 20;
+      try {
+        const run = await runPipeline((mocks) => {
+          mocks["fetchRss"]!.mockResolvedValue(
+            ARTICLES.map((a) => ({
+              ...a,
+              sourceName: "Test Feed",
+              sourceType: "rss",
+              purpose: "tech",
+              publishedAt: new Date().toISOString(),
+              description: "The source's own summary. ".repeat(10),
+            })),
+          );
+          mocks["extractMarkdown"]!.mockImplementation(async (url: string) => {
+            if (url.endsWith("/b")) throw new Error("Jina returned HTTP 503");
+            return "Article body. ".repeat(50);
+          });
+        });
+
+        expect(run.mocks["markAsEvaluated"]!.mock.calls).toEqual([
+          ["https://example.com/a", "below_threshold", 10, "tech"],
+        ]);
+      } finally {
+        mockConfig.purposes.tech.scoring.threshold = threshold;
+      }
+    });
+
+    test("a published run records the scored articles that lost the selection", async () => {
+      const quota = mockConfig.purposes.tech.quota;
+      mockConfig.purposes.tech.quota = { min: 1, max: 1 };
+      try {
+        const run = await runPipeline(healthy);
+
+        expect(run.exitCode).toBe(0);
+        expect(run.mocks["markAsProcessed"]).toHaveBeenCalledTimes(1);
+        expect(run.mocks["markAsProcessed"]!.mock.calls[0][0]).toBe("https://example.com/a");
+        expect(run.mocks["markAsEvaluated"]!.mock.calls).toEqual([
+          ["https://example.com/b", "not_selected", 10, "tech"],
+        ]);
+      } finally {
+        mockConfig.purposes.tech.quota = quota;
+      }
+    });
   });
 
   test("a failing source is reported as an error and listed under Source Alerts", async () => {
