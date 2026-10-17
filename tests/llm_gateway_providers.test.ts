@@ -21,11 +21,11 @@ jest.mock("../src/summarization/model_resolver", () => ({
 }));
 
 const mockGenerateContent = jest.fn();
-jest.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-    getGenerativeModel: ({ model }: { model: string }) => ({
-      generateContent: (request: unknown) => mockGenerateContent(model, request),
-    }),
+jest.mock("@google/genai", () => ({
+  GoogleGenAI: jest.fn().mockImplementation(() => ({
+    models: {
+      generateContent: (params: { model: string }) => mockGenerateContent(params.model, params),
+    },
   })),
 }));
 
@@ -43,9 +43,7 @@ import {
 } from "../src/summarization/llm_gateway";
 
 const outage = () => Object.assign(new Error("[503 Service Unavailable] The model is overloaded"), { status: 503 });
-const geminiOk = (text: string) => ({
-  response: { text: () => text, usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 } },
-});
+const geminiOk = (text: string) => ({ text, usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 } });
 const request = { systemPrompt: "system", userPrompt: "user", phase: "map" as const };
 
 beforeAll(() => {
@@ -85,6 +83,37 @@ describe("llmCall candidate order", () => {
       response_format: { type: "json_schema", json_schema: { schema: { type: "object" }, strict: true } },
     });
     expect(options).toMatchObject({ headers: { Authorization: "Bearer openai-key" } });
+  });
+
+  test("sends the system prompt, the timeout and the response schema to Gemini", async () => {
+    mockGenerateContent.mockResolvedValue(geminiOk('{"facts":[]}'));
+
+    const response = await llmCall({
+      ...request,
+      responseSchema: { type: "OBJECT" },
+      temperature: 0.1,
+      maxOutputTokens: 256,
+    });
+
+    expect(response).toMatchObject({ provider: "google", model: "map-model", inputTokens: 10, outputTokens: 5 });
+    expect(mockGenerateContent.mock.calls[0]?.[1]).toEqual({
+      model: "map-model",
+      contents: "user",
+      config: {
+        systemInstruction: "system",
+        httpOptions: { timeout: 180_000 },
+        responseMimeType: "application/json",
+        responseSchema: { type: "OBJECT" },
+        temperature: 0.1,
+        maxOutputTokens: 256,
+      },
+    });
+  });
+
+  test("a response without text is returned as empty text", async () => {
+    mockGenerateContent.mockResolvedValue({ text: undefined });
+
+    await expect(llmCall(request)).resolves.toMatchObject({ text: "", inputTokens: 0, outputTokens: 0 });
   });
 
   test("a per-call model overrides only the primary candidate", async () => {

@@ -203,7 +203,7 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | ID | 重要度 | 指摘 | 根拠 | 対応案 |
 | :-- | :-- | :-- | :-- | :-- |
 | LLM-1 | P0 | F-01・F-02 | — | Phase 0 |
-| LLM-2 | P1 | `@google/generative-ai` は Deprecated（2025-08-31 にサポート終了） | `node_modules/@google/generative-ai/README.md` | `@google/genai` へ移行する |
+| LLM-2 | P1 | `@google/generative-ai` は Deprecated（2025-08-31 にサポート終了） | `node_modules/@google/generative-ai/README.md` | `@google/genai` へ移行する（✅ #49。生成とモデル一覧を `@google/genai` 2.x に移行し、旧 SDK を依存から外した） |
 | LLM-3 | P1 | Gemini の呼び出しにタイムアウトがない（SDK の `RequestOptions.timeout` を指定していない）。Webhook を送る axios 呼び出しにもタイムアウトがない | `llm_gateway.ts:170`、`discord_notifier.ts:58`、`slack_notifier.ts:32`、`teams_notifier.ts:31` | 明示的なタイムアウトを設定する |
 | LLM-4 | P1 | サーキットブレーカーがプラットフォーム単位のため、過負荷の 1 モデル（503 が頻発する flash など）が原因で、同じプラットフォームの健全なモデル（flash-lite）まで遮断される | `llm_gateway.ts:398, 427` | `platform/model` 単位にする |
 | LLM-5 | P1 | Anthropic の `anthropic-version: "2024-10-22"` は無効な値（有効値は `2023-06-01`）。フォールバック先に設定すると 400 で即失敗する。`responseSchema` も Anthropic では無視される | `llm_gateway.ts:255-291` | ヘッダーを修正し、tool use 等で構造化出力に対応する |
@@ -408,7 +408,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
   - ゲートウェイのエラー分類とフォールバック
   - Map / Reduce
   - パイプラインの統合テスト（外部依存はすべてモック）
-- [ ] 3-5 `@google/genai` へ移行する。あわせてサーキットをモデル単位にし、Anthropic の構造化出力に対応し、未使用の依存（`p-retry`、`uuid`）を削除する。`npm audit fix`、`dotenv` の `quiet`、Zod 4 のエラー表示も対応する
+- [ ] 3-5 `@google/genai` へ移行する。あわせてサーキットをモデル単位にし、Anthropic の構造化出力に対応し、未使用の依存（`p-retry`、`uuid`）を削除する。`npm audit fix`、`dotenv` の `quiet`、Zod 4 のエラー表示も対応する（`@google/genai` への移行は #49 で完了。`p-retry`・`uuid` は依存にない。`dotenv` の `quiet` と Zod 4 のエラー表示は #36 で対応済み。サーキットのモデル単位化と Anthropic の構造化出力は #50）
 - [ ] 3-6 権限と資格情報を見直す
   - GitHub App トークンか、対象を限定した fine-grained PAT にする
   - `persist-credentials: false` にする
