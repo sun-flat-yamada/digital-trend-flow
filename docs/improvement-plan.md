@@ -230,7 +230,7 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | PUB-5 | P2 | Slack に Markdown をそのまま送っている（`**bold**`・`[text](url)`・`##` は mrkdwn で解釈されない）。2,800 字で機械的に切断する。Discord・Slack の案内文は日本語固定 | `slack_notifier.ts:28-52`、`discord_notifier.ts:25` | mrkdwn に変換し、出力言語に合わせる |
 | PUB-6 | P2 | `publish:complete` イベントが、実際に配信したかどうかに関係なく固定のチャネル一覧を通知する | `main.ts:561` | 配信結果を集計して通知する |
 | PUB-7 | P2 | 月次レポートの frontmatter `type` が `daily_summary` に固定されている | `markdown_builder.ts:47` | `type` を引数にする |
-| PUB-8 | P3 | `pages_generator.ts` は 2,288 行（CSS とクライアント JS をテンプレート文字列で内包）。自作の Markdown パーサーは番号付きリスト等に未対応 | `pages_generator.ts:969-2288` | 静的アセットに分離し、ライブラリを使う |
+| PUB-8 | P3 | `pages_generator.ts` は 2,288 行（CSS とクライアント JS をテンプレート文字列で内包）。自作の Markdown パーサーは番号付きリスト等に未対応 | `pages_generator.ts:969-2288` | 静的アセットに分離し、ライブラリを使う（✅ #56） |
 | PUB-9 | P3 | Podcast の台本は日本語見出しの正規表現に依存しており、`en` 出力では冒頭と締めの挨拶だけになる | `podcast_generator.ts:54` | 言語別テンプレートにするか、既定で無効にする |
 
 ### 4.7 状態管理・冪等性
@@ -433,7 +433,9 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 - [ ] 4-1 状態 DB を artifacts リポジトリへ移し、成果物と状態を 1 コミットで保存する。本体 `main` への日次 bot コミットをなくし、ブランチ保護を有効にする
 - [ ] 4-2 `main.ts` をステージ関数（取得 → 抽出 → 選定 → Map → Reduce → 評価 → 配信 → 永続化）に分割し、依存を注入する。ソースと配信先はレジストリで解決する（プラグインレジストリを実際に使うか、削除する）
 - [x] 4-3 実行ステータス（success / degraded / failed / skipped）を、`pipeline_runs`・metrics・Job Summary に必ず記録する（#54。`pipeline_runs` に `run_status`・`status_reasons` 列〔schema version 3、既存の行は `metrics_json` から補完〕。致命的なエラーでも 3 つとも残し、ワークフローはコミットする。success 以外のメトリクス JSON は `<日付>_metrics.<status>.json`）
-- [ ] 4-4 `pages_generator.ts` を分割（CSS・JS を静的アセットへ）し、HTML を無効化した Markdown レンダラーと CSP を使う
+- [x] 4-4 `pages_generator.ts` を分割（CSS・JS を静的アセットへ）し、HTML を無効化した Markdown レンダラーと CSP を使う（#56）
+
+> **進捗（2026-10-17、4-4）**: 4-4 を実施した（#56）。CSS とクライアント JS を `src/publishing/pages_assets/`（`styles.css`・`app.js`）に移し、サイト生成時に `_site/` へコピーする。`app.js` は UI 文言を index.html の JSON ブロック（`<script id="i18n-data" type="application/json">`）から読むので、言語ごとに生成し直す必要がない。Markdown の変換は `src/publishing/markdown_html.ts`（`markdown-it` 15.0.2、`html: false`）に置き換えた。リンクは http(s) のみ、画像は描画せず、URL の自動リンクはスキームのあるものだけにした。メトリクスの `<details>` 行は従来どおり固定の形だけを組み立て直す。番号付きリスト・表・コードブロックが描画されるようになり、段落内の改行は `<br>` になった。CSP・`feed.xml`・`404.html` は変えていない。`pages_generator.ts` は約 2,250 行から約 800 行になった
 - [x] 4-5 未配線の機能について、配線するか削除するかを決める（週次はワークフロー追加、年次は月次からの集約か削除、note.com / Zenn、キーワード拡張・トレンド分析、Langfuse スパン、Podcast）
 - [ ] 4-6 ドキュメントの不整合（§4.11）を直し、ADR（Architecture Decision Record）を導入し、`Item X.Y` コメントを整理する
 

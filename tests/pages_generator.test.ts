@@ -83,6 +83,51 @@ describe("pages_generator", () => {
     });
   });
 
+  describe("markdownToHtml (markdown-it)", () => {
+    it("renders numbered lists, keeping the citation inside its item", () => {
+      const html = markdownToHtml("1. **[A]**: first\n   **出典**: [S](https://s.example.com)\n2. **[B]**: second");
+      expect(html).toContain('<ol class="summary-list">');
+      expect(html).toContain("<li><strong>[A]</strong>: first<br>");
+      expect(html).toContain(
+        '<a href="https://s.example.com" target="_blank" rel="noopener noreferrer" class="link">S</a>',
+      );
+      expect(html).toContain("<li><strong>[B]</strong>: second</li>");
+    });
+
+    it("keeps only http(s) links and escapes raw HTML", () => {
+      const html = markdownToHtml(
+        "[bad](javascript:alert(1)) [data](data:text/html,x) [rel](./x)\n<script>alert(1)</script>",
+      );
+      expect(html).not.toContain("<a ");
+      expect(html).not.toContain("<script");
+      expect(html).toContain("&lt;script&gt;");
+      // Images are not rendered: an image becomes a plain link
+      expect(markdownToHtml("![img](https://i.example.com/a.png)")).not.toContain("<img");
+    });
+
+    it("links plain http(s) URLs only, not bare domains or file names", () => {
+      const html = markdownToHtml("See https://example.com/a and README.md or example.com");
+      expect(html).toContain('<a href="https://example.com/a"');
+      expect(html.match(/<a /g)).toHaveLength(1);
+    });
+
+    it("renders tables, code blocks and a plain paragraph inside a quote", () => {
+      const html = markdownToHtml("| a | b |\n|---|---|\n| 1 | 2 |\n\n```\nx < y\n```\n\n> quoted");
+      expect(html).toContain("<table>");
+      expect(html).toContain("<td>1</td>");
+      expect(html).toContain("<pre><code>x &lt; y\n</code></pre>");
+      expect(html).toContain('<blockquote class="summary-quote">\n<p>quoted</p>');
+    });
+
+    it("renders a details block that wraps a table", () => {
+      const html = markdownToHtml(
+        '<details class="pipeline-metrics">\n<summary>**M**</summary>\n\n| k | v |\n|---|---|\n| x | 1 |\n</details>',
+      );
+      expect(html).toMatch(/^<details class="pipeline-metrics">\n<summary><strong>M<\/strong><\/summary>\n<table>/);
+      expect(html.endsWith("</table>\n</details>")).toBe(true);
+    });
+  });
+
   describe("markdownToHtml HTML injection", () => {
     it("should escape HTML-looking lines other than the metrics block", () => {
       const md = [
@@ -381,6 +426,19 @@ categories:
       expect(indexHtml).toContain("サマリーあり");
       expect(indexHtml).toContain("本日");
       expect(indexHtml).toContain("選択中");
+
+      // The UI strings for app.js are a JSON data block; the stylesheet and script are the static assets
+      const data = indexHtml.match(/<script id="i18n-data" type="application\/json">([^<]*)<\/script>/);
+      expect(JSON.parse(data![1]!)).toMatchObject({
+        langCode: "ja",
+        isJa: true,
+        copySuccess: "リンクをコピーしました",
+      });
+      for (const asset of ["styles.css", "app.js"]) {
+        expect(fs.readFileSync(path.join(jaOutputDir, asset), "utf8")).toBe(
+          fs.readFileSync(path.join(PATHS.PAGES_ASSETS, asset), "utf8"),
+        );
+      }
     });
 
     it("should handle empty directories gracefully", () => {

@@ -659,6 +659,11 @@ artifacts/contents/
     └── zenn/dtf-<kind>-<period>.md            (Zenn の記事。ZENN_REPO の articles/ へ同期)
 ```
 
+## GitHub Pages
+
+- `src/publishing/pages_generator.ts` が `_site/` に `index.html`・`404.html`・`feed.xml`・`data/*.json` を書き、`src/publishing/pages_assets/` の `styles.css`・`app.js` をコピーする。`app.js` は静的で、UI 文言は index.html の `<script id="i18n-data" type="application/json">` から読む（CSP は `script-src 'self'` のまま）
+- サマリーの Markdown は `src/publishing/markdown_html.ts`（markdown-it、`html: false`）で HTML にする。リンクは http(s) のみ、画像は描画しない。メトリクスの `<details>` / `<summary>` 行だけを固定の形で組み立て直す。メールと note.com の下書きも同じ変換を使う
+
 ## Periodic Reports
 
 | レポート | モジュール | 入力 | ワークフロー |
