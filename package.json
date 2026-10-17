@@ -17,6 +17,7 @@
     "build:pages": "ts-node src/cli/build_pages.ts",
     "start": "node dist/cli/daily.js",
     "debug:filter": "ts-node src/cli/dry_run.ts",
+    "check:sources": "ts-node src/cli/check_sources.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

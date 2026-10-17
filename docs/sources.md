@@ -134,6 +134,21 @@ Bluesky AT Protocol 公開 AppView API (`public.api.bsky.app`) による技術�
 - **連続 3 日以上** 0 件のソースは自動アラート
 - Metrics JSON / GitHub Actions Summary で可視化
 
+## 到達性チェック (`npm run check:sources`)
+
+`config.yml` の全情報源に 1 回ずつアクセスし、到達できるか・何件返るか・所要時間を表にします。状態 DB (`pipeline_state.db`) は読み書きせず、LLM も Jina も呼びません。
+
+```bash
+npm run check:sources                                   # 全情報源
+npm run check:sources -- https://example.com/feed.xml   # 差し替え候補の RSS も試す
+```
+
+- 表は「有効」「無効 (`enabled: false`)」「候補 (引数の URL)」の欄に分かれます。無効な情報源も検査するので、復旧したら分かります
+- API キーが必要で未設定の情報源は `skipped` と表示します
+- Detail 列にエラー (`Status code 429` など) が出ます
+- 有効な情報源が 1 件でも失敗すると終了コード 1 になります。無効な情報源と候補は終了コードに影響しません
+- GitHub Actions では `.github/workflows/source_check.yml` が毎週日曜 JST 06:23 に実行し、結果を Job Summary に出します。手動実行 (`workflow_dispatch`) では `urls` に空白区切りで候補 URL を渡せます
+
 ## カスタムソースの追加
 
 → [`.agents/workflows/add-source.md`](../.agents/workflows/add-source.md) を参照

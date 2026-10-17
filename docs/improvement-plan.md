@@ -166,7 +166,7 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | ING-3 | P1 | Raindrop は、スコア不足や抽出失敗で採用されなかった項目の ID まで集め、実行後にアーカイブへ移動する。手動でクリップした記事が要約されないまま受信箱から消える | `raindrop.ts:123, 137`、`main.ts:568-573` | 要約に採用された URL の ID だけをアーカイブする |
 | ING-4 | P1 | X/Grok のコメントは「`/v1/responses` + `x_search`」だが、実装は検索ツールなしで `/v1/chat/completions` に `grok-3-fast` を投げる。実在しない投稿 URL を生成し得る（URL 形式しか検査しない） | `xai_grok.ts:14-20` と `:88-108` | 検索ツール付きで実装し直すまで無効化する。モデル名は config へ移す |
 | ING-5 | P1 | Reddit / Bluesky は GitHub Actions からの未認証アクセスで 403 | 09-30 ログ | Reddit は OAuth（script app）、Bluesky は App Password で認証した API を使う。または対象から外す |
-| ING-6 | P1 | RSS 4 本が死んでいる（Reuters / Ledge.ai / HF Daily Papers / VentureBeat） | §1.2 | 代替フィードに差し替え、`npm run check:sources` で定期的に検査する |
+| ING-6 | P1 | RSS 4 本が死んでいる（Reuters / Ledge.ai / HF Daily Papers / VentureBeat） | §1.2 | 代替フィードに差し替え、`npm run check:sources` で定期的に検査する（#32 で `check:sources` と週次の `source_check.yml` を追加。差し替えは未実施） |
 | ING-7 | P2 | `ArticleItem` が `rss.ts` に定義され、全モジュールが依存している。タイトルに `(HN: 744pts)`・`⭐ … (★3481/day)`・`🎬 …` などの装飾を埋め込むため、重複排除・キーワード判定・要約の見出しに混入する | `hackernews.ts:66`、`github_trending.ts:74`、`youtube.ts:72` | 型を `core/types.ts` へ移す。エンゲージメント等は `engagement`・`description` などの別フィールドにする（✅ #37） |
 | ING-8 | P2 | 取得期間（72 時間）がソースごとにハードコードされ、`freshness.max_age_hours` と二重管理になっている | `rss.ts:34`、`youtube.ts:50` | config から注入する |
 | ING-9 | P2 | GitHub Trending は正規表現による HTML スクレイピング。説明文の抽出で次のリポジトリの `<p>` を拾い得る | `github_trending.ts:42-68` | HTML パーサーを使うか、GitHub Search API 等へ切り替える（✅ #62。cheerio でリポジトリの行ごとに解析し、0 件は失敗として扱う） |
@@ -364,7 +364,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 > **進捗（2026-10-02）**: 1-3〜1-7 と 1-9 を実装し、1-1・1-2 は一部を実装した。実装時に決めた点・残した点は次のとおり。
 >
 > - 1-1: 取得関数は失敗時に例外を投げ、ソースは `error` として記録される。無効化したソースとキー未設定のソースは `disabled` として記録する。連続失敗（`error` と `empty`）の日数を Job Summary の「Source Alerts」に出す。結果型 `SourceResult` の導入と Discord への障害通知は未実装
-> - 1-2: 死んでいる Reuters・Ledge.ai・HF Daily Papers と、未認証で 403 になる Reddit・Bluesky を `config.yml` の `enabled: false`（新設）で止めた。RSS は User-Agent を付けて取得する（VentureBeat の 403 対策）。Newsweek（404）の差し替え、Reddit・Bluesky の認証、`check:sources` は未実装
+> - 1-2: 死んでいる Reuters・Ledge.ai・HF Daily Papers と、未認証で 403 になる Reddit・Bluesky を `config.yml` の `enabled: false`（新設）で止めた。RSS は User-Agent を付けて取得する（VentureBeat の 403 対策）。Newsweek（404）の差し替えと Reddit・Bluesky の認証は未実装。`check:sources` と週次ワークフロー `source_check.yml` は #32 で追加した（無効な情報源も別欄で検査し、引数で差し替え候補の URL を試せる）
 > - 1-3: 照会は正規化後の URL と生の URL の両方で行う。既存の行（BBC の `at_*` 付き URL 64 件）もそのまま一致する
 > - 1-4: 抽出に失敗した記事は、ソースの説明文（RSS の要約、arXiv の概要など）で採点・要約する。説明文がない記事は除外される
 > - 1-6: 設定ではなくコード（`XAI_GROK_DISABLED_REASON`）で無効化した。設定だけで戻せると、検証できない投稿 URL がまた混入するため

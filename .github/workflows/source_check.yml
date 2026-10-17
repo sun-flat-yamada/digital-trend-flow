@@ -1,0 +1,47 @@
+name: Source Reachability Check
+
+on:
+  # 毎週日曜 JST 06:23 (UTC 土曜 21:23)。毎時 0 分は GitHub 側の混雑で遅延・欠落しやすいため外している
+  schedule:
+    - cron: "23 21 * * 6"
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "Extra feed URLs to try, separated by spaces (replacement candidates)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check-sources:
+    name: Check source reachability
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check sources
+        env:
+          # 設定の読み込みに必要なだけで、LLM は呼ばない
+          GEMINI_API_KEY: dummy
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          RAINDROP_TEST_TOKEN: ${{ secrets.RAINDROP_TEST_TOKEN }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          EXTRA_URLS: ${{ inputs.urls }}
+        run: |
+          # EXTRA_URLS は空白区切りの URL 一覧なので、意図的に単語分割する
+          # shellcheck disable=SC2086
+          npm run check:sources -- $EXTRA_URLS
