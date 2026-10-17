@@ -1,8 +1,8 @@
 {
   "active": {
     "map": "map_v1.md",
+    "triage": "triage_v1.md",
     "reduce": "dynamic",
-    "judge": "judge_v1.md",
     "monthly_reduce": "monthly_reduce_v1.md",
     "weekly_reduce": "weekly_reduce_v1.md"
   },
@@ -11,6 +11,11 @@
       "version": "v1",
       "activated_at": "2026-04-12",
       "description": "Initial externalized prompts"
+    },
+    {
+      "version": "v2",
+      "activated_at": "2026-10-17",
+      "description": "Add batch triage prompt (triage_v1); remove the LLM Judge prompt"
     }
   ]
 }

@@ -8,19 +8,18 @@ Digital Trend Flow は 7 フェーズの Map-Reduce パイプラインで構成�
 flowchart TD
     subgraph "Phase 1: Ingestion"
         S1[RSS] & S2[Raindrop] & S3[X/Grok] & S4[HackerNews] & S5[arXiv] & S6[YouTube] & S7[GitHub Trending] & S8[Reddit] & S9[Bluesky]
-        S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 --> JR[Jina Reader]
+        S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 --> META[Metadata Pre-filter]
+        META --> TRIAGE{"Batch LLM Triage (Flash-Lite)"}
+        TRIAGE -->|"top max_candidates"| JR[Jina Reader]
+        TRIAGE -->|"failed → keyword fallback"| TITLE[Title Pre-screen]
+        TITLE --> JR
         JR --> |Markdown| RAW[Raw Articles]
     end
 
     subgraph "Phase 2: Filtering"
-        RAW --> META[Metadata Pre-filter]
-        META --> TITLE[Title Pre-screen]
-        TITLE --> SCORE[Purpose-based Scoring]
+        RAW --> SCORE[Purpose-based Scoring]
         SCORE --> DEDUP["Semantic Dedup (CJK & Latin)"]
-        DEDUP --> JUDGE{LLM Judge?}
-        JUDGE -->|optional| LJ[LLM-as-a-Judge]
-        JUDGE --> QUOTA[Two-Pass Quota Selection]
-        LJ --> QUOTA
+        DEDUP --> QUOTA[Two-Pass Quota Selection]
     end
 
     subgraph "Phase 3: Map"
@@ -125,9 +124,7 @@ interface PurposeScoreOutput {
   purposeLabel: string;       // "🔬 AI・LLM 研究" 等
   totalScore: number;
   matchedKeywords: string[];
-  llmJudgeScore?: number;     // LLM-as-Judge 評価 (opt-in)
   freshnessFactor?: number;   // 鮮度係数 (0.3–1.0)
-  detectedTopics?: string[];
 }
 ```
 
@@ -216,14 +213,16 @@ Phase 1: Ingestion
        ↓ ソースアダプター (7種)
   ArticleItem { sourceName, sourceType, purpose, title, url, publishedAt }
        ↓ State Manager: isProcessed(url) で重複排除
+       ↓ excludeByMetadata(): ドメイン・NGワードチェック
+       ↓ triageArticles(): タイトル・説明文・情報源をまとめて LLM で判定
+       ↓   (関連度・目的・重要度・重複先。上位 max_candidates 件だけ残す。
+       ↓    失敗時は titlePassesPreScreen() のキーワード事前選別に戻る)
        ↓ Jina Reader: extractMarkdown(url) → Markdown 本文
 Phase 2: Filtering
   ArticleData { url, title, content, publishedAt }
-       ↓ excludeByMetadata(): ドメイン・NGワードチェック
-       ↓ titlePassesPreScreen(): タイトルプレスクリーン
-       ↓ calculatePurposeScore(): キーワードマッチ + 鮮度 + TF-IDF
+       ↓ calculatePurposeScore(): 除外ルール + キーワードマッチ + 鮮度 + TF-IDF
+       ↓   (トリアージ経由の記事は閾値で落とさず、スコアは重要度ベース)
        ↓ semanticDedup(): タイトル類似度で重複排除
-       ↓ (optional) llmJudgeScore(): LLM 関連性評価
        ↓ twoPassSelect(): Min/Max クォータで選定
   ScoredArticle { article, score, purpose, purposeLabel, matchedKeywords }
 
@@ -271,7 +270,7 @@ ConfigSchema = z.object({
     author: z.string(),
     freshness: { enabled, decay_lambda, max_age_hours },
     state_ttl_days: z.number(),
-    llm_judge: { enabled, weight },
+    triage: { enabled, model?, max_candidates, batch_size, min_relevance },
     semantic_dedup: { enabled, similarity_threshold },
   }),
   purposes: z.record(string, PurposeSchema),  // 動的キー
@@ -383,7 +382,7 @@ ArticleItem (正規化済み共通型)
 ### Boundary 2: LLM Gateway 境界
 
 ```txt
-パイプライン (Map/Reduce/Judge)
+パイプライン (Triage/Map/Reduce)
     ↓ LLMRequest (統一リクエスト型)
 llm_gateway.ts
     ↓ プロバイダー固有 API (Gemini, OpenAI, Anthropic)
@@ -398,7 +397,8 @@ LLMResponse (統一レスポンス型)
 interface LLMRequest {
   systemPrompt: string;
   userPrompt: string;
-  phase: "map" | "reduce" | "judge" | ...;
+  phase: "map" | "reduce" | "triage" | ...;
+  model?: string;                            // 主プロバイダーのモデルを上書き
   responseSchema?: Record<string, unknown>;  // Structured Output
   temperature?: number;
   maxOutputTokens?: number;
@@ -427,11 +427,11 @@ interface LLMResponse {
 config.yml (purposes, scoring, exclude)
     ↓ Zod パース → 型安全な AppConfig
 ArticleData
-    ↓ scorer.ts (純粋関数: LLM 呼び出しなし※)
+    ↓ scorer.ts (純粋関数: LLM 呼び出しなし)
 PurposeScoreOutput
 ```
 
-※ `llmJudgeScore()` は opt-in で、デフォルト OFF。
+LLM による関連性判定は `llm_triage.ts`（本文取得前のバッチトリアージ）に分離しています。
 
 **何を隔離しているか**: スコアリングのロジック（キーワードマッチ、TF-IDF、鮮度計算、除外ルール）と、ビジネスルール（どのカテゴリに何点以上で採用するか）を分離しています。
 

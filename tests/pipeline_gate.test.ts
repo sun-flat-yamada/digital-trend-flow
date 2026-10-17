@@ -10,7 +10,7 @@ import * as path from "path";
 const mockConfig = {
   settings: {
     daily_threshold_score: 0,
-    llm_judge: { enabled: false, weight: 0.5 },
+    triage: { enabled: false, max_candidates: 30, batch_size: 150, min_relevance: 50 },
     language: "en",
     author: "test",
     quality_gate: { min_map_success_rate: 0.5, min_quality_score: 60 },
@@ -51,7 +51,7 @@ jest.mock("../src/ingestion/jina_reader", () => ({ extractMarkdown: jest.fn(asyn
 jest.mock("../src/filtering/scorer", () => ({
   normalizeUrl: (url: string) => url,
   excludeByMetadata: () => ({ excluded: false }),
-  titlePassesPreScreen: () => true,
+  titlePassesPreScreen: jest.fn(() => true),
   calculatePurposeScore: () => ({
     isExcluded: false,
     assignedPurpose: "tech",
@@ -60,9 +60,8 @@ jest.mock("../src/filtering/scorer", () => ({
     matchedKeywords: ["ai"],
   }),
   assignBestPurpose: jest.fn(),
-  llmJudgeScore: jest.fn(),
-  combineWithJudgeScore: (score: number) => score,
 }));
+jest.mock("../src/summarization/llm_gateway", () => ({ llmCall: jest.fn() }));
 jest.mock("../src/filtering/semantic_dedup", () => ({ semanticDedup: <T>(articles: T[]) => articles }));
 jest.mock("../src/filtering/keyword_expansion", () => ({
   discoverCandidateKeywords: () => [],
@@ -139,6 +138,8 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
     fetchRss: require("../src/ingestion/rss").fetchRss,
     extractMarkdown: require("../src/ingestion/jina_reader").extractMarkdown,
     mapExtractFacts: require("../src/summarization/gemini_map").mapExtractFacts,
+    llmCall: require("../src/summarization/llm_gateway").llmCall,
+    titlePassesPreScreen: require("../src/filtering/scorer").titlePassesPreScreen,
     reduceSummarize: require("../src/summarization/gemini_reduce").reduceSummarize,
     saveMarkdownFile: require("../src/storage/markdown_builder").saveMarkdownFile,
     notifyDiscord: require("../src/publishing/discord_notifier").notifyDiscord,
@@ -314,6 +315,64 @@ describe("daily pipeline publication gate", () => {
     expect(run.stepSummary).toContain("| Test Feed | rss | error | 0 |");
     expect(run.stepSummary).toContain("### 🚨 Source Alerts");
     expect(run.stepSummary).toContain("Status code 404");
+  });
+
+  describe("with batch LLM triage enabled", () => {
+    beforeEach(() => {
+      mockConfig.settings.triage.enabled = true;
+    });
+    afterEach(() => {
+      mockConfig.settings.triage.enabled = false;
+    });
+
+    const healthy = (mocks: Record<string, jest.Mock>) => {
+      mocks["mapExtractFacts"]!.mockImplementation(async (input: { url: string; title: string }) =>
+        mapOutput(input.url, input.title)
+      );
+      mocks["reduceSummarize"]!.mockResolvedValue({ markdown: GOOD_SUMMARY, usedFallback: false });
+    };
+
+    test("only the candidates triage keeps have their body fetched, and the keyword pre-screen is skipped", async () => {
+      const run = await runPipeline((mocks) => {
+        healthy(mocks);
+        mocks["llmCall"]!.mockResolvedValue({
+          text: JSON.stringify({
+            items: [
+              { id: 0, relevance: 90, purpose: "tech", importance: 8, duplicate_of: -1 },
+              { id: 1, relevance: 10, purpose: "none", importance: 1, duplicate_of: -1 },
+            ],
+          }),
+        });
+      });
+
+      expect(run.mocks["llmCall"]).toHaveBeenCalledTimes(1);
+      expect(run.mocks["llmCall"]!.mock.calls[0][0]).toMatchObject({ phase: "triage" });
+      expect(run.mocks["titlePassesPreScreen"]).not.toHaveBeenCalled();
+      expect(run.mocks["extractMarkdown"]).toHaveBeenCalledTimes(1);
+      expect(run.mocks["extractMarkdown"]).toHaveBeenCalledWith("https://example.com/a");
+      expect(run.mocks["savePipelineRun"]!.mock.calls[0][0].triage).toMatchObject({
+        status: "ok",
+        candidates: 2,
+        kept: 1,
+        dropped_irrelevant: 1,
+      });
+      expect(run.stepSummary).toContain("| Triage (ok) | 1 kept / 1 irrelevant / 0 duplicate / 0 over limit, of 2");
+    });
+
+    test("a failed triage falls back to the keyword pre-screen and is recorded", async () => {
+      const run = await runPipeline((mocks) => {
+        healthy(mocks);
+        mocks["llmCall"]!.mockRejectedValue(new Error("All LLM providers failed for phase: triage"));
+      });
+
+      expect(run.exitCode).toBe(0);
+      expect(run.mocks["titlePassesPreScreen"]).toHaveBeenCalledTimes(2);
+      expect(run.mocks["extractMarkdown"]).toHaveBeenCalledTimes(2);
+      const record = run.mocks["savePipelineRun"]!.mock.calls[0][0];
+      expect(record.triage).toMatchObject({ status: "fallback", error: "All LLM providers failed for phase: triage" });
+      expect(record.errors).toContain("Triage failed (keyword fallback): All LLM providers failed for phase: triage");
+      expect(run.stepSummary).toContain("| Triage (fallback) |");
+    });
   });
 
   test("a dry run stops after selection without calling the LLM or publishing", async () => {

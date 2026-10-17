@@ -16,9 +16,11 @@
 ```txt
  RSS ─ Raindrop ─ X/Grok ─ HackerNews ─ arXiv ─ YouTube ─ GitHub Trending
                         ↓ Ingestion
+           Batch LLM Triage (Flash-Lite, titles)
+                        ↓ top candidates only
                   Jina Reader (Markdown Extraction)
                         ↓ Filtering
-             Scorer + Semantic Dedup + LLM Judge
+                 Scorer + Semantic Dedup
                         ↓ Map
               Gemini Flash → Facts + Source URLs
                         ↓ Reduce
@@ -78,7 +80,7 @@ npm run build && npm start                        # Full pipeline execution
 src/
 ├── core/           # Config, Types (Zod), Paths, Metrics, Langfuse, Plugin Registry
 ├── ingestion/      # 7 Source Adapters + Jina Reader + SQLite State Manager
-├── filtering/      # Scorer, Semantic Dedup, Keyword Expansion, LLM Judge
+├── filtering/      # LLM Triage, Scorer, Semantic Dedup, Keyword Expansion
 ├── summarization/  # Map/Reduce, LLM Gateway (multi-provider), Model Resolver
 ├── aggregation/    # Monthly Digest, Trend Analyzer
 ├── evaluation/     # Quality Checker (automated)

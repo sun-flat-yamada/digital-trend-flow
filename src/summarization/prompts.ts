@@ -3,7 +3,7 @@
  * [Mechanism] Loads prompts from external files if available, falls back
  * to inline defaults. Tracks prompt versions via manifest.json.
  *
- * Items: 1.3 Prompt Versioning, 3.1 LLM-as-Judge prompt
+ * Items: 1.3 Prompt Versioning, Plan 2-1 batch triage prompt
  */
 
 import * as fs from "fs";
@@ -106,49 +106,42 @@ export const MAP_RESPONSE_SCHEMA = {
   required: ["source_title", "source_url", "facts"],
 };
 
-// ── LLM-as-Judge Prompt (Item 3.1) ──
+// ── Batch Triage Prompt (Plan 2-1) ──
 
-const INLINE_JUDGE_PROMPT = `You are a relevance judge for a technology news curation pipeline.
-Given an article's title and a brief excerpt, evaluate its relevance and importance.
+const INLINE_TRIAGE_PROMPT = `You are the triage step of a technology news curation pipeline.
+For every candidate article (title, source, optional description), return its relevance (0-100),
+the key of the best-fitting purpose (or "none"), importance (1-10), and duplicate_of (the id of
+another candidate on the same story, or -1). Return every candidate exactly once.
+Output ONLY valid JSON of the form {"items": [...]}.`;
 
-Rules:
-- Output ONLY valid JSON. No markdown fences, no explanation.
-- Score relevance from 0 (irrelevant) to 100 (critical).
-- Suggest the best category from the provided list.
-- Provide a brief reasoning (1 sentence).
-
-Output JSON schema:
-{
-  "relevance_score": number_0_to_100,
-  "category_suggestion": "string",
-  "reasoning": "string",
-  "is_breaking_news": boolean,
-  "topics": ["string"]
-}`;
-
-export function getJudgePrompt(): string {
+export function getTriagePrompt(): string {
   const manifest = loadManifest();
-  if (manifest?.active?.["judge"]) {
-    const loaded = loadPromptFile(manifest.active["judge"]);
+  if (manifest?.active?.["triage"]) {
+    const loaded = loadPromptFile(manifest.active["triage"]);
     if (loaded) return loaded;
   }
-  return INLINE_JUDGE_PROMPT;
+  return INLINE_TRIAGE_PROMPT;
 }
 
-export const JUDGE_RESPONSE_SCHEMA = {
+export const TRIAGE_RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
-    relevance_score: { type: "INTEGER", description: "0-100 relevance score" },
-    category_suggestion: { type: "STRING", description: "Best matching category" },
-    reasoning: { type: "STRING", description: "One sentence reasoning" },
-    is_breaking_news: { type: "BOOLEAN", description: "Is this breaking news" },
-    topics: {
+    items: {
       type: "ARRAY",
-      items: { type: "STRING" },
-      description: "Key topics mentioned",
+      items: {
+        type: "OBJECT",
+        properties: {
+          id: { type: "INTEGER", description: "Candidate id, unchanged" },
+          relevance: { type: "INTEGER", description: "0-100 relevance to the purposes" },
+          purpose: { type: "STRING", description: "Best-fitting purpose key, or none" },
+          importance: { type: "INTEGER", description: "Importance 1-10" },
+          duplicate_of: { type: "INTEGER", description: "Id of a candidate on the same story, or -1" },
+        },
+        required: ["id", "relevance", "purpose", "importance", "duplicate_of"],
+      },
     },
   },
-  required: ["relevance_score", "category_suggestion", "reasoning", "is_breaking_news", "topics"],
+  required: ["items"],
 };
 
 // ── Reduce Phase Prompt (Dynamic) ──

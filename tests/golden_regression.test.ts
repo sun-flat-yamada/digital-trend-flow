@@ -65,7 +65,7 @@ jest.mock("../src/core/config", () => ({
     settings: {
       daily_threshold_score: 0,
       freshness: { enabled: false, decay_lambda: 0.02, max_age_hours: 72 },
-      llm_judge: { enabled: false, weight: 0.5 },
+      triage: { enabled: false, max_candidates: 30, batch_size: 150, min_relevance: 50 },
       semantic_dedup: { enabled: false, similarity_threshold: 0.92 },
     },
   },

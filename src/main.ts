@@ -33,9 +33,9 @@ import {
   PurposeScoreOutput,
   excludeByMetadata,
   titlePassesPreScreen,
-  llmJudgeScore,
-  combineWithJudgeScore,
 } from "./filtering/scorer";
+import { triageArticles, triagePurposes, triageScore, type TriageDecision } from "./filtering/llm_triage";
+import { llmCall } from "./summarization/llm_gateway";
 import { semanticDedup } from "./filtering/semantic_dedup";
 import { discoverCandidateKeywords, formatSuggestionReport } from "./filtering/keyword_expansion";
 import { mapExtractFacts, MapInput, MapOutput } from "./summarization/gemini_map";
@@ -200,25 +200,28 @@ async function main(): Promise<RunStatus> {
   const allScoredArticles: ScoredArticle[] = [];
   const allTitles: string[] = []; // For keyword expansion (Item 3.2)
 
-  // Available categories for LLM Judge (Item 3.1)
-  const availableCategories = Object.entries(config.purposes)
-    .map(([key, p]) => `${key}: ${p.label}`)
-    .filter((_, i) => i < 10);
+  // Metadata pre-filter (blocked domains, NG title keywords) before triage, so blocked items cost nothing.
+  const candidates = uniqueItems.filter((item) => {
+    const metadataCheck = excludeByMetadata(item.title, normalizeUrl(item.url));
+    if (metadataCheck.excluded) {
+      console.log(`  ❌ Pre-excluded (Metadata): "${item.title}" (${metadataCheck.reason})`);
+    }
+    return !metadataCheck.excluded;
+  });
+
+  // Plan 2-1: batch LLM triage picks which candidates get their body fetched. Without it (disabled
+  // or failed) the keyword title pre-screen decides, as before.
+  const triageByItem = await triageCandidates(candidates);
+  const toExtract = triageByItem ? candidates.filter((item) => triageByItem.has(item)) : candidates;
 
   const extractionResults = await mapWithConcurrency(
-    uniqueItems,
+    toExtract,
     async (item) => {
       const normalizedUrl = normalizeUrl(item.url);
+      const triage = triageByItem?.get(item);
 
-      // Metadata pre-filter
-      const metadataCheck = excludeByMetadata(item.title, normalizedUrl);
-      if (metadataCheck.excluded) {
-        console.log(`  ❌ Pre-excluded (Metadata): "${item.title}" (${metadataCheck.reason})`);
-        return null;
-      }
-
-      // Title pre-screening
-      if (!titlePassesPreScreen(item.title, item.purpose)) {
+      // Title pre-screening (keyword path only)
+      if (!triage && !titlePassesPreScreen(item.title, item.purpose)) {
         console.log(`  ⏭️ Pre-skipped (no title keywords): "${item.title}"`);
         return null;
       }
@@ -248,9 +251,12 @@ async function main(): Promise<RunStatus> {
         ...(item.language !== undefined ? { language: item.language } : {}), // Item 2.6
       };
 
-      // Score against purpose
+      // Score against purpose. A triaged article is scored against the purpose triage chose; its
+      // keyword matches are kept for tags and explainability, but triage decides relevance.
       let scoreResult: PurposeScoreOutput;
-      if (item.purpose === "curated") {
+      if (triage) {
+        scoreResult = calculatePurposeScore(articleData, triage.purpose);
+      } else if (item.purpose === "curated") {
         scoreResult = assignBestPurpose(articleData);
       } else {
         scoreResult = calculatePurposeScore(articleData, item.purpose);
@@ -261,20 +267,18 @@ async function main(): Promise<RunStatus> {
         return null;
       }
 
-      // Item 3.1: LLM-as-Judge scoring (if enabled)
       let finalScore = scoreResult.totalScore;
-      if (config.settings.llm_judge.enabled) {
-        const judgeResult = await llmJudgeScore(articleData, availableCategories);
-        finalScore = combineWithJudgeScore(finalScore, judgeResult);
-      }
+      if (triage) {
+        finalScore = triageScore(triage);
+      } else {
+        // Keyword path: check the purpose threshold
+        const purposeDef = config.purposes[scoreResult.assignedPurpose];
+        const threshold = purposeDef?.scoring?.threshold ?? config.settings.daily_threshold_score;
 
-      // Check threshold
-      const purposeDef = config.purposes[scoreResult.assignedPurpose];
-      const threshold = purposeDef?.scoring?.threshold ?? config.settings.daily_threshold_score;
-
-      if (finalScore < threshold) {
-        console.log(`  ⬇️ Below threshold [${scoreResult.purposeLabel}]: "${item.title}" (score: ${finalScore.toFixed(1)} < ${threshold})`);
-        return null;
+        if (finalScore < threshold) {
+          console.log(`  ⬇️ Below threshold [${scoreResult.purposeLabel}]: "${item.title}" (score: ${finalScore.toFixed(1)} < ${threshold})`);
+          return null;
+        }
       }
 
       allTitles.push(item.title);
@@ -604,6 +608,42 @@ async function main(): Promise<RunStatus> {
 
   console.log(`\n🎉 Pipeline complete! Processed ${summarizedArticles.length} articles across ${activePurposes.length} categories.`);
   return "success";
+}
+
+// ── Batch LLM Triage (Plan 2-1) ──
+
+/**
+ * Runs the batch triage over the candidates and records its outcome in the metrics. Returns the
+ * kept candidates with their verdicts, or null when the keyword pre-screen should decide instead
+ * (triage disabled, or a triage call failed).
+ */
+async function triageCandidates(candidates: ArticleItem[]): Promise<Map<ArticleItem, TriageDecision<ArticleItem>> | null> {
+  const settings = config.settings.triage;
+  const emptyStats = { candidates: candidates.length, kept: 0, dropped_irrelevant: 0, dropped_duplicate: 0, dropped_over_limit: 0, batches: 0 };
+  if (!settings.enabled) {
+    metrics.setTriage({ status: "disabled", ...emptyStats });
+    return null;
+  }
+  if (candidates.length === 0) {
+    metrics.setTriage({ status: "ok", ...emptyStats });
+    return new Map();
+  }
+
+  const result = await triageArticles(candidates, triagePurposes(config.purposes), settings, llmCall, env.API_INTERVAL_MS);
+  if (result.status === "failed") {
+    console.warn(`  ⚠️ Triage failed; falling back to the keyword title pre-screen: ${result.error}`);
+    metrics.recordError(`Triage failed (keyword fallback): ${result.error}`);
+    metrics.setTriage({ status: "fallback", ...result.stats, error: result.error });
+    return null;
+  }
+
+  const { stats } = result;
+  console.log(
+    `  🧭 Triage kept ${stats.kept}/${stats.candidates} candidates ` +
+      `(${stats.dropped_irrelevant} irrelevant, ${stats.dropped_duplicate} duplicate, ${stats.dropped_over_limit} over the limit of ${settings.max_candidates}).`
+  );
+  metrics.setTriage({ status: "ok", ...stats });
+  return new Map(result.kept.map((d) => [d.item, d]));
 }
 
 // ── Degraded Run Handling ──

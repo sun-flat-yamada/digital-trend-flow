@@ -21,9 +21,12 @@ settings:
     decay_lambda: 0.02              # 指数減衰係数
     max_age_hours: 72               # 最大経過時間
   state_ttl_days: 90                # 処理済み URL の TTL
-  llm_judge:
-    enabled: false                  # LLM-as-a-Judge (コスト注意)
-    weight: 0.5                     # キーワードスコアとの混合比率
+  triage:                           # バッチ LLM トリアージ (本文取得の前に候補を絞る)
+    enabled: true
+    # model: latest-flash-lite      # 省略時は models.map
+    max_candidates: 30              # 本文を取得する候補の上限
+    batch_size: 150                 # 1 回の LLM 呼び出しに入れる候補数
+    min_relevance: 50               # 関連度 (0〜100) の下限
   semantic_dedup:
     enabled: true
     similarity_threshold: 0.75      # タイトル類似度閾値
