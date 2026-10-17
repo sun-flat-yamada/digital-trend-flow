@@ -287,8 +287,8 @@ function synthesizeAudio(script: PodcastScript, voices: PodcastVoices, audioPath
         [
           "--voice",
           turn.speaker === "HostA" ? voices.host_a : voices.host_b,
-          "--text",
-          turn.text,
+          // "--text=…": a turn that starts with "-" must not be read as an option
+          `--text=${turn.text}`,
           "--write-media",
           segmentPath,
         ],

@@ -124,7 +124,7 @@ describe("yearly report", () => {
 
     const report = await generateYearlyReport("2026");
 
-    expect(report).toMatchObject({ kind: "yearly", period: "2026", endDate: "2026-12-31", articleCount: 3 });
+    expect(report).toMatchObject({ kind: "yearly", period: "2026", endDate: "2026-12-31", articleCount: 12 }); // 3 daily summaries × 4 articles
     const prompt = mockLlm.mock.calls[0]![0].userPrompt as string;
     expect(prompt).toContain("September body");
     expect(prompt).toContain("December body");

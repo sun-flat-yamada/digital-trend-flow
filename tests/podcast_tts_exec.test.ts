@@ -42,7 +42,7 @@ describe("podcast audio synthesis", () => {
     expect(result.status).toBe("synthesized");
     const synthesisCall = mockExecFileSync.mock.calls.find(([, args]) => {
       const a = args as string[];
-      return a.includes("--text") && a[a.indexOf("--text") + 1]!.includes(payload);
+      return a.some((arg) => arg.startsWith("--text=") && arg.includes(payload));
     });
     expect(synthesisCall).toBeDefined();
     const [command, , options] = synthesisCall as [string, string[], { shell?: unknown }];

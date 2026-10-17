@@ -148,9 +148,14 @@ export function noteCookieHeader(token: string): string {
 /**
  * Creates a draft on note.com through the editor's internal API: `POST /text_notes` creates an
  * empty draft, then `POST /text_notes/draft_save?id=…` saves the title and HTML body (a full
- * overwrite). The draft stays unpublished. Throws on failure (e.g. an expired session cookie).
+ * overwrite). The draft stays unpublished. With `existing`, that draft is overwritten instead of
+ * creating another one. Throws on failure (e.g. an expired session cookie).
  */
-export async function publishToNote(draft: NoteDraft, token: string): Promise<NoteDraftResult> {
+export async function publishToNote(
+  draft: NoteDraft,
+  token: string,
+  existing?: NoteDraftResult,
+): Promise<NoteDraftResult> {
   const headers = {
     Cookie: noteCookieHeader(token),
     "Content-Type": "application/json",
@@ -160,16 +165,22 @@ export async function publishToNote(draft: NoteDraft, token: string): Promise<No
     Referer: "https://editor.note.com/",
   };
 
-  const created = await axios.post(
-    `${NOTE_API_BASE}/text_notes`,
-    { template_key: null },
-    { headers, timeout: NOTE_TIMEOUT_MS },
-  );
-  const data = created.data?.data ?? created.data;
-  const id = Number(data?.id);
-  const key = String(data?.key ?? "");
-  if (!Number.isFinite(id) || id <= 0 || key === "") {
-    throw new Error(`note.com did not return a draft id (status ${created.status})`);
+  let id: number;
+  let key: string;
+  if (existing) {
+    ({ id, key } = existing);
+  } else {
+    const created = await axios.post(
+      `${NOTE_API_BASE}/text_notes`,
+      { template_key: null },
+      { headers, timeout: NOTE_TIMEOUT_MS },
+    );
+    const data = created.data?.data ?? created.data;
+    id = Number(data?.id);
+    key = String(data?.key ?? "");
+    if (!Number.isFinite(id) || id <= 0 || key === "") {
+      throw new Error(`note.com did not return a draft id (status ${created.status})`);
+    }
   }
 
   await axios.post(
@@ -179,6 +190,24 @@ export async function publishToNote(draft: NoteDraft, token: string): Promise<No
   );
 
   return { id, key, editUrl: `https://editor.note.com/notes/${key}/edit/` };
+}
+
+/** File recording the note.com draft created for a slug, so a re-run updates it instead of adding one. */
+function noteRecordPath(outputDir: string, slug: string): string {
+  return path.join(outputDir, `${slug}.note.json`);
+}
+
+/** Reads the note.com draft recorded for a slug, or undefined when there is none (or it is unreadable). */
+export function readNoteRecord(outputDir: string, slug: string): NoteDraftResult | undefined {
+  try {
+    const record = JSON.parse(fs.readFileSync(noteRecordPath(outputDir, slug), "utf8")) as Partial<NoteDraftResult>;
+    if (typeof record.id === "number" && record.id > 0 && typeof record.key === "string" && record.key !== "") {
+      return { id: record.id, key: record.key, editUrl: `https://editor.note.com/notes/${record.key}/edit/` };
+    }
+  } catch {
+    // No record yet
+  }
+  return undefined;
 }
 
 // ── Publishers ──
@@ -203,7 +232,7 @@ export function publishZennArticle(payload: PublishPayload, options: ZennPublish
 
 /**
  * Publishes a report as a note.com draft: the draft file is always written; the draft is also
- * created on note.com when a session token is given. Throws when the API call fails, after the
+ * created on note.com when a session token is given (and updated on a later run for the same period). Throws when the API call fails, after the
  * file has been written.
  */
 export async function publishNoteDraft(
@@ -211,15 +240,20 @@ export async function publishNoteDraft(
   token: string | undefined,
   outputDir?: string,
 ): Promise<NoteDraftResult | null> {
+  const dir = outputDir ?? PATHS.ARTIFACTS_NOTE.absolute;
+  const slug = articleSlug(payload.kind, payload.period);
   const draft = buildNoteDraft(payload.title, payload.markdown, payload.tags);
-  saveNoteDraftFile(articleSlug(payload.kind, payload.period), draft, outputDir);
+  saveNoteDraftFile(slug, draft, dir);
   if (!token) {
     console.log("ℹ️ note.com API posting skipped (NOTE_API_TOKEN not set); the draft file can be pasted manually.");
     return null;
   }
+  // A re-run for the same period (e.g. a manual retry) overwrites the draft it created before.
+  const existing = readNoteRecord(dir, slug);
   try {
-    const result = await publishToNote(draft, token);
-    console.log(`✅ note.com draft created: ${result.editUrl}`);
+    const result = await publishToNote(draft, token, existing);
+    fs.writeFileSync(noteRecordPath(dir, slug), JSON.stringify({ id: result.id, key: result.key }) + "\n", "utf8");
+    console.log(`✅ note.com draft ${existing ? "updated" : "created"}: ${result.editUrl}`);
     return result;
   } catch (error) {
     const status = asErrorLike(error).response?.status;
