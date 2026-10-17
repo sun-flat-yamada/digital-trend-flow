@@ -31,7 +31,7 @@ Import the change-dev workflow of `sun-flat-yamada/github-copilot-dashboard` (Is
 #### [NEW] [src/cli/change_dev_branch.ts](../../../src/cli/change_dev_branch.ts) — `npm run change-dev:branch -- name|check|rename`
 #### [NEW] [src/cli/plan_check.ts](../../../src/cli/plan_check.ts) — `npm run change-dev:plan-check`
 #### [NEW] [tests/change_dev.test.ts](../../../tests/change_dev.test.ts)
-#### [NEW] [.github/workflows/branch_name.yml](../../../.github/workflows/branch_name.yml)
+#### [NEW] [.github/workflows/change_dev.yml](../../../.github/workflows/change_dev.yml)
 
 ## Verification Plan
 
