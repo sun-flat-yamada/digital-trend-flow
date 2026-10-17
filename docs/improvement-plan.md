@@ -205,8 +205,8 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | LLM-1 | P0 | F-01・F-02 | — | Phase 0 |
 | LLM-2 | P1 | `@google/generative-ai` は Deprecated（2025-08-31 にサポート終了） | `node_modules/@google/generative-ai/README.md` | `@google/genai` へ移行する（✅ #49。生成とモデル一覧を `@google/genai` 2.x に移行し、旧 SDK を依存から外した） |
 | LLM-3 | P1 | Gemini の呼び出しにタイムアウトがない（SDK の `RequestOptions.timeout` を指定していない）。Webhook を送る axios 呼び出しにもタイムアウトがない | `llm_gateway.ts:170`、`discord_notifier.ts:58`、`slack_notifier.ts:32`、`teams_notifier.ts:31` | 明示的なタイムアウトを設定する |
-| LLM-4 | P1 | サーキットブレーカーがプラットフォーム単位のため、過負荷の 1 モデル（503 が頻発する flash など）が原因で、同じプラットフォームの健全なモデル（flash-lite）まで遮断される | `llm_gateway.ts:398, 427` | `platform/model` 単位にする |
-| LLM-5 | P1 | Anthropic の `anthropic-version: "2024-10-22"` は無効な値（有効値は `2023-06-01`）。フォールバック先に設定すると 400 で即失敗する。`responseSchema` も Anthropic では無視される | `llm_gateway.ts:255-291` | ヘッダーを修正し、tool use 等で構造化出力に対応する |
+| LLM-4 | P1 | サーキットブレーカーがプラットフォーム単位のため、過負荷の 1 モデル（503 が頻発する flash など）が原因で、同じプラットフォームの健全なモデル（flash-lite）まで遮断される | `llm_gateway.ts:398, 427` | `platform/model` 単位にする（✅ #50） |
+| LLM-5 | P1 | Anthropic の `anthropic-version: "2024-10-22"` は無効な値（有効値は `2023-06-01`）。フォールバック先に設定すると 400 で即失敗する。`responseSchema` も Anthropic では無視される | `llm_gateway.ts:255-291` | ヘッダーを修正し、tool use 等で構造化出力に対応する（✅ ヘッダーは #26、構造化出力は #50。Anthropic は強制した tool 呼び出しの `input_schema`、OpenAI は JSON Schema〔小文字の型・`additionalProperties: false`〕で送る） |
 | LLM-6 | P2 | コスト表を部分一致・先頭一致で引くため、`gpt-4.1-mini` が `gpt-4.1` の単価で計算される。価格表もコードにハードコードされている | `metrics.ts:55-94` | 最長一致にし、価格表を config 化する |
 | LLM-7 | P2 | 「Semantic Cache」は実行内メモリの完全一致キャッシュである。1 回の実行で同じ URL は 1 回しか処理しないため、実質ヒットしない | `gemini_map.ts:14-26, 53-59` | 削除するか、永続キャッシュとして設計し直す |
 | LLM-8 | P2 | プロンプトがファイルとコードに二重定義され、ファイルがないと無言でインライン版に切り替わる。`promptHash` は未使用で、出力と使用プロンプトの対応を追えない。月次・週次のプロンプトは日本語固定 | `prompts.ts`、`prompts/manifest.json` | ファイルを唯一の正とし、版とハッシュを metrics・frontmatter に記録し、多言語化する |
@@ -408,7 +408,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
   - ゲートウェイのエラー分類とフォールバック
   - Map / Reduce
   - パイプラインの統合テスト（外部依存はすべてモック）
-- [ ] 3-5 `@google/genai` へ移行する。あわせてサーキットをモデル単位にし、Anthropic の構造化出力に対応し、未使用の依存（`p-retry`、`uuid`）を削除する。`npm audit fix`、`dotenv` の `quiet`、Zod 4 のエラー表示も対応する（`@google/genai` への移行は #49 で完了。`p-retry`・`uuid` は依存にない。`dotenv` の `quiet` と Zod 4 のエラー表示は #36 で対応済み。サーキットのモデル単位化と Anthropic の構造化出力は #50）
+- [x] 3-5 `@google/genai` へ移行する。あわせてサーキットをモデル単位にし、Anthropic の構造化出力に対応し、未使用の依存（`p-retry`、`uuid`）を削除する。`npm audit fix`、`dotenv` の `quiet`、Zod 4 のエラー表示も対応する（`@google/genai` への移行は #49 で完了。`p-retry`・`uuid` は依存にない。`dotenv` の `quiet` と Zod 4 のエラー表示は #36 で対応済み。サーキットのモデル単位化と Anthropic・OpenAI の構造化出力は #50 で完了）
 - [ ] 3-6 権限と資格情報を見直す
   - GitHub App トークンか、対象を限定した fine-grained PAT にする
   - `persist-credentials: false` にする
