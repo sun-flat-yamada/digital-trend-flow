@@ -23,6 +23,8 @@
     "start": "node dist/cli/daily.js",
     "debug:filter": "ts-node src/cli/dry_run.ts",
     "check:sources": "ts-node src/cli/check_sources.ts",
+    "change-dev:branch": "ts-node src/cli/change_dev_branch.ts",
+    "change-dev:plan-check": "ts-node src/cli/plan_check.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

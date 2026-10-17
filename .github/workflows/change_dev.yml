@@ -1,0 +1,46 @@
+name: Change-dev Check
+
+# change-dev のブランチ名 (<type>/<issue>-<slug>) と plan-first を PR で検査する (.agents/rules/development-workflow.md)。
+# クラウドセッションの割り当て名 (claude/<adjective>-<name>-<id>) は、改名の許可が出るまで警告にとどめる (--warn-cloud)。
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  change-dev:
+    name: Branch name and plan-first
+    # Fork の PR と Dependabot は独自の命名で、計画を書かない
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # plan-first はベースからの全コミットを読む
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate head branch name
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: npm run -s change-dev:branch -- check "$HEAD_REF" --warn-cloud
+
+      - name: Plan committed before the implementation
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npm run -s change-dev:plan-check -- --base "$BASE_SHA" --head "$HEAD_SHA"
