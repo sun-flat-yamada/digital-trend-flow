@@ -238,9 +238,9 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | ID | 重要度 | 指摘 | 根拠 | 対応案 |
 | :-- | :-- | :-- | :-- | :-- |
 | ST-1 | P1 | `config.yml` の `state_ttl_days` が使われず、90 日にハードコードされている | `state_manager.ts:20, 41, 112, 171` | config から注入する |
-| ST-2 | P1 | 選ばれなかった記事は処理済みにならないため、RSS に残っている同じ記事を毎日 Jina で取り直している（抽出時間が長い主因の一つ） | `main.ts:563-566` | 「評価済み（不採用）」を短い TTL で記録する |
+| ST-2 | P1 | 選ばれなかった記事は処理済みにならないため、RSS に残っている同じ記事を毎日 Jina で取り直している（抽出時間が長い主因の一つ） | `main.ts:563-566` | 「評価済み（不採用）」を短い TTL で記録する（✅ #42。閾値未満・除外・選外を `evaluated_urls` に `settings.evaluated_ttl_days`〔既定 7 日〕記録し、取得直後に除く） |
 | ST-3 | P2 | 失敗した実行や 0 件の実行では `pipeline_runs`・メトリクスが保存されない（早期 return、致命的エラー時は `cleanup` のみ） | `main.ts:268-271, 365-368, 706-717` | 実行ステータス付きで常に保存する |
-| ST-4 | P2 | スキーマのマイグレーション機構がない（`CREATE TABLE IF NOT EXISTS` のみ） | `state_manager.ts:34-80` | `PRAGMA user_version` で段階的に移行する |
+| ST-4 | P2 | スキーマのマイグレーション機構がない（`CREATE TABLE IF NOT EXISTS` のみ） | `state_manager.ts:34-80` | `PRAGMA user_version` で段階的に移行する（✅ #42。現行を version 1、`evaluated_urls` を version 2 とした） |
 | ST-5 | P2 | 版日付が UTC の実行日になっている。定期実行は 2〜4.5 時間遅れており、0 時 UTC を跨ぐと日付がずれ、前日分の上書きや欠番が起き得る | `main.ts:95`、§1.1 | 版日付を JST で明示的に決め、既存ファイルの上書きを防ぐ |
 
 ### 4.8 CI/CD・ワークフロー

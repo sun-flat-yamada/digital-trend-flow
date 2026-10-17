@@ -5,6 +5,10 @@
  *
  * Items: 5.1 SQLite 移行, 5.2 TTL 実装, 5.3 処理統計永続化
  *
+ * Schema migrations: `PRAGMA user_version` records the schema version, and getDb() applies the
+ * missing steps of MIGRATIONS in order, each in its own transaction. A DB created before
+ * versioning (user_version 0) already has the version 1 tables, which are created IF NOT EXISTS.
+ *
  * Migration from processed_urls.json:
  * - On first run, if processed_urls.json exists, its data is imported
  *   into the SQLite DB and the JSON file is renamed to .bak.
@@ -14,11 +18,10 @@ import Database from "better-sqlite3";
 import * as fs from "fs";
 import { config } from "../core/config";
 import type { PipelineRunMetrics } from "../core/metrics";
-import { PATHS } from "../core/paths";
+import { PATHS, stateDbPath } from "../core/paths";
 import { normalizeUrl } from "../core/url";
 import { errorMessage } from "../core/errors";
 
-const DB_PATH = PATHS.DB;
 const LEGACY_JSON_PATH = PATHS.LEGACY_JSON;
 const DEFAULT_TTL_DAYS = 90;
 
@@ -26,15 +29,11 @@ const DEFAULT_TTL_DAYS = 90;
 
 let db: Database.Database | null = null;
 
-function getDb(): Database.Database {
-  if (db) return db;
-
-  db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL"); // Write-Ahead Logging for better concurrency
-  db.pragma("foreign_keys = ON");
-
-  // Create tables
-  db.exec(`
+/** Schema steps; MIGRATIONS[n] brings a DB from version n to n + 1. */
+const MIGRATIONS: ReadonlyArray<(database: Database.Database) => void> = [
+  // 1: processed URLs, run records and source health
+  (database) =>
+    database.exec(`
     CREATE TABLE IF NOT EXISTS processed_urls (
       url TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -80,7 +79,54 @@ function getDb(): Database.Database {
 
     CREATE INDEX IF NOT EXISTS idx_source_health_date
       ON source_health(check_date);
-  `);
+  `),
+  // 2: articles that were evaluated but not summarized, kept briefly so they are not re-fetched
+  (database) =>
+    database.exec(`
+    CREATE TABLE IF NOT EXISTS evaluated_urls (
+      url TEXT PRIMARY KEY,
+      outcome TEXT NOT NULL, -- 'below_threshold' | 'excluded' | 'not_selected'
+      score REAL NOT NULL DEFAULT 0,
+      purpose TEXT,
+      evaluated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_evaluated_urls_expires
+      ON evaluated_urls(expires_at);
+  `),
+];
+
+/** The schema version this code writes. */
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
+function migrate(database: Database.Database): void {
+  const current = database.pragma("user_version", { simple: true }) as number;
+  if (current > SCHEMA_VERSION) {
+    throw new Error(`State DB schema version ${current} is newer than this code supports (${SCHEMA_VERSION})`);
+  }
+  for (let version = current; version < SCHEMA_VERSION; version++) {
+    database.transaction(() => {
+      MIGRATIONS[version]?.(database);
+      database.pragma(`user_version = ${version + 1}`);
+    })();
+  }
+  if (current < SCHEMA_VERSION) console.log(`🗄️ State DB schema migrated: version ${current} → ${SCHEMA_VERSION}`);
+}
+
+function getDb(): Database.Database {
+  if (db) return db;
+
+  const opened = new Database(stateDbPath());
+  try {
+    opened.pragma("journal_mode = WAL"); // Write-Ahead Logging for better concurrency
+    opened.pragma("foreign_keys = ON");
+    migrate(opened);
+  } catch (error) {
+    opened.close(); // so the next call retries instead of using an unmigrated DB
+    throw error;
+  }
+  db = opened;
 
   // Migrate from legacy JSON if it exists
   migrateLegacyJson();
@@ -89,6 +135,11 @@ function getDb(): Database.Database {
   purgeExpired();
 
   return db;
+}
+
+/** The schema version of the open state DB (opening it, and so migrating it, if needed). */
+export function getSchemaVersion(): number {
+  return getDb().pragma("user_version", { simple: true }) as number;
 }
 
 // ── Legacy Migration ──
@@ -138,20 +189,16 @@ function migrateLegacyJson(): void {
 function purgeExpired(): void {
   const database = getDb();
   const result = database.prepare(`DELETE FROM processed_urls WHERE expires_at < datetime('now')`).run();
+  const evaluated = database.prepare(`DELETE FROM evaluated_urls WHERE expires_at < datetime('now')`).run();
 
-  if (result.changes > 0) {
-    console.log(`🧹 Purged ${result.changes} expired entries from state DB`);
+  const purged = result.changes + evaluated.changes;
+  if (purged > 0) {
+    console.log(`🧹 Purged ${purged} expired entries from state DB`);
   }
 }
 
 // ── Public API ──
 
-/**
- * Checks if a given URL has already been processed.
- * The URL is canonicalized first, so callers may pass the raw link from a feed. The raw form is
- * checked too: entries recorded before canonicalization was widened can still carry tracking
- * parameters (e.g. the BBC's at_medium) that the canonical form now drops.
- */
 let stateLookupsDisabled = false;
 
 /**
@@ -162,6 +209,12 @@ export function disableStateLookups(): void {
   stateLookupsDisabled = true;
 }
 
+/**
+ * Checks if a given URL has already been processed.
+ * The URL is canonicalized first, so callers may pass the raw link from a feed. The raw form is
+ * checked too: entries recorded before canonicalization was widened can still carry tracking
+ * parameters (e.g. the BBC's at_medium) that the canonical form now drops.
+ */
 export function isProcessed(url: string): boolean {
   if (stateLookupsDisabled) return false;
   const database = getDb();
@@ -185,6 +238,38 @@ export function markAsProcessed(url: string, title: string, score: number, purpo
   `,
     )
     .run(normalizeUrl(url), title, score, purpose ?? null, `+${config.settings.state_ttl_days} days`);
+}
+
+/**
+ * Why an evaluated article was not summarized. Only outcomes the rules decide are recorded; an
+ * extraction failure or an outage is not, so the article is retried by the next run.
+ */
+export type EvaluationOutcome = "below_threshold" | "excluded" | "not_selected";
+
+/**
+ * Records an article (in canonical form) that was evaluated but not summarized. The entry expires
+ * after `settings.evaluated_ttl_days`; until then the article is dropped before its body is fetched.
+ */
+export function markAsEvaluated(url: string, outcome: EvaluationOutcome, score: number, purpose?: string): void {
+  const database = getDb();
+  database
+    .prepare(
+      `
+    INSERT OR REPLACE INTO evaluated_urls (url, outcome, score, purpose, evaluated_at, expires_at)
+    VALUES (?, ?, ?, ?, datetime('now'), datetime('now', ?))
+  `,
+    )
+    .run(normalizeUrl(url), outcome, score, purpose ?? null, `+${config.settings.evaluated_ttl_days} days`);
+}
+
+/** Checks whether an article was evaluated and not summarized within `settings.evaluated_ttl_days`. */
+export function isEvaluated(url: string): boolean {
+  if (stateLookupsDisabled) return false;
+  const database = getDb();
+  const row = database
+    .prepare(`SELECT 1 FROM evaluated_urls WHERE url IN (?, ?) AND expires_at > datetime('now')`)
+    .get(normalizeUrl(url), url);
+  return !!row;
 }
 
 /**

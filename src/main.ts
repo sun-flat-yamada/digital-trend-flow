@@ -47,6 +47,8 @@ import { evaluateRunGate, RunGateResult } from "./evaluation/run_gate";
 import { analyzeTopicTrends } from "./aggregation/trend_analyzer";
 import {
   markAsProcessed,
+  markAsEvaluated,
+  isEvaluated,
   flushState,
   savePipelineRun,
   recordSourceHealth,
@@ -162,11 +164,17 @@ export async function runDailyPipeline(): Promise<RunStatus> {
 
   // The same story often arrives from several sources (RSS + HN + Raindrop) or with different
   // tracking parameters; extract and score each canonical URL only once.
-  const uniqueItems = dedupeByUrl(allNewItems);
-  const duplicateCount = allNewItems.length - uniqueItems.length;
+  const dedupedItems = dedupeByUrl(allNewItems);
+  const duplicateCount = allNewItems.length - dedupedItems.length;
+  // Articles a recent run evaluated and did not summarize are dropped before triage and extraction.
+  const uniqueItems = dedupedItems.filter((item) => !isEvaluated(item.url));
+  const evaluatedCount = dedupedItems.length - uniqueItems.length;
+  metrics.setSkippedEvaluated(evaluatedCount);
   console.log(
     `  → Found ${uniqueItems.length} new (unprocessed) articles` +
-      (duplicateCount > 0 ? ` (${duplicateCount} duplicate URLs dropped).` : "."),
+      (duplicateCount > 0 ? ` (${duplicateCount} duplicate URLs dropped)` : "") +
+      (evaluatedCount > 0 ? ` (${evaluatedCount} evaluated recently, skipped)` : "") +
+      ".",
   );
   await registry.events.emit("ingestion:complete", { count: uniqueItems.length });
 
@@ -209,8 +217,12 @@ export async function runDailyPipeline(): Promise<RunStatus> {
       }
 
       let content: string;
+      // Only a verdict on the extracted body is recorded; one on a fallback description is not
+      // (the extraction failure may be temporary).
+      let bodyExtracted = false;
       try {
         content = await extractMarkdown(normalizedUrl);
+        bodyExtracted = true;
         metrics.recordExtraction("ok");
       } catch (error) {
         const reason = errorMessageOf(error);
@@ -246,6 +258,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
 
       if (scoreResult.isExcluded) {
         console.log(`  ❌ Excluded: "${item.title}" (${scoreResult.exclusionReason})`);
+        if (bodyExtracted) markAsEvaluated(normalizedUrl, "excluded", 0, scoreResult.assignedPurpose);
         return null;
       }
 
@@ -261,6 +274,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
           console.log(
             `  ⬇️ Below threshold [${scoreResult.purposeLabel}]: "${item.title}" (score: ${finalScore.toFixed(1)} < ${threshold})`,
           );
+          if (bodyExtracted) markAsEvaluated(normalizedUrl, "below_threshold", finalScore, scoreResult.assignedPurpose);
           return null;
         }
       }
@@ -559,6 +573,12 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   // Mark processed URLs
   for (const sa of summarizedArticles) {
     markAsProcessed(sa.article.url, sa.article.title, sa.score, sa.purpose);
+  }
+  // Scored articles that lost the selection (quota or semantic dedup) are not re-fetched for a
+  // while. Selected articles whose Map failed are left alone, so the next run retries them.
+  const selectedUrls = new Set(selectedArticles.map((sa) => sa.article.url));
+  for (const sa of allScoredArticles) {
+    if (!selectedUrls.has(sa.article.url)) markAsEvaluated(sa.article.url, "not_selected", sa.score, sa.purpose);
   }
 
   // Archive Raindrop items

@@ -317,7 +317,7 @@ EnvSchema = z.object({
 
 ## Persistence Schema (SQLite)
 
-`pipeline_state.db` は WAL モードで動作し、3 テーブルでパイプラインの状態を管理します。
+`pipeline_state.db` は WAL モードで動作し、4 テーブルでパイプラインの状態を管理します。スキーマの版は `PRAGMA user_version` に記録し、開くときに `state_manager.ts` の `MIGRATIONS` を順に適用します (現在 version 2)。DB のパスは環境変数 `PIPELINE_STATE_DB` で差し替えられます (テストでは `:memory:`)。
 
 ### processed_urls — 冪等性保証
 
@@ -329,6 +329,21 @@ EnvSchema = z.object({
 | `purpose`      | TEXT    | 割り当てカテゴリ           |
 | `processed_at` | TEXT    | 処理日時                   |
 | `expires_at`   | TEXT    | TTL 期限 (default: +90 日) |
+
+### evaluated_urls — 評価済み (不採用) の記事
+
+本文を取得して評価したが要約に使わなかった記事を短期間記録し、次の実行では本文の取得前に除きます (件数は metrics の `articles_skipped_evaluated`)。規則で決まる結果だけを記録し、本文の抽出に失敗した記事 (説明文で採点したもの) や、選ばれたのに Map が失敗した記事は記録しません。
+
+| Column         | Type    | Description                                                                 |
+| :------------- | :------ | :-------------------------------------------------------------------------- |
+| `url`          | TEXT PK | 正規化済み記事 URL                                                          |
+| `outcome`      | TEXT    | `below_threshold` (閾値未満) / `excluded` (除外ルール) / `not_selected` (選外) |
+| `score`        | REAL    | パイプラインスコア                                                          |
+| `purpose`      | TEXT    | 割り当てカテゴリ                                                            |
+| `evaluated_at` | TEXT    | 評価日時                                                                    |
+| `expires_at`   | TEXT    | 有効期限 (`settings.evaluated_ttl_days`、既定 7 日)                          |
+
+`not_selected` は公開まで進んだ実行でだけ記録します (degraded の実行では記録しない)。
 
 ### pipeline_runs — 実行履歴
 

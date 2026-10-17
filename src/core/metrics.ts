@@ -59,6 +59,8 @@ export interface PipelineRunMetrics {
   finished_at?: string;
   duration_ms?: number;
   articles_ingested: number;
+  /** New articles dropped before body extraction because a recent run already evaluated them. */
+  articles_skipped_evaluated: number;
   articles_scored: number;
   articles_selected: number;
   articles_by_purpose: Record<string, number>;
@@ -133,6 +135,7 @@ class MetricsCollector {
       date: now.toISOString().split("T")[0] ?? "unknown",
       started_at: now.toISOString(),
       articles_ingested: 0,
+      articles_skipped_evaluated: 0,
       articles_scored: 0,
       articles_selected: 0,
       articles_by_purpose: {},
@@ -175,6 +178,11 @@ class MetricsCollector {
     this.metrics.articles_ingested = ingested;
     this.metrics.articles_scored = scored;
     this.metrics.articles_selected = selected;
+  }
+
+  /** Records how many new articles were dropped as already evaluated by a recent run. */
+  setSkippedEvaluated(count: number): void {
+    this.metrics.articles_skipped_evaluated = count;
   }
 
   /** Sets the per-purpose article distribution. */
@@ -281,6 +289,7 @@ class MetricsCollector {
 | Run ID | \`${m.run_id.slice(0, 8)}\` |
 | Duration | ${m.duration_ms ? `${(m.duration_ms / 1000).toFixed(1)}s` : "N/A"} |
 | Articles Ingested | ${m.articles_ingested} |
+| Skipped (Evaluated Recently) | ${m.articles_skipped_evaluated} |
 | Articles Scored | ${m.articles_scored} |
 | Articles Selected | ${m.articles_selected} |
 ${triageRow}| Content Extraction (Failed / Description Fallback) | ${m.extraction.failed} / ${m.extraction.fallback} of ${m.extraction.attempted} |
