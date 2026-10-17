@@ -131,6 +131,20 @@ describe("note.com", () => {
     expect(fs.existsSync(path.join(tmpDir, "dtf-weekly-2026-w42.html"))).toBe(true);
   });
 
+  test("publishNoteDraft records the draft and updates it on a re-run", async () => {
+    mockPost
+      .mockResolvedValueOnce({ status: 201, data: { data: { id: 7, key: "n7" } } })
+      .mockResolvedValueOnce({ status: 201, data: {} })
+      .mockResolvedValueOnce({ status: 201, data: {} });
+    const first = await publishNoteDraft(payload, "session", tmpDir);
+    expect(first).toEqual({ id: 7, key: "n7", editUrl: "https://editor.note.com/notes/n7/edit/" });
+    const second = await publishNoteDraft(payload, "session", tmpDir);
+    expect(second).toEqual(first);
+    // Second run: no new draft, only draft_save on the recorded id
+    expect(mockPost).toHaveBeenCalledTimes(3);
+    expect(mockPost.mock.calls[2]![0]).toBe("https://note.com/api/v1/text_notes/draft_save?id=7&is_temp_saved=true");
+  });
+
   test("publishNoteDraft explains an expired session", async () => {
     mockPost.mockRejectedValueOnce(Object.assign(new Error("Request failed"), { response: { status: 401 } }));
     await expect(publishNoteDraft(payload, "expired", tmpDir)).rejects.toThrow(/HTTP 401.*renew NOTE_API_TOKEN/);

@@ -72,19 +72,25 @@ export function readMonthlyDigests(
   return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month));
 }
 
+export interface DailyTopStory {
+  date: string;
+  topStory: string;
+  tags: string[];
+  articleCount: number;
+}
+
 /** The top story (frontmatter `top_story`) of each daily summary of a year. */
-export function readDailyTopStories(
-  year: string,
-  dailyRoot: string = PATHS.ARTIFACTS_DAILY.absolute,
-): { date: string; topStory: string; tags: string[] }[] {
-  const stories: { date: string; topStory: string; tags: string[] }[] = [];
+export function readDailyTopStories(year: string, dailyRoot: string = PATHS.ARTIFACTS_DAILY.absolute): DailyTopStory[] {
+  const stories: DailyTopStory[] = [];
   for (let m = 1; m <= 12; m++) {
     const dir = path.join(dailyRoot, year, String(m).padStart(2, "0"));
     for (const file of markdownFiles(dir).sort()) {
       const date = path.basename(file).match(/^(\d{4}-\d{2}-\d{2})_digital-trend_daily_summary\.md$/)?.[1];
       if (!date) continue;
       const summary = readDailySummary(file, date, 0);
-      if (summary.topStory) stories.push({ date, topStory: summary.topStory, tags: summary.tags });
+      if (summary.topStory) {
+        stories.push({ date, topStory: summary.topStory, tags: summary.tags, articleCount: summary.articleCount });
+      }
     }
   }
   return stories;
@@ -147,13 +153,15 @@ Generate the yearly trend report.`;
   const markdown = appendTrendSection(reportText, endDate, 365);
   const tags = rankByFrequency([...monthly.flatMap((m) => m.tags), ...topStories.flatMap((s) => s.tags)], 10);
   const title = `Yearly Trend Report ${year}`;
+  // Articles summarized over the year, like the article count of the weekly and monthly reports
+  const totalArticles = topStories.reduce((sum, s) => sum + s.articleCount, 0);
 
   const outputPath = saveMarkdownFile(
     path.join(PATHS.ARTIFACTS_YEARLY.absolute, year),
     `${year}_digital-trend_yearly_report.md`,
     title,
     markdown,
-    topStories.length,
+    totalArticles,
     config.settings.author,
     {
       tags,
@@ -164,5 +172,5 @@ Generate the yearly trend report.`;
   );
 
   console.log(`✅ Yearly report generated: ${outputPath}`);
-  return { kind: "yearly", period: year, endDate, title, markdown, articleCount: topStories.length, tags, outputPath };
+  return { kind: "yearly", period: year, endDate, title, markdown, articleCount: totalArticles, tags, outputPath };
 }
