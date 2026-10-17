@@ -10,22 +10,14 @@ import { config, env } from "./core/config";
 import { metrics, SOURCE_ALERT_STREAK, type RunStatus } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
-import { fetchRss } from "./ingestion/rss";
-import {
-  fetchRaindropBookmarks,
-  archiveProcessedRaindrops,
-  archivableRaindropIds,
-  type RaindropFetchResult,
-} from "./ingestion/raindrop";
-import { fetchXViGrok } from "./ingestion/xai_grok";
+import { archiveProcessedRaindrops, archivableRaindropIds } from "./ingestion/raindrop";
 import { sourceDisabledReason } from "./ingestion/source_availability";
+import {
+  fetchSource as fetchConfiguredSource,
+  type RaindropResultSet,
+  type SourceWithPurpose,
+} from "./ingestion/fetch_source";
 import { extractMarkdown } from "./ingestion/jina_reader";
-import { fetchHackerNews } from "./ingestion/hackernews";
-import { fetchArxiv } from "./ingestion/arxiv";
-import { fetchYouTube } from "./ingestion/youtube";
-import { fetchGitHubTrending } from "./ingestion/github_trending";
-import { fetchReddit } from "./ingestion/reddit";
-import { fetchBluesky } from "./ingestion/bluesky";
 import {
   calculatePurposeScore,
   assignBestPurpose,
@@ -130,35 +122,9 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     });
   }
 
-  const raindropResultSets: (RaindropFetchResult & {
-    collectionId: number;
-    archiveId: number | undefined;
-  })[] = [];
-  const fetchSource = async (s: Source & { purpose: string }): Promise<ArticleItem[]> => {
-    switch (s.type) {
-      case "rss":
-        return fetchRss(s.name, s.url, s.purpose);
-      case "raindrop": {
-        const result = await fetchRaindropBookmarks(s.collection_id, s.name, s.lookback_hours, s.purpose);
-        raindropResultSets.push({ ...result, collectionId: s.collection_id, archiveId: s.archive_collection_id });
-        return result.articles;
-      }
-      case "xai_grok":
-        return fetchXViGrok(s.query, s.name, s.purpose);
-      case "hackernews":
-        return fetchHackerNews(s.name, s.min_score, s.max_items, s.purpose);
-      case "arxiv":
-        return fetchArxiv(s.query, s.name, s.max_results, s.purpose);
-      case "youtube":
-        return fetchYouTube(s.name, s.query, s.channel_id, s.max_results, s.purpose);
-      case "github_trending":
-        return fetchGitHubTrending(s.name, s.language_filter, s.since, s.purpose);
-      case "reddit":
-        return fetchReddit(s.subreddit, s.min_score, s.max_items, s.purpose);
-      case "bluesky":
-        return fetchBluesky(s.query, s.min_likes, s.max_items, s.purpose);
-    }
-  };
+  const raindropResultSets: RaindropResultSet[] = [];
+  const fetchSource = (s: SourceWithPurpose): Promise<ArticleItem[]> =>
+    fetchConfiguredSource(s, (result) => raindropResultSets.push(result));
 
   // Fetchers throw on failure, so a broken feed is reported as an error rather than as "empty".
   const fetchResults = await Promise.allSettled(activeSources.map(fetchSource));

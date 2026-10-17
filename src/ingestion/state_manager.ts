@@ -152,7 +152,18 @@ function purgeExpired(): void {
  * checked too: entries recorded before canonicalization was widened can still carry tracking
  * parameters (e.g. the BBC's at_medium) that the canonical form now drops.
  */
+let stateLookupsDisabled = false;
+
+/**
+ * Makes isProcessed() answer false without opening the state DB, for read-only tools such as
+ * `npm run check:sources` that must neither create nor modify pipeline_state.db.
+ */
+export function disableStateLookups(): void {
+  stateLookupsDisabled = true;
+}
+
 export function isProcessed(url: string): boolean {
+  if (stateLookupsDisabled) return false;
   const database = getDb();
   const row = database
     .prepare(`SELECT 1 FROM processed_urls WHERE url IN (?, ?) AND expires_at > datetime('now')`)
