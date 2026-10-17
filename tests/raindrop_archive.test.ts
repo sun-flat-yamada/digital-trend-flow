@@ -22,6 +22,8 @@ describe("archivableRaindropIds", () => {
   });
 
   test("archives nothing new when no bookmark was summarized", () => {
-    expect(archivableRaindropIds({ articles: [], processedIds: [], idByUrl: { "https://example.com/a": 5 } }, [])).toEqual([]);
+    expect(
+      archivableRaindropIds({ articles: [], processedIds: [], idByUrl: { "https://example.com/a": 5 } }, []),
+    ).toEqual([]);
   });
 });

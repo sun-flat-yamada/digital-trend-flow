@@ -51,7 +51,7 @@ export async function fetchBluesky(
   query: string,
   minLikes: number = 20,
   maxItems: number = 15,
-  purpose: string = "ai_research"
+  purpose: string = "ai_research",
 ): Promise<ArticleItem[]> {
   try {
     const response = await axios.get<BskySearchResponse>(BSKY_PUBLIC_API, {
@@ -79,9 +79,7 @@ export async function fetchBluesky(
 
       // If post links to an external article, prefer the external URL
       const externalUri = post.embed?.external?.uri;
-      const targetUrl = externalUri && !externalUri.includes("bsky.app")
-        ? externalUri
-        : bskyPostUrl;
+      const targetUrl = externalUri && !externalUri.includes("bsky.app") ? externalUri : bskyPostUrl;
 
       if (isProcessed(targetUrl)) continue;
 

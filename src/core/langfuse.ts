@@ -67,7 +67,7 @@ export function recordGeneration(
     outputTokens: number;
     latencyMs: number;
     costUsd: number;
-  }
+  },
 ): void {
   if (!trace) return;
   try {

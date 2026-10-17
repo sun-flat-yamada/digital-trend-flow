@@ -6,7 +6,7 @@ import { normalizeUrl } from "../core/url";
 
 const RAINDROP_API_BASE = "https://api.raindrop.io/rest/v1";
 const MAX_PER_PAGE = 50; // API maximum
-const MAX_PAGES = 5;     // Safety cap: 50 * 5 = 250 items max per run
+const MAX_PAGES = 5; // Safety cap: 50 * 5 = 250 items max per run
 
 /**
  * ======================================================================
@@ -26,7 +26,7 @@ const MAX_PAGES = 5;     // Safety cap: 50 * 5 = 250 items max per run
  *
  *   Layer 3 (Archive):    After the main pipeline completes successfully,
  *                         `archiveProcessedRaindrops()` moves processed items
- *                         from the Inbox (-1) to a dedicated "Processed" 
+ *                         from the Inbox (-1) to a dedicated "Processed"
  *                         collection. This ensures they won't appear in the
  *                         Inbox on the next run, even if the state DB is lost.
  *
@@ -88,7 +88,7 @@ export async function fetchRaindropBookmarks(
   collectionId: number = -1,
   collectionName: string = "Inbox",
   lookbackHours: number = 48,
-  purpose: string = "curated"
+  purpose: string = "curated",
 ): Promise<RaindropFetchResult> {
   const token = env.RAINDROP_TEST_TOKEN;
 
@@ -107,18 +107,15 @@ export async function fetchRaindropBookmarks(
     let hasMore = true;
 
     while (hasMore && page < MAX_PAGES) {
-      const response = await axios.get(
-        `${RAINDROP_API_BASE}/raindrops/${collectionId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
-            perpage: MAX_PER_PAGE,
-            page,
-            sort: "-created", // Newest first — critical for date-based early exit
-          },
-          timeout: 10000,
-        }
-      );
+      const response = await axios.get(`${RAINDROP_API_BASE}/raindrops/${collectionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          perpage: MAX_PER_PAGE,
+          page,
+          sort: "-created", // Newest first — critical for date-based early exit
+        },
+        timeout: 10000,
+      });
 
       const items: RaindropItem[] = response.data?.items ?? [];
 
@@ -170,7 +167,7 @@ export async function fetchRaindropBookmarks(
 
     console.log(
       `  📎 Raindrop [${collectionName}]: ${newArticles.length} new items ` +
-      `(scanned ${page} page(s), cutoff: ${lookbackHours}h)`
+        `(scanned ${page} page(s), cutoff: ${lookbackHours}h)`,
     );
 
     return { articles: newArticles, processedIds: processedRaindropIds, idByUrl };
@@ -200,7 +197,7 @@ export async function fetchRaindropBookmarks(
 export async function archiveProcessedRaindrops(
   sourceCollectionId: number,
   raindropIds: number[],
-  archiveCollectionId?: number
+  archiveCollectionId?: number,
 ): Promise<void> {
   const token = env.RAINDROP_TEST_TOKEN;
 
@@ -213,17 +210,15 @@ export async function archiveProcessedRaindrops(
       `${RAINDROP_API_BASE}/raindrops/${sourceCollectionId}`,
       {
         ids: raindropIds,
-        collection: { "$id": archiveCollectionId },
+        collection: { $id: archiveCollectionId },
       },
       {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 10000,
-      }
+      },
     );
 
-    console.log(
-      `  📦 Raindrop: Archived ${raindropIds.length} items → collection #${archiveCollectionId}`
-    );
+    console.log(`  📦 Raindrop: Archived ${raindropIds.length} items → collection #${archiveCollectionId}`);
   } catch (error: any) {
     // Non-fatal: don't crash the pipeline for an archive failure.
     // Items will simply be picked up again but skipped by Layer 2 (state DB).

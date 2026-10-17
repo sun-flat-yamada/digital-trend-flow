@@ -28,14 +28,11 @@ export async function fetchHackerNews(
   sourceName: string = "Hacker News",
   minScore: number = 100,
   maxItems: number = 30,
-  purpose: string = "ai_dev_tools"
+  purpose: string = "ai_dev_tools",
 ): Promise<ArticleItem[]> {
   try {
     // Get top story IDs
-    const topResponse = await axios.get<number[]>(
-      `${HN_API_BASE}/topstories.json`,
-      { timeout: 10000 }
-    );
+    const topResponse = await axios.get<number[]>(`${HN_API_BASE}/topstories.json`, { timeout: 10000 });
     const topIds = topResponse.data.slice(0, maxItems * 2); // Fetch extras for filtering
 
     // Fetch story details in parallel (batched)
@@ -45,9 +42,7 @@ export async function fetchHackerNews(
     for (let i = 0; i < topIds.length && newItems.length < maxItems; i += batchSize) {
       const batch = topIds.slice(i, i + batchSize);
       const results = await Promise.allSettled(
-        batch.map((id) =>
-          axios.get<HNItem>(`${HN_API_BASE}/item/${id}.json`, { timeout: 5000 })
-        )
+        batch.map((id) => axios.get<HNItem>(`${HN_API_BASE}/item/${id}.json`, { timeout: 5000 })),
       );
 
       for (const result of results) {

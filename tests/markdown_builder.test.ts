@@ -25,7 +25,7 @@ describe("saveMarkdownFile", () => {
       "Test Summary",
       "## Content\n\nHello world.",
       5,
-      "Test Author"
+      "Test Author",
     );
 
     expect(fs.existsSync(filePath)).toBe(true);
@@ -58,7 +58,7 @@ describe("saveMarkdownFile", () => {
       "Content here.",
       10,
       "Author",
-      metadata
+      metadata,
     );
 
     const content = fs.readFileSync(filePath, "utf8");
@@ -83,7 +83,7 @@ describe("saveMarkdownFile", () => {
       "English Content.",
       5,
       "Author",
-      metadata
+      metadata,
     );
 
     const content = fs.readFileSync(filePath, "utf8");
@@ -93,14 +93,7 @@ describe("saveMarkdownFile", () => {
 
   test("creates parent directories automatically", () => {
     const nestedDir = path.join(testDir, "nested", "deep");
-    const filePath = saveMarkdownFile(
-      nestedDir,
-      "nested_test.md",
-      "Nested",
-      "Body",
-      1,
-      "Author"
-    );
+    const filePath = saveMarkdownFile(nestedDir, "nested_test.md", "Nested", "Body", 1, "Author");
     expect(fs.existsSync(filePath)).toBe(true);
   });
 
@@ -120,7 +113,7 @@ describe("saveMarkdownFile", () => {
       "## 本日のニュース\n\nニュース内容です。",
       5,
       "Author",
-      metadata
+      metadata,
     );
 
     const content = fs.readFileSync(filePath, "utf8");
@@ -131,7 +124,7 @@ describe("saveMarkdownFile", () => {
 
     // Check foldable metrics block
     expect(content).toContain('<details class="pipeline-metrics">');
-    expect(content).toContain('<summary>📊 記事生成メトリクス（所要時間・消費Token・コスト）</summary>');
+    expect(content).toContain("<summary>📊 記事生成メトリクス（所要時間・消費Token・コスト）</summary>");
     expect(content).toContain("- **所要時間**: 42.5秒");
     expect(content).toContain("- **消費Token**: 入力 12,500 / 出力 1,500 (合計: 14,000)");
     expect(content).toContain("- **コスト**: $0.0035 (約 ¥0.54)");
@@ -160,7 +153,7 @@ describe("saveMarkdownFile", () => {
       "## Today News\n\nEnglish content.",
       3,
       "Author",
-      metadata
+      metadata,
     );
 
     const content = fs.readFileSync(filePath, "utf8");

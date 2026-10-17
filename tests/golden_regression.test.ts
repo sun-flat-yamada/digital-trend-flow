@@ -5,11 +5,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import {
-  calculatePurposeScore,
-  assignBestPurpose,
-  excludeByMetadata,
-} from "../src/filtering/scorer";
+import { calculatePurposeScore, assignBestPurpose, excludeByMetadata } from "../src/filtering/scorer";
 
 jest.mock("../src/core/config", () => ({
   config: {
@@ -84,7 +80,7 @@ interface GoldenEntry {
 }
 
 const goldenData: GoldenEntry[] = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "golden", "golden_dataset.json"), "utf8")
+  fs.readFileSync(path.join(__dirname, "golden", "golden_dataset.json"), "utf8"),
 );
 
 describe("Golden Dataset Regression", () => {

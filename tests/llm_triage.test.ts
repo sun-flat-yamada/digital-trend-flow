@@ -65,7 +65,14 @@ describe("triagePurposes", () => {
         label: "AI",
         priority: 1,
         quota: { min: 2, max: 5 },
-        scoring: { threshold: 8, title_multiplier: 2, keywords: [{ word: "AI", weight: 4 }, { word: "LLM", weight: 12 }] },
+        scoring: {
+          threshold: 8,
+          title_multiplier: 2,
+          keywords: [
+            { word: "AI", weight: 4 },
+            { word: "LLM", weight: 12 },
+          ],
+        },
         sources: [],
       },
       curated: { label: "Curated", priority: 5, quota: { min: 0, max: 3 }, scoring: null, sources: [] },
@@ -108,7 +115,9 @@ describe("parseTriageResponse", () => {
   });
 
   test("throws when the response leaves out too much of the batch", () => {
-    const text = JSON.stringify({ items: [{ id: 0, relevance: 90, purpose: "ai_research", importance: 5, duplicate_of: -1 }] });
+    const text = JSON.stringify({
+      items: [{ id: 0, relevance: 90, purpose: "ai_research", importance: 5, duplicate_of: -1 }],
+    });
     expect(() => parseTriageResponse(text, [0, 1, 2])).toThrow("covered 1/3");
   });
 });
@@ -118,7 +127,7 @@ describe("resolveTriage", () => {
     const result = resolveTriage(
       [verdict(0), verdict(1, { relevance: 49 }), verdict(2, { purpose: "none" }), verdict(3, { purpose: "sports" })],
       PURPOSES,
-      SETTINGS
+      SETTINGS,
     );
     expect(result.kept.map((v) => v.id)).toEqual([0]);
     expect(result.dropped_irrelevant).toBe(3);
@@ -135,7 +144,7 @@ describe("resolveTriage", () => {
         verdict(4, { importance: 3 }),
       ],
       PURPOSES,
-      SETTINGS
+      SETTINGS,
     );
     expect(result.kept.map((v) => v.id)).toEqual([2, 4]);
     expect(result.dropped_duplicate).toBe(3);
@@ -150,7 +159,7 @@ describe("resolveTriage", () => {
         verdict(3, { duplicate_of: 42 }),
       ],
       PURPOSES,
-      SETTINGS
+      SETTINGS,
     );
     expect(result.kept.map((v) => v.id).sort()).toEqual([0, 1, 3]);
     expect(result.dropped_duplicate).toBe(1);
@@ -170,7 +179,7 @@ describe("resolveTriage", () => {
         verdict(3, { importance: 2, purpose: "geopolitics" }),
       ],
       PURPOSES,
-      { ...SETTINGS, max_candidates: 2 }
+      { ...SETTINGS, max_candidates: 2 },
     );
     expect(result.kept.map((v) => v.id)).toEqual([0, 3]);
     expect(result.dropped_over_limit).toBe(2);
@@ -186,12 +195,24 @@ describe("triageArticles", () => {
       const ids = [...request.userPrompt.matchAll(/"id":(\d+)/g)].map((m) => Number(m[1]));
       return response(
         JSON.stringify({
-          items: ids.map((id) => ({ id, relevance: id === 1 ? 10 : 80, purpose: "ai_research", importance: 10 - id, duplicate_of: -1 })),
-        })
+          items: ids.map((id) => ({
+            id,
+            relevance: id === 1 ? 10 : 80,
+            purpose: "ai_research",
+            importance: 10 - id,
+            duplicate_of: -1,
+          })),
+        }),
       );
     });
 
-    const result = await triageArticles(items, PURPOSES, { ...SETTINGS, batch_size: 2, model: "custom-model" }, call, 0);
+    const result = await triageArticles(
+      items,
+      PURPOSES,
+      { ...SETTINGS, batch_size: 2, model: "custom-model" },
+      call,
+      0,
+    );
 
     expect(call).toHaveBeenCalledTimes(2);
     expect(calls[0]).toMatchObject({ phase: "triage", model: "custom-model" });
@@ -211,7 +232,17 @@ describe("triageArticles", () => {
   test("counts candidates the model left out as irrelevant", async () => {
     const items = [0, 1, 2, 3, 4].map((n) => item(n));
     const call = jest.fn(async () =>
-      response(JSON.stringify({ items: [0, 1, 2, 3].map((id) => ({ id, relevance: 80, purpose: "ai_research", importance: 5, duplicate_of: -1 })) }))
+      response(
+        JSON.stringify({
+          items: [0, 1, 2, 3].map((id) => ({
+            id,
+            relevance: 80,
+            purpose: "ai_research",
+            importance: 5,
+            duplicate_of: -1,
+          })),
+        }),
+      ),
     );
     const result = await triageArticles(items, PURPOSES, SETTINGS, call, 0);
     expect(result.stats).toMatchObject({ kept: 4, dropped_irrelevant: 1 });
@@ -220,7 +251,13 @@ describe("triageArticles", () => {
   test("reports failure when any batch fails, so the caller can fall back", async () => {
     const call = jest
       .fn<Promise<LLMResponse>, [LLMRequest]>()
-      .mockResolvedValueOnce(response(JSON.stringify({ items: [{ id: 0, relevance: 80, purpose: "ai_research", importance: 5, duplicate_of: -1 }] })))
+      .mockResolvedValueOnce(
+        response(
+          JSON.stringify({
+            items: [{ id: 0, relevance: 80, purpose: "ai_research", importance: 5, duplicate_of: -1 }],
+          }),
+        ),
+      )
       .mockRejectedValueOnce(new Error("All LLM providers failed for phase: triage"));
 
     const result = await triageArticles([item(0), item(1)], PURPOSES, { ...SETTINGS, batch_size: 1 }, call, 0);
@@ -231,7 +268,11 @@ describe("triageArticles", () => {
 
 describe("triageScore", () => {
   test("orders by importance first, relevance second", () => {
-    expect(triageScore({ importance: 8, relevance: 60 })).toBeGreaterThan(triageScore({ importance: 7, relevance: 100 }));
-    expect(triageScore({ importance: 7, relevance: 90 })).toBeGreaterThan(triageScore({ importance: 7, relevance: 60 }));
+    expect(triageScore({ importance: 8, relevance: 60 })).toBeGreaterThan(
+      triageScore({ importance: 7, relevance: 100 }),
+    );
+    expect(triageScore({ importance: 7, relevance: 90 })).toBeGreaterThan(
+      triageScore({ importance: 7, relevance: 60 }),
+    );
   });
 });

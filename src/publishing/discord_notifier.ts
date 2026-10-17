@@ -11,14 +11,11 @@ function smartTruncateForDiscord(markdown: string, maxLength: number): string {
   if (markdown.length <= maxLength) return markdown;
 
   // Find the last section boundary before maxLength
-  const candidates = [
-    markdown.lastIndexOf("\n---\n", maxLength),
-    markdown.lastIndexOf("\n## ", maxLength),
-  ].filter((i) => i > maxLength * 0.4); // Don't cut too aggressively
+  const candidates = [markdown.lastIndexOf("\n---\n", maxLength), markdown.lastIndexOf("\n## ", maxLength)].filter(
+    (i) => i > maxLength * 0.4,
+  ); // Don't cut too aggressively
 
-  const cutPoint = candidates.length > 0
-    ? Math.max(...candidates)
-    : maxLength;
+  const cutPoint = candidates.length > 0 ? Math.max(...candidates) : maxLength;
 
   return (
     markdown.slice(0, cutPoint).trim() +
@@ -38,11 +35,7 @@ function smartTruncateForDiscord(markdown: string, maxLength: number): string {
  * @param summaryMarkdown The full Markdown summary (will be truncated for Discord)
  * @param articleCount Number of articles processed
  */
-export async function notifyDiscord(
-  title: string,
-  summaryMarkdown: string,
-  articleCount: number
-): Promise<void> {
+export async function notifyDiscord(title: string, summaryMarkdown: string, articleCount: number): Promise<void> {
   const webhookUrl = env.DISCORD_WEBHOOK_URL;
 
   if (!webhookUrl) {
@@ -55,19 +48,23 @@ export async function notifyDiscord(
     // Smart truncation: cut at section boundaries to preserve structure.
     const truncatedContent = smartTruncateForDiscord(summaryMarkdown, 3900);
 
-    await axios.post(webhookUrl, {
-      embeds: [
-        {
-          title: `📊 ${title}`,
-          description: truncatedContent,
-          color: 0x5865f2, // Discord blurple
-          footer: {
-            text: `Processed ${articleCount} articles | Obsidian HeadQuarter`,
+    await axios.post(
+      webhookUrl,
+      {
+        embeds: [
+          {
+            title: `📊 ${title}`,
+            description: truncatedContent,
+            color: 0x5865f2, // Discord blurple
+            footer: {
+              text: `Processed ${articleCount} articles | Obsidian HeadQuarter`,
+            },
+            timestamp: new Date().toISOString(),
           },
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    }, { timeout: 15000 }); // a hung webhook must not stall the run
+        ],
+      },
+      { timeout: 15000 },
+    ); // a hung webhook must not stall the run
 
     console.log("✅ Discord notification sent successfully.");
   } catch (error: any) {

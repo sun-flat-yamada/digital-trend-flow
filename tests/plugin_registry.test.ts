@@ -62,15 +62,17 @@ describe("EventBus", () => {
     });
 
     // Should not throw
-    await expect(
-      registry.events.emit("pipeline:error", { error: "test" })
-    ).resolves.not.toThrow();
+    await expect(registry.events.emit("pipeline:error", { error: "test" })).resolves.not.toThrow();
   });
 
   test("supports multiple handlers for same event", async () => {
     let count = 0;
-    registry.events.on("pipeline:complete", () => { count++; });
-    registry.events.on("pipeline:complete", () => { count++; });
+    registry.events.on("pipeline:complete", () => {
+      count++;
+    });
+    registry.events.on("pipeline:complete", () => {
+      count++;
+    });
 
     await registry.events.emit("pipeline:complete");
     expect(count).toBe(2);

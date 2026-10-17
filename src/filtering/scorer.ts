@@ -22,11 +22,11 @@ export interface ArticleData {
 export interface PurposeScoreOutput {
   isExcluded: boolean;
   exclusionReason?: string;
-  assignedPurpose: string;   // Final purpose (may differ from source purpose for curated)
-  purposeLabel: string;      // Human-readable label
+  assignedPurpose: string; // Final purpose (may differ from source purpose for curated)
+  purposeLabel: string; // Human-readable label
   totalScore: number;
   matchedKeywords: string[];
-  freshnessFactor?: number;  // Item 2.5
+  freshnessFactor?: number; // Item 2.5
 }
 
 // ── TF-IDF State (Item 3.3) ──
@@ -73,7 +73,7 @@ function matchesExcludeKeyword(
   keyword: ExcludeKeyword,
   title: string,
   content: string,
-  checkScope: "title" | "content" | "both"
+  checkScope: "title" | "content" | "both",
 ): boolean {
   // Legacy string format — check in the specified scope
   if (typeof keyword === "string") {
@@ -90,12 +90,13 @@ function matchesExcludeKeyword(
   const effectiveScope = keyword.scope ?? "both";
   const textToCheck: string[] = [];
 
-  if ((effectiveScope === "title" || effectiveScope === "both") &&
-      (checkScope === "title" || checkScope === "both")) {
+  if ((effectiveScope === "title" || effectiveScope === "both") && (checkScope === "title" || checkScope === "both")) {
     textToCheck.push(title);
   }
-  if ((effectiveScope === "content" || effectiveScope === "both") &&
-      (checkScope === "content" || checkScope === "both")) {
+  if (
+    (effectiveScope === "content" || effectiveScope === "both") &&
+    (checkScope === "content" || checkScope === "both")
+  ) {
     textToCheck.push(content);
   }
 
@@ -120,7 +121,11 @@ function matchesExcludeKeyword(
 /**
  * Evaluates URL and title against the global blocklist (early return filter).
  */
-export function excludeByMetadata(title: string, url: string, excludeRules: ExcludeRules = config.exclude): { excluded: boolean; reason?: string } {
+export function excludeByMetadata(
+  title: string,
+  url: string,
+  excludeRules: ExcludeRules = config.exclude,
+): { excluded: boolean; reason?: string } {
   // 1. Check Domain
   try {
     const hostname = new URL(url).hostname;
@@ -145,7 +150,10 @@ export function excludeByMetadata(title: string, url: string, excludeRules: Excl
 /**
  * Full exclusion check including content length and content NG keywords.
  */
-export function classifyExclusion(article: ArticleData, excludeRules: ExcludeRules = config.exclude): { excluded: boolean; reason?: string } {
+export function classifyExclusion(
+  article: ArticleData,
+  excludeRules: ExcludeRules = config.exclude,
+): { excluded: boolean; reason?: string } {
   // 1. Check Metadata first
   const metadataCheck = excludeByMetadata(article.title, article.url, excludeRules);
   if (metadataCheck.excluded) return metadataCheck;
@@ -175,7 +183,7 @@ export function classifyExclusion(article: ArticleData, excludeRules: ExcludeRul
  */
 export function cleanseMarkdownContext(markdown: string): string {
   if (!markdown) return "";
-  
+
   return markdown
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "[$1]")
@@ -231,7 +239,7 @@ export function calculateFreshnessFactor(publishedAt?: string): number {
 
 function scoreAgainstPurpose(
   article: ArticleData,
-  scoring: PurposeScoring
+  scoring: PurposeScoring,
 ): { score: number; matchedKeywords: string[] } {
   let score = 0;
   const matchedKeywords: string[] = [];
@@ -264,10 +272,7 @@ function scoreAgainstPurpose(
  * Calculates the score of an article using its designated purpose's keyword list,
  * with a freshness adjustment.
  */
-export function calculatePurposeScore(
-  article: ArticleData,
-  purposeKey: string
-): PurposeScoreOutput {
+export function calculatePurposeScore(article: ArticleData, purposeKey: string): PurposeScoreOutput {
   // 1. Exclusion check
   const { excluded, reason } = classifyExclusion(article);
   if (excluded) {

@@ -34,45 +34,27 @@ export const PATHS = {
   // Output (Artifacts) relative and absolute
   ARTIFACTS_DAILY: {
     relative: "artifacts/contents/digital-trend/collection/daily",
-    absolute: path.resolve(
-      PROJECT_ROOT,
-      "artifacts/contents/digital-trend/collection/daily",
-    ),
+    absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/daily"),
   },
   ARTIFACTS_WEEKLY: {
     relative: "artifacts/contents/digital-trend/collection/weekly",
-    absolute: path.resolve(
-      PROJECT_ROOT,
-      "artifacts/contents/digital-trend/collection/weekly",
-    ),
+    absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/weekly"),
   },
   ARTIFACTS_MONTHLY: {
     relative: "artifacts/contents/digital-trend/collection/monthly",
-    absolute: path.resolve(
-      PROJECT_ROOT,
-      "artifacts/contents/digital-trend/collection/monthly",
-    ),
+    absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/monthly"),
   },
   ARTIFACTS_YEARLY: {
     relative: "artifacts/contents/digital-trend/collection/yearly",
-    absolute: path.resolve(
-      PROJECT_ROOT,
-      "artifacts/contents/digital-trend/collection/yearly",
-    ),
+    absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/yearly"),
   },
   ARTIFACTS_METRICS: {
     relative: "artifacts/contents/digital-trend/collection/metrics",
-    absolute: path.resolve(
-      PROJECT_ROOT,
-      "artifacts/contents/digital-trend/collection/metrics",
-    ),
+    absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/metrics"),
   },
   ARTIFACTS_AUDIO: {
     relative: "artifacts/contents/digital-trend/collection/audio",
-    absolute: path.resolve(
-      PROJECT_ROOT,
-      "artifacts/contents/digital-trend/collection/audio",
-    ),
+    absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/audio"),
   },
   ARTIFACTS_NOTE: {
     relative: "artifacts/contents/publish/note",

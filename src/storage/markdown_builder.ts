@@ -58,7 +58,7 @@ export function saveMarkdownFile(
   content: string,
   articleCount: number,
   author: string,
-  metadata?: SummaryFrontmatter
+  metadata?: SummaryFrontmatter,
 ): string {
   const absoluteDir = path.resolve(process.cwd(), outputDir);
   fs.mkdirSync(absoluteDir, { recursive: true });

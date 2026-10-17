@@ -10,7 +10,7 @@ describe("evaluateRunGate", () => {
   test("passes a run with enough extracted facts and a good summary", () => {
     const result = evaluateRunGate(
       { mapAttempted: 10, mapSucceeded: 9, reduceUsedFallback: false, qualityScore: 95 },
-      thresholds
+      thresholds,
     );
 
     expect(result.status).toBe("success");
@@ -42,7 +42,7 @@ describe("evaluateRunGate", () => {
   test("degrades a run whose Reduce phase fell back to raw facts", () => {
     const result = evaluateRunGate(
       { mapAttempted: 4, mapSucceeded: 4, reduceUsedFallback: true, qualityScore: 76 },
-      thresholds
+      thresholds,
     );
 
     expect(result.status).toBe("degraded");
@@ -52,7 +52,7 @@ describe("evaluateRunGate", () => {
   test("degrades a run whose quality score is below the minimum and lists every reason", () => {
     const result = evaluateRunGate(
       { mapAttempted: 10, mapSucceeded: 2, reduceUsedFallback: true, qualityScore: 41.5 },
-      thresholds
+      thresholds,
     );
 
     expect(result.status).toBe("degraded");

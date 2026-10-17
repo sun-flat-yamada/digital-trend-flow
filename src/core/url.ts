@@ -9,10 +9,32 @@ import { config } from "./config";
 
 // Parameters that only track the visit and never select content.
 const TRACKING_PARAMS = new Set([
-  "fbclid", "gclid", "dclid", "gbraid", "wbraid", "msclkid", "yclid", "twclid", "igshid",
-  "mc_cid", "mc_eid", "_hsenc", "_hsmi", "mkt_tok",
-  "at_medium", "at_campaign", "at_custom1", "at_custom2", "at_custom3", "at_custom4",
-  "at_link_id", "at_link_type", "at_link_origin", "at_ptr_name", "at_format", "at_bbc_team",
+  "fbclid",
+  "gclid",
+  "dclid",
+  "gbraid",
+  "wbraid",
+  "msclkid",
+  "yclid",
+  "twclid",
+  "igshid",
+  "mc_cid",
+  "mc_eid",
+  "_hsenc",
+  "_hsmi",
+  "mkt_tok",
+  "at_medium",
+  "at_campaign",
+  "at_custom1",
+  "at_custom2",
+  "at_custom3",
+  "at_custom4",
+  "at_link_id",
+  "at_link_type",
+  "at_link_origin",
+  "at_ptr_name",
+  "at_format",
+  "at_bbc_team",
 ]);
 const TRACKING_PARAM_PREFIXES = ["utm_"];
 
@@ -46,7 +68,7 @@ export function canonicalizeUrl(rawUrl: string, extraParams: readonly string[] =
 /** Canonicalizes a URL, also dropping `exclude.url_strip_parameters` from config.yml. */
 export function normalizeUrl(
   rawUrl: string,
-  stripParameters: readonly string[] = config.exclude.url_strip_parameters
+  stripParameters: readonly string[] = config.exclude.url_strip_parameters,
 ): string {
   return canonicalizeUrl(rawUrl, stripParameters);
 }

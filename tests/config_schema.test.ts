@@ -53,7 +53,17 @@ describe("Config Schema Validation", () => {
     const raw = yaml.parse(fs.readFileSync(path.join(process.cwd(), "config.yml"), "utf8"));
     const config = ConfigSchema.parse(raw);
 
-    const validTypes = ["rss", "xai_grok", "raindrop", "hackernews", "arxiv", "youtube", "github_trending", "reddit", "bluesky"];
+    const validTypes = [
+      "rss",
+      "xai_grok",
+      "raindrop",
+      "hackernews",
+      "arxiv",
+      "youtube",
+      "github_trending",
+      "reddit",
+      "bluesky",
+    ];
     for (const [purposeKey, purpose] of Object.entries(config.purposes)) {
       for (const source of purpose.sources) {
         expect(validTypes).toContain(source.type);

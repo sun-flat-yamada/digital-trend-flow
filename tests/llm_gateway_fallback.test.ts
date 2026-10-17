@@ -32,7 +32,7 @@ import { metrics } from "../src/core/metrics";
 const clientError = (): Error =>
   Object.assign(
     new Error("[GoogleGenerativeAI Error]: [400 Bad Request] Developer instruction is not enabled for this model"),
-    { status: 400 }
+    { status: 400 },
   );
 
 const okResponse = (text: string) => ({
@@ -59,9 +59,11 @@ describe("LLM Gateway - provider fallback", () => {
     expect(response.model).toBe("reduce-model");
     expect(mockGenerateContent).toHaveBeenCalledTimes(2);
     expect(
-      metrics.getSnapshot().errors.some(
-        (e) => e.startsWith("[map] google/map-model") && e.includes("Developer instruction is not enabled")
-      )
+      metrics
+        .getSnapshot()
+        .errors.some(
+          (e) => e.startsWith("[map] google/map-model") && e.includes("Developer instruction is not enabled"),
+        ),
     ).toBe(true);
   });
 
@@ -87,9 +89,9 @@ describe("LLM Gateway - provider fallback", () => {
     });
     const errorsBefore = metrics.getSnapshot().errors.length;
 
-    await expect(
-      llmCall({ systemPrompt: "system", userPrompt: "user", phase: "reduce" })
-    ).rejects.toThrow(/All LLM providers failed for phase: reduce \(last error: google\/map-model: .*Developer instruction/);
+    await expect(llmCall({ systemPrompt: "system", userPrompt: "user", phase: "reduce" })).rejects.toThrow(
+      /All LLM providers failed for phase: reduce \(last error: google\/map-model: .*Developer instruction/,
+    );
 
     // Both the primary (reduce-model) and the in-provider fallback (map-model) were recorded.
     const newErrors = metrics.getSnapshot().errors.slice(errorsBefore);

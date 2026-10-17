@@ -27,7 +27,7 @@ export async function reduceSummarize(
   allFacts: (MapOutput & { purpose: string; purposeLabel: string; score?: number })[],
   date: string,
   activePurposes: { key: string; label: string }[] = [],
-  targetLanguage: string = "en"
+  targetLanguage: string = "en",
 ): Promise<ReduceResult> {
   try {
     // Build dynamic purpose-aware prompt
@@ -58,7 +58,7 @@ export async function reduceSummarize(
 
     if (factsPayload.length > MAX_REDUCE_INPUT_CHARS) {
       console.warn(
-        `⚠️ Reduce input exceeds safe limit (${factsPayload.length} chars). Filtering low-importance facts.`
+        `⚠️ Reduce input exceeds safe limit (${factsPayload.length} chars). Filtering low-importance facts.`,
       );
       finalFacts = compressedFacts
         .map((f) => ({
@@ -108,9 +108,9 @@ Based on these facts, generate the daily briefing with purpose-sectioned format.
           `## ${label}\n\n${facts
             .map(
               (f) =>
-                `### ${f.source_title}\n**${sourceLabel}**: ${f.source_url}\n${f.facts.map((fact) => `- ${fact.text}`).join("\n")}`
+                `### ${f.source_title}\n**${sourceLabel}**: ${f.source_url}\n${f.facts.map((fact) => `- ${fact.text}`).join("\n")}`,
             )
-            .join("\n\n")}`
+            .join("\n\n")}`,
       )
       .join("\n\n---\n\n");
 

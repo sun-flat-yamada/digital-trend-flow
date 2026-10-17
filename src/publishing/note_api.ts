@@ -24,12 +24,15 @@ export function createZennDraft(
   slug: string,
   title: string,
   content: string,
-  topics: string[] = ["AI", "Tech"]
+  topics: string[] = ["AI", "Tech"],
 ): string {
   const outputDir = PATHS.ARTIFACTS_ZENN.absolute;
   fs.mkdirSync(outputDir, { recursive: true });
 
-  const topicList = topics.slice(0, 5).map((t) => `"${t}"`).join(", ");
+  const topicList = topics
+    .slice(0, 5)
+    .map((t) => `"${t}"`)
+    .join(", ");
 
   const zennMarkdown = `---
 title: "${title}"
@@ -52,11 +55,7 @@ ${content}
  * Publishes a summary to note.com as a draft article.
  * NOTE: note.com does not have a public API. This is a placeholder.
  */
-export async function publishToNote(
-  title: string,
-  content: string,
-  _isPaid: boolean = false
-): Promise<void> {
+export async function publishToNote(title: string, content: string, _isPaid: boolean = false): Promise<void> {
   console.log(`ℹ️ note.com publishing is not yet implemented. Would publish: "${title}" (${content.length} chars)`);
   // TODO: Implement via Playwright browser automation when needed
 }

@@ -55,7 +55,9 @@ describe("pages_generator", () => {
     it("should format inline markdown links and styles", () => {
       const md = "Here is [an article](https://example.com) with **bold** text and `code`.";
       const html = markdownToHtml(md);
-      expect(html).toContain('<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="link">an article</a>');
+      expect(html).toContain(
+        '<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="link">an article</a>',
+      );
       expect(html).toContain("<strong>bold</strong>");
       expect(html).toContain("<code>code</code>");
     });
@@ -259,8 +261,8 @@ Overview of breakthroughs across September.
       expect(result.daily.length).toBeGreaterThanOrEqual(1);
       expect(result.reports.length).toBeGreaterThanOrEqual(2);
 
-      const hasWeekly = result.reports.some(r => r.reportType === "weekly");
-      const hasMonthly = result.reports.some(r => r.reportType === "monthly");
+      const hasWeekly = result.reports.some((r) => r.reportType === "weekly");
+      const hasMonthly = result.reports.some((r) => r.reportType === "monthly");
       expect(hasWeekly).toBe(true);
       expect(hasMonthly).toBe(true);
     });
@@ -272,7 +274,9 @@ Overview of breakthroughs across September.
       const file1 = path.join(testArtifactsDir, "2026-09-01_summary.md");
       const file2 = path.join(testArtifactsDir, "2026-09-02_summary.md");
 
-      fs.writeFileSync(file1, `---
+      fs.writeFileSync(
+        file1,
+        `---
 title: Daily Summary 2026-09-01
 top_story: First Story
 date: 2026-09-01
@@ -282,9 +286,13 @@ categories:
 ---
 # Summary 1
 ### First Story
-`, "utf8");
+`,
+        "utf8",
+      );
 
-      fs.writeFileSync(file2, `---
+      fs.writeFileSync(
+        file2,
+        `---
 title: Daily Summary 2026-09-02
 top_story: Second Story (Today's Headline)
 date: 2026-09-02
@@ -294,7 +302,9 @@ categories:
 ---
 # Summary 2
 ### Second Story (Today's Headline)
-`, "utf8");
+`,
+        "utf8",
+      );
 
       const result = generatePagesSite(testArtifactsDir, testOutputDir);
 
@@ -315,7 +325,9 @@ categories:
 
       // The Atom feed is published with the site and linked from the page
       const feedXml = fs.readFileSync(path.join(testOutputDir, "feed.xml"), "utf8");
-      expect(indexHtml).toContain('<link rel="alternate" type="application/atom+xml" title="Digital Trend Flow" href="./feed.xml">');
+      expect(indexHtml).toContain(
+        '<link rel="alternate" type="application/atom+xml" title="Digital Trend Flow" href="./feed.xml">',
+      );
       expect(feedXml).toMatch(/<link href="[^"]*#2026-09-03" rel="alternate"/);
       expect(feedXml.indexOf("#2026-09-03")).toBeLessThan(feedXml.indexOf("#2026-09-02"));
 

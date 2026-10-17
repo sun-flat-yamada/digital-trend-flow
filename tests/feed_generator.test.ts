@@ -17,7 +17,9 @@ describe("buildAtomFeed", () => {
     const xml = buildAtomFeed(entries, SITE, UPDATED);
 
     expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
-    expect(xml).toContain('<link href="https://owner.github.io/repo/feed.xml" rel="self" type="application/atom+xml"/>');
+    expect(xml).toContain(
+      '<link href="https://owner.github.io/repo/feed.xml" rel="self" type="application/atom+xml"/>',
+    );
     expect(xml).toContain('<link href="https://owner.github.io/repo/#2026-10-01" rel="alternate" type="text/html"/>');
     expect(xml).toContain(`<updated>${UPDATED}</updated>`);
     expect((xml.match(/<entry>/g) ?? []).length).toBe(2);
@@ -47,13 +49,13 @@ describe("buildAtomFeed", () => {
 describe("resolveSiteUrl", () => {
   test("prefers PAGES_BASE_URL and adds a trailing slash", () => {
     expect(resolveSiteUrl({ PAGES_BASE_URL: "https://example.com/trends", GITHUB_REPOSITORY: "o/r" })).toBe(
-      "https://example.com/trends/"
+      "https://example.com/trends/",
     );
   });
 
   test("derives the project site URL from GITHUB_REPOSITORY", () => {
     expect(resolveSiteUrl({ GITHUB_REPOSITORY: "Sun-Flat-Yamada/digital-trend-flow" })).toBe(
-      "https://sun-flat-yamada.github.io/digital-trend-flow/"
+      "https://sun-flat-yamada.github.io/digital-trend-flow/",
     );
   });
 

@@ -138,7 +138,9 @@ export async function generateWeeklyDigest(weekParam: string): Promise<string | 
   }
 
   matchedSummaries.sort((a, b) => a.date.localeCompare(b.date));
-  console.log(`📅 Generating weekly digest for ${isoWeek} (${matchedSummaries.length} daily summaries, ${startDate} ~ ${endDate})`);
+  console.log(
+    `📅 Generating weekly digest for ${isoWeek} (${matchedSummaries.length} daily summaries, ${startDate} ~ ${endDate})`,
+  );
 
   const totalArticles = matchedSummaries.reduce((sum, d) => sum + d.articleCount, 0);
   const allCategories = [...new Set(matchedSummaries.flatMap((d) => d.categories))];

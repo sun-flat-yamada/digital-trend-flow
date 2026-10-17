@@ -39,7 +39,7 @@ export async function fetchReddit(
   subreddit: string,
   minScore: number = 50,
   maxItems: number = 15,
-  purpose: string = "ai_dev_tools"
+  purpose: string = "ai_dev_tools",
 ): Promise<ArticleItem[]> {
   const cleanSubreddit = subreddit.replace(/^r\//i, "");
   const endpoint = `https://www.reddit.com/r/${cleanSubreddit}/hot.json?limit=${Math.min(maxItems * 2, 50)}`;

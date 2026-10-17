@@ -28,7 +28,7 @@ describe("generateMonthlyDigest", () => {
     fs.writeFileSync(
       path.join(dir, "2026-09-01_digital-trend_daily_summary.md"),
       "---\ntitle: Daily Summary 2026-09-01\narticles_processed: 3\n---\n\n## 🔥 Top\n### Story\n",
-      "utf8"
+      "utf8",
     );
     jest.spyOn(console, "log").mockImplementation(() => undefined);
   });
@@ -42,7 +42,7 @@ describe("generateMonthlyDigest", () => {
     (llmCall as jest.Mock).mockRejectedValueOnce(new Error("All LLM providers failed for phase: reduce"));
 
     await expect(generateMonthlyDigest("2026-09")).rejects.toThrow(
-      "Monthly digest generation failed for 2026-09: All LLM providers failed"
+      "Monthly digest generation failed for 2026-09: All LLM providers failed",
     );
   });
 

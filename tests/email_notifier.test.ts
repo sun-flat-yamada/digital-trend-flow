@@ -26,9 +26,7 @@ describe("Email Notifier", () => {
       await notifyEmail("Test Summary", "## Content", 5, mockTransport);
 
       expect(mockSendMail).not.toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("MAIL_TO not set")
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("MAIL_TO not set"));
     });
 
     test("skips notification when SMTP credentials are not configured", async () => {
@@ -40,9 +38,7 @@ describe("Email Notifier", () => {
 
       await notifyEmail("Test Summary", "## Content", 5);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("SMTP credentials not fully set")
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("SMTP credentials not fully set"));
     });
 
     test("createEmailTransport returns null when SMTP credentials are missing", () => {
@@ -78,9 +74,7 @@ describe("Email Notifier", () => {
       expect(callArgs.html).toContain("<!DOCTYPE html>");
       expect(callArgs.html).toContain("Daily Summary 2026-09-21");
       expect(callArgs.html).toContain("Processed 3 articles");
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Email notification sent successfully")
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Email notification sent successfully"));
     });
 
     test("falls back to default from address if MAIL_FROM is omitted", async () => {
@@ -98,7 +92,7 @@ describe("Email Notifier", () => {
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
           from: "admin@example.com",
-        })
+        }),
       );
     });
   });
@@ -112,12 +106,10 @@ describe("Email Notifier", () => {
       const mockTransport = { sendMail: mockSendMail } as unknown as Transporter;
 
       // Should not throw
-      await expect(
-        notifyEmail("Failed Email", "Content", 1, mockTransport)
-      ).resolves.not.toThrow();
+      await expect(notifyEmail("Failed Email", "Content", 1, mockTransport)).resolves.not.toThrow();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Email notification failed: Connection timeout")
+        expect.stringContaining("Email notification failed: Connection timeout"),
       );
     });
   });

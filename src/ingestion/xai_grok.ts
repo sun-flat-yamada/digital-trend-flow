@@ -74,7 +74,7 @@ Rules:
 export async function fetchXViGrok(
   query: string,
   sourceName: string = "X via Grok",
-  purpose: string = "ai_dev_tools"
+  purpose: string = "ai_dev_tools",
 ): Promise<ArticleItem[]> {
   const apiKey = env.XAI_API_KEY;
 
@@ -103,7 +103,7 @@ export async function fetchXViGrok(
           "Content-Type": "application/json",
         },
         timeout: 30000, // 30s timeout — Grok x_search can be slow
-      }
+      },
     );
 
     const rawContent = response.data?.choices?.[0]?.message?.content ?? "";

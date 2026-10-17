@@ -34,10 +34,7 @@ export interface RetryOptions {
 /**
  * Retries a promise-returning function with exponential backoff.
  */
-export async function pRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
+export async function pRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
   const retries = options.retries ?? 3;
   const factor = options.factor ?? 2;
   const minTimeout = options.minTimeout ?? 2000;

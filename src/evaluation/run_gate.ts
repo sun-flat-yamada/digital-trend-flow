@@ -40,7 +40,7 @@ export function evaluateRunGate(input: RunGateInput, thresholds: RunGateThreshol
   } else if (mapSuccessRate < thresholds.minMapSuccessRate) {
     reasons.push(
       `Map success rate ${percent(mapSuccessRate)} (${input.mapSucceeded}/${input.mapAttempted} articles) ` +
-        `is below the minimum of ${percent(thresholds.minMapSuccessRate)}`
+        `is below the minimum of ${percent(thresholds.minMapSuccessRate)}`,
     );
   }
 
@@ -50,7 +50,7 @@ export function evaluateRunGate(input: RunGateInput, thresholds: RunGateThreshol
 
   if (input.qualityScore !== undefined && input.qualityScore < thresholds.minQualityScore) {
     reasons.push(
-      `Quality score ${input.qualityScore.toFixed(1)} is below the minimum of ${thresholds.minQualityScore}`
+      `Quality score ${input.qualityScore.toFixed(1)} is below the minimum of ${thresholds.minQualityScore}`,
     );
   }
 

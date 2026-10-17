@@ -167,7 +167,8 @@ describe("calculatePurposeScore", () => {
     const article = {
       url: "https://example.com",
       title: "New LLM Architecture",
-      content: "This paper introduces a new transformer-based LLM architecture that achieves state-of-the-art performance on multiple NLP benchmarks. The model uses a novel attention mechanism and demonstrates significant improvements over previous approaches in both accuracy and efficiency metrics.",
+      content:
+        "This paper introduces a new transformer-based LLM architecture that achieves state-of-the-art performance on multiple NLP benchmarks. The model uses a novel attention mechanism and demonstrates significant improvements over previous approaches in both accuracy and efficiency metrics.",
     };
     const result = calculatePurposeScore(article, "ai_research");
     expect(result.isExcluded).toBe(false);
@@ -179,14 +180,16 @@ describe("calculatePurposeScore", () => {
     const article = {
       url: "https://example.com",
       title: "Cooking Recipe",
-      content: "Mix flour and sugar together in a large bowl. Add eggs and vanilla extract. Stir until smooth. Preheat oven to 350 degrees Fahrenheit. Pour batter into a greased pan and bake for 25 minutes until golden brown. Let cool before serving with whipped cream.",
+      content:
+        "Mix flour and sugar together in a large bowl. Add eggs and vanilla extract. Stir until smooth. Preheat oven to 350 degrees Fahrenheit. Pour batter into a greased pan and bake for 25 minutes until golden brown. Let cool before serving with whipped cream.",
     };
     const result = calculatePurposeScore(article, "ai_research");
     expect(result.totalScore).toBe(0);
   });
 
   test("applies title multiplier", () => {
-    const filler = " This is additional context to ensure the article passes content length validation checks. It provides enough text to meet the minimum character threshold required by the pipeline processing rules.";
+    const filler =
+      " This is additional context to ensure the article passes content length validation checks. It provides enough text to meet the minimum character threshold required by the pipeline processing rules.";
     const titleOnly = {
       url: "https://example.com",
       title: "LLM Breakthrough",
@@ -209,7 +212,8 @@ describe("assignBestPurpose", () => {
     const article = {
       url: "https://example.com",
       title: "New transformer model",
-      content: "A new GPT-based LLM model was released today with SOTA benchmarks. The model demonstrates remarkable improvements across multiple evaluation criteria including reasoning, coding, and language understanding tasks. Researchers believe this could reshape the landscape of natural language processing.",
+      content:
+        "A new GPT-based LLM model was released today with SOTA benchmarks. The model demonstrates remarkable improvements across multiple evaluation criteria including reasoning, coding, and language understanding tasks. Researchers believe this could reshape the landscape of natural language processing.",
     };
     const result = assignBestPurpose(article);
     expect(result.assignedPurpose).toBe("ai_research");
@@ -219,7 +223,8 @@ describe("assignBestPurpose", () => {
     const article = {
       url: "https://example.com",
       title: "Random unrelated topic",
-      content: "This has nothing to do with technology or any scored categories. It is a lifestyle blog post about gardening tips for spring planting season. The author shares personal experiences growing tomatoes and herbs in their backyard garden over the past decade of practice.",
+      content:
+        "This has nothing to do with technology or any scored categories. It is a lifestyle blog post about gardening tips for spring planting season. The author shares personal experiences growing tomatoes and herbs in their backyard garden over the past decade of practice.",
     };
     const result = assignBestPurpose(article);
     expect(result.assignedPurpose).toBe("curated");

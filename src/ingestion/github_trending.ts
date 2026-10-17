@@ -19,7 +19,7 @@ export async function fetchGitHubTrending(
   sourceName: string = "GitHub Trending",
   languageFilter?: string,
   since: string = "daily",
-  purpose: string = "ai_dev_tools"
+  purpose: string = "ai_dev_tools",
 ): Promise<ArticleItem[]> {
   try {
     let url = GITHUB_TRENDING_URL;
@@ -54,7 +54,7 @@ export async function fetchGitHubTrending(
       // Extract description if available
       const descRegex = new RegExp(
         `href="/${repoPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[\\s\\S]*?<p[^>]*class="[^"]*"[^>]*>\\s*([^<]+)`,
-        "m"
+        "m",
       );
       const descMatch = html.match(descRegex);
       const description = descMatch?.[1]?.trim() ?? "";
@@ -62,7 +62,7 @@ export async function fetchGitHubTrending(
       // Extract stars count
       const starsRegex = new RegExp(
         `${repoPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?(\\d[\\d,]*) stars today`,
-        "m"
+        "m",
       );
       const starsMatch = html.match(starsRegex);
       const stars = starsMatch?.[1]?.replace(/,/g, "") ?? "0";

@@ -135,7 +135,7 @@ export async function notifyEmail(
   title: string,
   summaryMarkdown: string,
   articleCount: number,
-  transportOverride?: Transporter
+  transportOverride?: Transporter,
 ): Promise<void> {
   const mailTo = env.MAIL_TO;
 

@@ -22,9 +22,7 @@ interface DeduplicationCandidate {
  * Strips editorial tags and brackets commonly found in news titles.
  */
 function cleanHeadline(text: string): string {
-  return text
-    .replace(/^(\[[^\]]+\]|【[^】]+】|\([^)]+\))\s*/g, "")
-    .trim();
+  return text.replace(/^(\[[^\]]+\]|【[^】]+】|\([^)]+\))\s*/g, "").trim();
 }
 
 /**
@@ -81,9 +79,7 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
  * @param articles Array of candidate articles with scores
  * @returns Deduplicated array (duplicates removed, higher-scored kept)
  */
-export function semanticDedup<T extends DeduplicationCandidate>(
-  articles: T[]
-): T[] {
+export function semanticDedup<T extends DeduplicationCandidate>(articles: T[]): T[] {
   if (!config.settings.semantic_dedup.enabled) return articles;
 
   const threshold = config.settings.semantic_dedup.similarity_threshold;
@@ -104,7 +100,7 @@ export function semanticDedup<T extends DeduplicationCandidate>(
         isDuplicate = true;
         removedCount++;
         console.log(
-          `  🔄 Dedup: "${article.title}" ≈ "${kept[existing.index]?.title}" (sim: ${(similarity * 100).toFixed(0)}%)`
+          `  🔄 Dedup: "${article.title}" ≈ "${kept[existing.index]?.title}" (sim: ${(similarity * 100).toFixed(0)}%)`,
         );
         break;
       }

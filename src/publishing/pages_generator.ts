@@ -103,8 +103,7 @@ export const I18N_EN: PagesI18n = {
   copyLink: "🔗 Copy Link",
   copiedLink: "Link copied!",
   noDataHeadline: "No headline available for today.",
-  noDataContent:
-    '<p class="no-data">No data available. Run the pipeline to generate summaries.</p>',
+  noDataContent: '<p class="no-data">No data available. Run the pipeline to generate summaries.</p>',
   noSearchResults: "No matching summaries found",
   noReportsFound: "No periodic reports found",
   cardArticles: (count) => `${count} articles`,
@@ -161,14 +160,12 @@ export const I18N_JA: PagesI18n = {
   copyLink: "🔗 リンクをコピー",
   copiedLink: "リンクをコピーしました",
   noDataHeadline: "本日のヘッドライン情報はまだありません。",
-  noDataContent:
-    '<p class="no-data">データがありません。パイプラインを実行してサマリーを生成してください。</p>',
+  noDataContent: '<p class="no-data">データがありません。パイプラインを実行してサマリーを生成してください。</p>',
   noSearchResults: "該当するサマリーはありません",
   noReportsFound: "該当する定期レポートはありません",
   cardArticles: (count) => `${count} 記事`,
   summaryAvailableTooltip: "サマリーあり: ",
-  monthTitle: (year, month) =>
-    `${year}年 ${String(month + 1).padStart(2, "0")}月`,
+  monthTitle: (year, month) => `${year}年 ${String(month + 1).padStart(2, "0")}月`,
   notFoundTitle: "ページが見つかりません — Digital Trend Flow",
   notFoundDesc: "トップページへ自動遷移します...",
   notFoundBack: "トップページへ戻る",
@@ -219,12 +216,7 @@ export function markdownToHtml(md: string): string {
     }
 
     // End list if not list item
-    if (
-      inList &&
-      !line.startsWith("- ") &&
-      !line.startsWith("* ") &&
-      line !== ""
-    ) {
+    if (inList && !line.startsWith("- ") && !line.startsWith("* ") && line !== "") {
       htmlParts.push("</ul>");
       inList = false;
     }
@@ -492,17 +484,13 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
     if (!period) {
       if (reportType === "weekly") {
         const weekMatch =
-          basename.match(/(\d{4}-w\d{2})/i) ||
-          title.match(/(\d{4}-w\d{2})/i) ||
-          markdownBody.match(/(\d{4}-w\d{2})/i);
+          basename.match(/(\d{4}-w\d{2})/i) || title.match(/(\d{4}-w\d{2})/i) || markdownBody.match(/(\d{4}-w\d{2})/i);
         period = weekMatch && weekMatch[1] ? weekMatch[1].toUpperCase() : date;
       } else if (reportType === "monthly") {
-        const monthMatch =
-          basename.match(/(\d{4}-\d{2})/) || title.match(/(\d{4}-\d{2})/);
+        const monthMatch = basename.match(/(\d{4}-\d{2})/) || title.match(/(\d{4}-\d{2})/);
         period = monthMatch && monthMatch[1] ? monthMatch[1] : date.slice(0, 7);
       } else if (reportType === "yearly") {
-        const yearMatch =
-          basename.match(/(\d{4})/) || title.match(/(\d{4})/);
+        const yearMatch = basename.match(/(\d{4})/) || title.match(/(\d{4})/);
         period = yearMatch && yearMatch[1] ? yearMatch[1] : date.slice(0, 4);
       } else {
         period = date;
@@ -512,46 +500,23 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
     const id = `${reportType}-${period || date}`;
 
     let sourceUrl: string | undefined = undefined;
-    const sourceMatch = markdownBody.match(
-      /\*\*(?:出典|Source)\*\*:\s*(?:\[[^\]]+\]\()?(https?:\/\/[^\s)]+)/,
-    );
+    const sourceMatch = markdownBody.match(/\*\*(?:出典|Source)\*\*:\s*(?:\[[^\]]+\]\()?(https?:\/\/[^\s)]+)/);
     if (sourceMatch && sourceMatch[1]) {
       sourceUrl = sourceMatch[1].replace(/\)$/, "");
     }
 
-    const categories: string[] = Array.isArray(frontmatter.categories)
-      ? frontmatter.categories
-      : [];
-    const tags: string[] = Array.isArray(frontmatter.tags)
-      ? frontmatter.tags
-      : [];
-    const rawCount =
-      frontmatter.articles_processed ??
-      frontmatter.article_count ??
-      frontmatter.total_articles;
+    const categories: string[] = Array.isArray(frontmatter.categories) ? frontmatter.categories : [];
+    const tags: string[] = Array.isArray(frontmatter.tags) ? frontmatter.tags : [];
+    const rawCount = frontmatter.articles_processed ?? frontmatter.article_count ?? frontmatter.total_articles;
     const parsedCount =
-      typeof rawCount === "number"
-        ? rawCount
-        : typeof rawCount === "string"
-          ? parseInt(rawCount, 10)
-          : 0;
+      typeof rawCount === "number" ? rawCount : typeof rawCount === "string" ? parseInt(rawCount, 10) : 0;
     const articleCount = Number.isNaN(parsedCount) ? 0 : parsedCount;
 
     const rawQuality = frontmatter.quality_score;
     const parsedQuality =
-      typeof rawQuality === "number"
-        ? rawQuality
-        : typeof rawQuality === "string"
-          ? parseFloat(rawQuality)
-          : null;
-    const qualityScore =
-      parsedQuality !== null && !Number.isNaN(parsedQuality)
-        ? parsedQuality
-        : null;
-    const language: string | undefined =
-      typeof frontmatter.language === "string"
-        ? frontmatter.language
-        : undefined;
+      typeof rawQuality === "number" ? rawQuality : typeof rawQuality === "string" ? parseFloat(rawQuality) : null;
+    const qualityScore = parsedQuality !== null && !Number.isNaN(parsedQuality) ? parsedQuality : null;
+    const language: string | undefined = typeof frontmatter.language === "string" ? frontmatter.language : undefined;
 
     const contentHtml = markdownToHtml(markdownBody);
 
@@ -566,9 +531,7 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
       tags,
       articleCount,
       qualityScore,
-      ...(frontmatter.top_purpose
-        ? { topPurpose: frontmatter.top_purpose }
-        : {}),
+      ...(frontmatter.top_purpose ? { topPurpose: frontmatter.top_purpose } : {}),
       ...(language ? { language } : {}),
       contentHtml,
       rawMarkdown: markdownBody,
@@ -601,26 +564,11 @@ export function scanAllSummaries(artifactsDir?: string): ScannedSummariesResult 
         path.resolve(process.cwd(), "artifacts/contents/weekly"),
         path.resolve(process.cwd(), "artifacts/contents/monthly"),
         path.resolve(process.cwd(), "artifacts/contents/yearly"),
-        path.resolve(
-          process.cwd(),
-          "artifacts/contents/digital-trend/collection/daily",
-        ),
-        path.resolve(
-          process.cwd(),
-          "artifacts/contents/digital-trend/collection/weekly",
-        ),
-        path.resolve(
-          process.cwd(),
-          "artifacts/contents/digital-trend/collection/monthly",
-        ),
-        path.resolve(
-          process.cwd(),
-          "artifacts/contents/digital-trend/collection/yearly",
-        ),
-        path.resolve(
-          process.cwd(),
-          "artifacts/contents/digital-trend/collection",
-        ),
+        path.resolve(process.cwd(), "artifacts/contents/digital-trend/collection/daily"),
+        path.resolve(process.cwd(), "artifacts/contents/digital-trend/collection/weekly"),
+        path.resolve(process.cwd(), "artifacts/contents/digital-trend/collection/monthly"),
+        path.resolve(process.cwd(), "artifacts/contents/digital-trend/collection/yearly"),
+        path.resolve(process.cwd(), "artifacts/contents/digital-trend/collection"),
         path.resolve(process.cwd(), "artifacts"),
       ].filter((d): d is string => typeof d === "string" && fs.existsSync(d));
 
@@ -667,8 +615,7 @@ export function scanAllSummaries(artifactsDir?: string): ScannedSummariesResult 
   // Deduplicate by unique key
   const byKey = new Map<string, PageSummaryItem>();
   for (const item of items) {
-    const key =
-      item.id || `${item.reportType || "daily"}-${item.period || item.date}`;
+    const key = item.id || `${item.reportType || "daily"}-${item.period || item.date}`;
     const existing = byKey.get(key);
     if (!existing || item.rawMarkdown.length > existing.rawMarkdown.length) {
       byKey.set(key, item);
@@ -714,11 +661,7 @@ export function generatePagesSite(
   latestDate: string | null;
   reportCount: number;
 } {
-  const siteLang =
-    language ||
-    process.env.OUTPUT_LANGUAGE ||
-    process.env.SUMMARY_LANGUAGE ||
-    "en";
+  const siteLang = language || process.env.OUTPUT_LANGUAGE || process.env.SUMMARY_LANGUAGE || "en";
   const i18n = getI18n(siteLang);
   const { all, daily, reports } = scanAllSummaries(artifactsDir);
   const outDir = path.resolve(process.cwd(), outputDir);
@@ -736,16 +679,8 @@ export function generatePagesSite(
   fs.writeFileSync(path.join(outDir, "app.js"), generateJs(i18n), "utf8");
 
   const latestSummary = daily[0] ?? all[0] ?? null;
-  fs.writeFileSync(
-    path.join(outDir, "index.html"),
-    generateHtml(all, daily, reports, latestSummary, i18n),
-    "utf8",
-  );
-  fs.writeFileSync(
-    path.join(outDir, "404.html"),
-    generate404Html(i18n),
-    "utf8",
-  );
+  fs.writeFileSync(path.join(outDir, "index.html"), generateHtml(all, daily, reports, latestSummary, i18n), "utf8");
+  fs.writeFileSync(path.join(outDir, "404.html"), generate404Html(i18n), "utf8");
   fs.writeFileSync(
     path.join(outDir, "feed.xml"),
     buildAtomFeed(
@@ -777,7 +712,7 @@ function generateHtml(
   initial: PageSummaryItem | null,
   i18n: PagesI18n = I18N_EN,
 ): string {
-  const initialDate = initial ? (initial.period || initial.date) : "";
+  const initialDate = initial ? initial.period || initial.date : "";
   const initialTitle = initial ? initial.title : "No summaries available";
   const initialTopStory = initial ? initial.topStory : i18n.noDataHeadline;
   const initialContent = initial ? initial.contentHtml : i18n.noDataContent;

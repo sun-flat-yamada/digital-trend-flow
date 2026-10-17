@@ -152,7 +152,7 @@ export const TRIAGE_RESPONSE_SCHEMA = {
  */
 export function buildReducePrompt(
   activePurposes: { key: string; label: string }[],
-  targetLanguage: string = "en"
+  targetLanguage: string = "en",
 ): string {
   const isJa = targetLanguage.toLowerCase() === "ja" || targetLanguage.toLowerCase() === "japanese";
   const sourceLabel = isJa ? "出典" : "Source";
@@ -163,7 +163,7 @@ export function buildReducePrompt(
 
 1. **[${isJa ? "トレンドタイトル" : "Trend Title"}]**: [${isJa ? "1-2文の分析" : "1-2 sentence analysis"}]
    **${sourceLabel}**: [Source Title](Source URL)
-2. ...`
+2. ...`,
     )
     .join("\n\n");
 
@@ -253,12 +253,15 @@ ${purposeSections}
 }
 
 // Legacy export (default English)
-export const REDUCE_SYSTEM_PROMPT = buildReducePrompt([
-  { key: "ai_research", label: "🔬 AI・LLM 研究" },
-  { key: "ai_dev_tools", label: "🛠️ 開発ツール・IDE統合" },
-  { key: "business", label: "💼 ビジネス動向" },
-  { key: "geopolitics", label: "🌍 政治・地政学" },
-], "en");
+export const REDUCE_SYSTEM_PROMPT = buildReducePrompt(
+  [
+    { key: "ai_research", label: "🔬 AI・LLM 研究" },
+    { key: "ai_dev_tools", label: "🛠️ 開発ツール・IDE統合" },
+    { key: "business", label: "💼 ビジネス動向" },
+    { key: "geopolitics", label: "🌍 政治・地政学" },
+  ],
+  "en",
+);
 
 // ── Monthly Digest Prompt (Item 6.1) ──
 
@@ -329,4 +332,3 @@ export function getWeeklyReducePrompt(): string {
   }
   return INLINE_WEEKLY_PROMPT;
 }
-

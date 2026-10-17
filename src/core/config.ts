@@ -32,7 +32,7 @@ function loadAndValidateConfig(configPath: string): AppConfig {
     const absolutePath = path.resolve(configPath);
     const fileContents = fs.readFileSync(absolutePath, "utf8");
     const parsedYaml = yaml.parse(fileContents);
-    
+
     return ConfigSchema.parse(parsedYaml);
   } catch (error: any) {
     console.error(`❌ Critical Error: Failed to load or validate config at ${configPath}`);
@@ -79,5 +79,5 @@ export const config = applyEnvOverrides(loadAndValidateConfig(PATHS.CONFIG), env
 
 export default {
   env,
-  config
+  config,
 };
