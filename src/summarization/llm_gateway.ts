@@ -6,13 +6,14 @@
  * Items: 1.1 Structured Output, 1.2 Multi-LLM Fallback, 1.4 Thinking Model
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { GenerateContentConfig, Schema } from "@google/genai";
 import axios from "axios";
 import pRetry, { AbortError } from "../core/retry";
 import { env, config } from "../core/config";
 import { metrics, estimateCost } from "../core/metrics";
 import type { LLMCallMetrics } from "../core/metrics";
 import { resolveModel } from "./model_resolver";
+import { geminiClient } from "./gemini_client";
 import { asErrorLike, errorMessage, toError } from "../core/errors";
 
 // ── Types ──
@@ -168,41 +169,40 @@ export function resetCircuits(): void {
 
 // ── Provider Implementations ──
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 const GEMINI_TIMEOUT_MS = 180_000;
 
 async function callGemini(request: LLMRequest, modelAlias: string): Promise<LLMResponse> {
   const modelName = await resolveModel(modelAlias, "google");
-  // Without a timeout a stalled request hangs the run until the job times out.
-  const model = genAI.getGenerativeModel({ model: modelName }, { timeout: GEMINI_TIMEOUT_MS });
 
-  // Item 1.1: Build generation config with optional Structured Output
-  const generationConfig: Record<string, unknown> = {};
+  const generationConfig: GenerateContentConfig = {
+    systemInstruction: request.systemPrompt,
+    // Without a timeout a stalled request hangs the run until the job times out.
+    httpOptions: { timeout: GEMINI_TIMEOUT_MS },
+  };
+  // Item 1.1: Structured Output (the schemas use the OpenAPI subset, e.g. type "OBJECT")
   if (request.responseSchema) {
-    generationConfig["responseMimeType"] = "application/json";
-    generationConfig["responseSchema"] = request.responseSchema;
+    generationConfig.responseMimeType = "application/json";
+    generationConfig.responseSchema = request.responseSchema as Schema;
   }
   if (request.temperature !== undefined) {
-    generationConfig["temperature"] = request.temperature;
+    generationConfig.temperature = request.temperature;
   }
   if (request.maxOutputTokens !== undefined) {
-    generationConfig["maxOutputTokens"] = request.maxOutputTokens;
+    generationConfig.maxOutputTokens = request.maxOutputTokens;
   }
 
   const start = Date.now();
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: request.userPrompt }] }],
-    systemInstruction: { role: "model", parts: [{ text: request.systemPrompt }] },
-    ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {}),
+  const response = await geminiClient.models.generateContent({
+    model: modelName,
+    contents: request.userPrompt,
+    config: generationConfig,
   });
 
   const latencyMs = Date.now() - start;
-  const response = result.response;
-  const text = response.text();
   const usage = response.usageMetadata;
 
   return {
-    text,
+    text: response.text ?? "",
     model: modelName,
     provider: "google",
     inputTokens: usage?.promptTokenCount ?? 0,

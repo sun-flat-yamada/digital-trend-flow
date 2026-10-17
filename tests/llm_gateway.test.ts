@@ -12,6 +12,7 @@ import {
   getCircuit,
   resetCircuits,
 } from "../src/summarization/llm_gateway";
+import { ApiError } from "@google/genai";
 
 describe("LLM Gateway - Error Classification", () => {
   test("correctly identifies 429 rate limit errors", () => {
@@ -78,6 +79,36 @@ describe("LLM Gateway - Error Classification", () => {
 
     const regularError = new Error("Something broke");
     expect(extractRetryDelayMs(regularError)).toBeNull();
+  });
+});
+
+describe("LLM Gateway - errors of the @google/genai SDK", () => {
+  // The SDK throws ApiError with the HTTP status and the JSON error body as the message.
+  const sdkError = (status: number, body: unknown) => new ApiError({ status, message: JSON.stringify(body) });
+
+  test("classifies by status and reads the retry delay and the quota from the error body", () => {
+    const quota = sdkError(429, {
+      error: {
+        code: 429,
+        message: "You exceeded your current quota. Quota exceeded for metric: x, limit: 0, model: gemini-3.1-pro",
+        status: "RESOURCE_EXHAUSTED",
+        details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "32s" }],
+      },
+    });
+    expect(isRateLimitError(quota)).toBe(true);
+    expect(extractRetryDelayMs(quota)).toBe(32000);
+    expect(String(quota.message)).toContain("limit: 0");
+
+    const overloaded = sdkError(503, {
+      error: { code: 503, message: "The model is overloaded.", status: "UNAVAILABLE" },
+    });
+    expect(isTransientError(overloaded)).toBe(true);
+    expect(isRateLimitError(overloaded)).toBe(false);
+
+    const badRequest = sdkError(400, {
+      error: { code: 400, message: "Developer instruction is not enabled", status: "INVALID_ARGUMENT" },
+    });
+    expect(isTransientError(badRequest)).toBe(false);
   });
 });
 

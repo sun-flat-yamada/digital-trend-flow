@@ -18,11 +18,11 @@ jest.mock("../src/summarization/model_resolver", () => ({
 }));
 
 const mockGenerateContent = jest.fn();
-jest.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-    getGenerativeModel: ({ model }: { model: string }) => ({
-      generateContent: (request: unknown) => mockGenerateContent(model, request),
-    }),
+jest.mock("@google/genai", () => ({
+  GoogleGenAI: jest.fn().mockImplementation(() => ({
+    models: {
+      generateContent: (params: { model: string }) => mockGenerateContent(params.model, params),
+    },
   })),
 }));
 
@@ -36,10 +36,8 @@ const clientError = (): Error =>
   );
 
 const okResponse = (text: string) => ({
-  response: {
-    text: () => text,
-    usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
-  },
+  text,
+  usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
 });
 
 describe("LLM Gateway - provider fallback", () => {

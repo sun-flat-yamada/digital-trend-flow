@@ -1,5 +1,5 @@
-import { env } from "../core/config";
 import { errorMessage } from "../core/errors";
+import { geminiClient } from "./gemini_client";
 
 // Cache the resolved models to avoid repeated API calls
 const resolvedCache: Record<string, string> = {};
@@ -9,18 +9,19 @@ const resolvedCache: Record<string, string> = {};
 // for example, answers a system instruction with "400 Developer instruction is not enabled".
 const NON_TEXT_VARIANT_TOKENS = new Set(["tts", "image", "audio", "live", "embedding", "computer", "robotics"]);
 
+/** A model from the SDK's `models.list` (only the fields used here). */
+interface GeminiModelInfo {
+  name: string;
+  /** The API's `supportedGenerationMethods`, e.g. ["generateContent", "countTokens"]. */
+  supportedActions?: string[];
+}
+
 /**
  * Returns true if a model from the `models.list` response can serve plain-text
  * `generateContent` requests (the only kind this pipeline makes).
  */
-/** A model entry of the Gemini `GET /v1beta/models` response (only the fields used here). */
-interface GeminiModelInfo {
-  name: string;
-  supportedGenerationMethods?: unknown;
-}
-
-export function isTextGenerationModel(model: { name?: string; supportedGenerationMethods?: unknown }): boolean {
-  const methods = model.supportedGenerationMethods;
+export function isTextGenerationModel(model: { name?: string; supportedActions?: unknown }): boolean {
+  const methods = model.supportedActions;
   if (Array.isArray(methods) && !methods.includes("generateContent")) {
     return false;
   }
@@ -66,20 +67,13 @@ export async function resolveModel(configuredModel: string, platform: string = "
   const fallbackModel = isFlashLite ? "gemini-3.1-flash-lite" : isPro ? "gemini-2.5-pro" : "gemini-3.8-flash";
 
   try {
-    const url = "https://generativelanguage.googleapis.com/v1beta/models";
-    const res = await fetch(url, {
-      headers: { "x-goog-api-key": env.GEMINI_API_KEY },
-    });
-    if (!res.ok) {
-      throw new Error(`API returned status: ${res.status}`);
-    }
-    const data = await res.json();
-    if (!data.models || !Array.isArray(data.models)) {
-      throw new Error("No models array in response");
+    const models = await listGeminiModels();
+    if (models.length === 0) {
+      throw new Error("The model list is empty");
     }
 
     // Filter models based on target category: flash-lite / flash / pro
-    const geminiModels = (data.models as GeminiModelInfo[])
+    const geminiModels = models
       .filter((m) => m.name && m.name.startsWith("models/gemini-"))
       .filter((m) => isTextGenerationModel(m))
       .filter((m) => {
@@ -133,4 +127,15 @@ export async function resolveModel(configuredModel: string, platform: string = "
     resolvedCache[cacheKey] = fallbackModel;
     return fallbackModel;
   }
+}
+
+/** Lists the Gemini Developer API models. The SDK's pager fetches every page. */
+async function listGeminiModels(): Promise<GeminiModelInfo[]> {
+  const models: GeminiModelInfo[] = [];
+  const pager = await geminiClient.models.list({ config: { pageSize: 1000 } });
+  for await (const model of pager) {
+    if (!model.name) continue;
+    models.push({ name: model.name, ...(model.supportedActions ? { supportedActions: model.supportedActions } : {}) });
+  }
+  return models;
 }

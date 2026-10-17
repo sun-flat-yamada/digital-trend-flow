@@ -1,15 +1,23 @@
 import { resolveModel, clearResolvedCache, isTextGenerationModel } from "../src/summarization/model_resolver";
 
-describe("Model Resolver", () => {
-  const originalFetch = global.fetch;
+const mockList = jest.fn();
+jest.mock("@google/genai", () => ({
+  GoogleGenAI: jest.fn().mockImplementation(() => ({ models: { list: (params: unknown) => mockList(params) } })),
+}));
 
+/** Makes models.list return these models, the way the SDK's pager yields them. */
+function mockModels(models: { name: string; supportedActions?: string[] }[]): void {
+  mockList.mockResolvedValue({
+    async *[Symbol.asyncIterator]() {
+      yield* models;
+    },
+  });
+}
+
+describe("Model Resolver", () => {
   beforeEach(() => {
     clearResolvedCache();
     jest.clearAllMocks();
-  });
-
-  afterAll(() => {
-    global.fetch = originalFetch;
   });
 
   test("returns non-google platform models as-is", async () => {
@@ -23,29 +31,19 @@ describe("Model Resolver", () => {
   });
 
   test("resolves latest-flash-lite to highest flash-lite model", async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        models: [
-          { name: "models/gemini-2.0-flash-lite" },
-          { name: "models/gemini-2.5-flash-lite" },
-          { name: "models/gemini-3.1-flash-lite" },
-          { name: "models/gemini-3.8-flash" },
-        ],
-      }),
-    });
+    mockModels([
+      { name: "models/gemini-2.0-flash-lite" },
+      { name: "models/gemini-2.5-flash-lite" },
+      { name: "models/gemini-3.1-flash-lite" },
+      { name: "models/gemini-3.8-flash" },
+    ]);
 
     const result = await resolveModel("latest-flash-lite", "google");
     expect(result).toBe("gemini-3.1-flash-lite");
   });
 
   test("resolves cost-effective and cheapest aliases to flash-lite", async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        models: [{ name: "models/gemini-2.5-flash-lite" }, { name: "models/gemini-3.1-flash-lite" }],
-      }),
-    });
+    mockModels([{ name: "models/gemini-2.5-flash-lite" }, { name: "models/gemini-3.1-flash-lite" }]);
 
     const resultCostEffective = await resolveModel("cost-effective", "google");
     expect(resultCostEffective).toBe("gemini-3.1-flash-lite");
@@ -56,17 +54,12 @@ describe("Model Resolver", () => {
   });
 
   test("resolves latest-flash to highest base flash model excluding lite", async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        models: [
-          { name: "models/gemini-2.5-flash" },
-          { name: "models/gemini-3.1-flash-lite" },
-          { name: "models/gemini-3.8-flash" },
-          { name: "models/gemini-3.8-flash-exp" }, // should be excluded
-        ],
-      }),
-    });
+    mockModels([
+      { name: "models/gemini-2.5-flash" },
+      { name: "models/gemini-3.1-flash-lite" },
+      { name: "models/gemini-3.8-flash" },
+      { name: "models/gemini-3.8-flash-exp" }, // should be excluded
+    ]);
 
     const result = await resolveModel("latest-flash", "google");
     expect(result).toBe("gemini-3.8-flash");
@@ -75,33 +68,23 @@ describe("Model Resolver", () => {
   test("skips speech, image, audio and Live variants when resolving latest-flash-lite", async () => {
     // Reproduces the 2026-09-23 incident: a TTS-only model outranked the text model by version
     // and every Map call failed with "400 Developer instruction is not enabled for this model".
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        models: [
-          { name: "models/gemini-3.5-flash-lite", supportedGenerationMethods: ["generateContent", "countTokens"] },
-          { name: "models/gemini-3.8-flash-lite-tts", supportedGenerationMethods: ["generateContent", "countTokens"] },
-          { name: "models/gemini-3.8-flash-lite-image", supportedGenerationMethods: ["generateContent"] },
-          { name: "models/gemini-3.8-flash-lite-native-audio", supportedGenerationMethods: ["generateContent"] },
-          { name: "models/gemini-3.8-flash-lite-live", supportedGenerationMethods: ["bidiGenerateContent"] },
-        ],
-      }),
-    });
+    mockModels([
+      { name: "models/gemini-3.5-flash-lite", supportedActions: ["generateContent", "countTokens"] },
+      { name: "models/gemini-3.8-flash-lite-tts", supportedActions: ["generateContent", "countTokens"] },
+      { name: "models/gemini-3.8-flash-lite-image", supportedActions: ["generateContent"] },
+      { name: "models/gemini-3.8-flash-lite-native-audio", supportedActions: ["generateContent"] },
+      { name: "models/gemini-3.8-flash-lite-live", supportedActions: ["bidiGenerateContent"] },
+    ]);
 
     const result = await resolveModel("latest-flash-lite", "google");
     expect(result).toBe("gemini-3.5-flash-lite");
   });
 
   test("skips models that do not support generateContent", async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        models: [
-          { name: "models/gemini-3.5-flash", supportedGenerationMethods: ["generateContent"] },
-          { name: "models/gemini-3.9-flash", supportedGenerationMethods: ["countTokens"] },
-        ],
-      }),
-    });
+    mockModels([
+      { name: "models/gemini-3.5-flash", supportedActions: ["generateContent"] },
+      { name: "models/gemini-3.9-flash", supportedActions: ["countTokens"] },
+    ]);
 
     const result = await resolveModel("latest-flash", "google");
     expect(result).toBe("gemini-3.5-flash");
@@ -114,13 +97,18 @@ describe("Model Resolver", () => {
     expect(isTextGenerationModel({ name: "models/gemini-2.5-flash-preview-native-audio-dialog" })).toBe(false);
     expect(isTextGenerationModel({ name: "models/gemini-2.0-flash-preview-image-generation" })).toBe(false);
     expect(isTextGenerationModel({ name: "models/gemini-embedding-001" })).toBe(false);
-    expect(
-      isTextGenerationModel({ name: "models/gemini-3.5-flash", supportedGenerationMethods: ["embedContent"] }),
-    ).toBe(false);
+    expect(isTextGenerationModel({ name: "models/gemini-3.5-flash", supportedActions: ["embedContent"] })).toBe(false);
+  });
+
+  test("asks the SDK for every model in one page and falls back when the list is empty", async () => {
+    mockModels([]);
+
+    expect(await resolveModel("latest-flash", "google")).toBe("gemini-3.8-flash");
+    expect(mockList).toHaveBeenCalledWith({ config: { pageSize: 1000 } });
   });
 
   test("falls back gracefully when API returns error", async () => {
-    global.fetch = jest.fn().mockRejectedValue(new Error("API network failure"));
+    mockList.mockRejectedValue(new Error("API network failure"));
 
     const flashLiteFallback = await resolveModel("latest-flash-lite", "google");
     expect(flashLiteFallback).toBe("gemini-3.1-flash-lite");
