@@ -70,6 +70,7 @@ npm run build && npm start                        # フルパイプライン実�
 | `daily_summary.yml`  | 毎日 03:47      | 日次サマリー + artifacts repo へ push（`repository_dispatch` にも対応） |
 | `monthly_digest.yml` | 毎月 2 日 04:30 | 前月の月次ダイジェスト + トレンド分析                                   |
 | `yearly_report.yml`  | 1/1 05:00       | 年次レポート                                                            |
+| `ci.yml`             | PR / main push  | 監査・型チェック・Lint・設定検証・Jest・ビルド + actionlint             |
 
 ## Project Structure
 
