@@ -24,6 +24,7 @@ export const SourceSchema = z.discriminatedUnion("type", [
     name: z.string(),
     enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
     url: z.string().url(),
+    lookback_hours: z.number().positive().optional(), // default: settings.freshness.max_age_hours
     language: z.string().optional(),
   }),
   z.object({
@@ -62,6 +63,7 @@ export const SourceSchema = z.discriminatedUnion("type", [
     type: z.literal("youtube"),
     name: z.string(),
     enabled: z.boolean().default(true), // false skips the source and records it as "disabled"
+    lookback_hours: z.number().positive().optional(), // default: settings.freshness.max_age_hours
     channel_id: z.string().optional(),
     query: z.string().optional(),
     max_results: z.number().default(10),
@@ -211,6 +213,42 @@ export const InsightsSchema = z.object({
 
 export type InsightsConfig = z.infer<typeof InsightsSchema>;
 
+// --- Defaults shared by the schema and the code ---
+
+/** How far back RSS and YouTube fetch, unless a source sets `lookback_hours` (= freshness.max_age_hours). */
+export const DEFAULT_LOOKBACK_HOURS = 72;
+
+export const ModelPriceSchema = z.object({ input: z.number().min(0), output: z.number().min(0) });
+export type ModelPrice = z.infer<typeof ModelPriceSchema>;
+
+/**
+ * USD per 1M tokens (paid tier, standard, text), checked against the official pricing pages on
+ * 2026-10-17. A model is priced by the longest key its name contains; `default` covers the rest.
+ */
+export const DEFAULT_PRICING: Record<string, ModelPrice> = {
+  // Google Gemini (ai.google.dev/gemini-api/docs/pricing)
+  "gemini-3.8-flash": { input: 0.75, output: 3.75 },
+  "gemini-3.6-flash": { input: 0.75, output: 3.75 },
+  "gemini-3.5-flash-lite": { input: 0.3, output: 2.5 },
+  "gemini-3.1-flash-lite": { input: 0.25, output: 1.5 },
+  "gemini-3.1-pro": { input: 2.0, output: 12.0 },
+  "gemini-3-flash": { input: 0.5, output: 3.0 },
+  "gemini-2.5-pro": { input: 1.25, output: 10.0 },
+  "gemini-2.5-flash": { input: 0.3, output: 2.5 },
+  "gemini-2.5-flash-lite": { input: 0.1, output: 0.4 },
+  // OpenAI (developers.openai.com/api/docs/pricing)
+  "gpt-4.1": { input: 2.0, output: 8.0 },
+  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
+  "gpt-4.1-nano": { input: 0.1, output: 0.4 },
+  // Anthropic (platform.claude.com/docs/en/about-claude/pricing)
+  "claude-sonnet-5": { input: 2.0, output: 10.0 },
+  "claude-sonnet-4": { input: 3.0, output: 15.0 },
+  "claude-haiku-5-5": { input: 0.1, output: 0.5 },
+  "claude-haiku-4-5": { input: 1.0, output: 5.0 },
+  // Any other model
+  default: { input: 0.5, output: 2.0 },
+};
+
 // --- Main Config Schema ---
 export const ConfigSchema = z.object({
   version: z.string(),
@@ -229,9 +267,20 @@ export const ConfigSchema = z.object({
       .object({
         enabled: z.boolean().default(true),
         decay_lambda: z.number().default(0.02), // exponential decay factor
-        max_age_hours: z.number().default(72),
+        // Also how far back RSS and YouTube fetch (a source's `lookback_hours` overrides it)
+        max_age_hours: z.number().positive().default(DEFAULT_LOOKBACK_HOURS),
       })
-      .default({ enabled: true, decay_lambda: 0.02, max_age_hours: 72 }),
+      .default({ enabled: true, decay_lambda: 0.02, max_age_hours: DEFAULT_LOOKBACK_HOURS }),
+    // Body extraction (ingestion/jina_reader.ts)
+    extraction: z
+      .object({
+        jina_timeout_ms: z.number().int().positive().default(20_000), // per Jina Reader request
+        jina_retries: z.number().int().min(0).default(2), // retries of a transient failure (408/429/5xx/network)
+        host_failure_limit: z.number().int().positive().default(2), // consecutive failures before a host is skipped
+      })
+      .default({ jina_timeout_ms: 20_000, jina_retries: 2, host_failure_limit: 2 }),
+    // LLM prices for the cost estimate in metrics (USD per 1M tokens); replaces the whole table
+    pricing: z.record(z.string(), ModelPriceSchema).default(DEFAULT_PRICING),
     // Item 5.2: State TTL
     state_ttl_days: z.number().default(90),
     // Plan ST-2: articles evaluated but not summarized are not re-fetched for this many days

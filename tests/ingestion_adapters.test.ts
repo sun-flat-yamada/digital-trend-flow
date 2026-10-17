@@ -66,6 +66,17 @@ describe("fetchRss", () => {
     expect(items[1]?.description).toBeUndefined();
   });
 
+  test("keeps only the items within the given lookback window", async () => {
+    parseFixture();
+
+    const items = await fetchRss("Example", "https://news.example.com/feed.xml", "tech", 3);
+
+    expect(items.map((i) => i.url)).toEqual([
+      "https://news.example.com/articles/open-weight-model",
+      "https://news.example.com/articles/undated",
+    ]);
+  });
+
   test("wraps a fetch failure with the source name", async () => {
     jest.spyOn(Parser.prototype, "parseURL").mockRejectedValue(new Error("Status code 429"));
 

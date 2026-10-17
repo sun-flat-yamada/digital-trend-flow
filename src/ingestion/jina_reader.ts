@@ -3,7 +3,7 @@
  * [Mechanism] Wraps Jina Reader and Firecrawl behind a unified interface
  * to enable automatic fallback on extraction failure. Only transient failures
  * (network errors, timeouts, 408/429/5xx) are retried, and a host that fails
- * twice in a row is skipped for the rest of the run. Failures throw, so the
+ * `settings.extraction.host_failure_limit` times in a row is skipped for the rest of the run. Failures throw, so the
  * caller can fall back to the source's own description.
  *
  * Item: 2.1 Content Extractor Abstraction + Firecrawl Fallback
@@ -11,14 +11,12 @@
 
 import axios from "axios";
 import pRetry, { AbortError } from "../core/retry";
-import { env } from "../core/config";
+import { config, env } from "../core/config";
 import { asErrorLike, errorMessage } from "../core/errors";
 
 const JINA_API_BASE = "https://r.jina.ai/";
 const FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v1";
 
-/** Consecutive failures after which the remaining URLs on the same host are not requested. */
-const HOST_FAILURE_LIMIT = 2;
 const hostFailures = new Map<string, number>();
 
 const hostOf = (url: string): string => {
@@ -47,7 +45,8 @@ export function resetExtractionState(): void {
 export async function extractMarkdown(url: string): Promise<string> {
   const host = hostOf(url);
   const failures = hostFailures.get(host) ?? 0;
-  if (failures >= HOST_FAILURE_LIMIT) {
+  // Consecutive failures after which the remaining URLs on the same host are not requested.
+  if (failures >= config.settings.extraction.host_failure_limit) {
     throw new Error(`skipped: ${failures} consecutive extraction failures on ${host}`);
   }
   try {
@@ -115,7 +114,7 @@ async function extractViaJina(url: string): Promise<string> {
           // An API key raises the rate limit; anonymous requests are throttled per IP.
           ...(env.JINA_API_KEY ? { Authorization: `Bearer ${env.JINA_API_KEY}` } : {}),
         },
-        timeout: 20000,
+        timeout: config.settings.extraction.jina_timeout_ms,
       });
       const content = typeof response.data === "string" ? response.data.trim() : "";
       if (!content) {
@@ -134,7 +133,7 @@ async function extractViaJina(url: string): Promise<string> {
   };
 
   return pRetry(fetchContent, {
-    retries: 2,
+    retries: config.settings.extraction.jina_retries,
     onFailedAttempt: (context) => {
       console.warn(
         `⚠️ Jina extraction attempt ${context.attemptNumber} failed for ${url} (${errorMessage(context.error)}). ${context.retriesLeft} retries left.`,
