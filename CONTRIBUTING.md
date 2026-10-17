@@ -10,7 +10,7 @@
 
 1. **Issue**: 1 タスク = 1 Issue = 1 PR。テンプレート `🎫 Work Unit` で Why / What / 完了条件 / 受け入れ基準 / 参照・前提 / 作業開始方法を書く。着手前に、既存の PR やマージ済みの対応がないかを確認する。範囲外の発見は新しい Issue にする。
 2. **計画を先にコミット**: `.devs/changes/yyyy-mm-dd_<ChangeTitle>/` に `implementation_plan.md` と `task.md` を書き、実装より前に単独でコミットする。`npm run change-dev:plan-check` で確認する（ドキュメントのみの変更は対象外）。
-3. **ブランチ**: `<type>/<issue>-<slug>`（例: `feat/42-reddit-source`）。`npm run change-dev:branch -- name --issue <n>` で作り、`npm run change-dev:branch -- check` で確認する。
+3. **ブランチ**: `<type>/<issue>-<slug>`（例: `feat/42-reddit-source`）。`npm run change-dev:branch -- name --issue <n>` で作り、`npm run change-dev:branch -- check` で確認する。クラウドセッションは割り当てブランチ（`claude/...`）を最初の push 前に `npm run change-dev:branch -- rename ...` で改名する。
 4. **実装と品質ゲート**: Conventional Commits で小さくコミットし、push の前に品質ゲートを通す（下記）。挙動・設定・構成を変えたら `AGENTS.md` と `docs/` も同じ PR で直す。
 5. **Walkthrough**: 変更ディレクトリに `walkthrough.md`（概要・変更ファイル・品質ゲートの結果）を書く。
 6. **ドラフト PR**: `origin/main` に rebase してから push し、`.github/PULL_REQUEST_TEMPLATE.md` に沿って日本語で書き、`Closes #<issue>` を入れてドラフトで出す。
@@ -39,4 +39,4 @@ npm run change-dev:plan-check
 | Workflow | 内容 |
 | :--- | :--- |
 | `ci.yml` | 型チェック・lint・整形・設定検証・テスト（カバレッジ）・ビルド・actionlint |
-| `change_dev.yml` | PR のブランチ名（`<type>/<issue>-<slug>`）と plan-first。クラウドセッションの割り当て名（`claude/...`）は警告 |
+| `change_dev.yml` | PR のブランチ名（`<type>/<issue>-<slug>`）と plan-first。クラウドセッションの割り当て名（`claude/...`）は失敗にする |
