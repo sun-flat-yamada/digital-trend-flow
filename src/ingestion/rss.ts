@@ -21,7 +21,8 @@ export interface ArticleItem {
 const parser = new Parser({
   timeout: 20000,
   headers: {
-    "User-Agent": "Mozilla/5.0 (compatible; DigitalTrendFlow/1.0; +https://github.com/sun-flat-yamada/digital-trend-flow)",
+    "User-Agent":
+      "Mozilla/5.0 (compatible; DigitalTrendFlow/1.0; +https://github.com/sun-flat-yamada/digital-trend-flow)",
     Accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8",
   },
 });
@@ -30,11 +31,7 @@ const parser = new Parser({
  * [Role] Fetches an RSS feed and filters for new, unprocessed items.
  * [Mechanism] Parses the URL via 'rss-parser', iterates through items, checks the 'state_manager' for deduplication, and maps to the internal 'ArticleItem' schema.
  */
-export async function fetchRss(
-  sourceName: string,
-  url: string,
-  purpose: string
-): Promise<ArticleItem[]> {
+export async function fetchRss(sourceName: string, url: string, purpose: string): Promise<ArticleItem[]> {
   try {
     const feed = await parser.parseURL(url);
     const newItems: ArticleItem[] = [];

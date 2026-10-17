@@ -39,13 +39,9 @@ describe("mapExtractFacts", () => {
         JSON.stringify({
           source_title: "Title rewritten by the model",
           source_url: "https://wrong.example.com/",
-          facts: [
-            { text: "Fact A", importance: 7 },
-            { text: "   ", importance: 3 },
-            { importance: 5 },
-          ],
-        })
-      )
+          facts: [{ text: "Fact A", importance: 7 }, { text: "   ", importance: 3 }, { importance: 5 }],
+        }),
+      ),
     );
 
     const result = await mapExtractFacts(article("ok"));

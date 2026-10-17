@@ -31,7 +31,7 @@ export async function fetchYouTube(
   query?: string,
   channelId?: string,
   maxResults: number = 10,
-  purpose: string = "ai_research"
+  purpose: string = "ai_research",
 ): Promise<ArticleItem[]> {
   const apiKey = env.YOUTUBE_API_KEY;
 

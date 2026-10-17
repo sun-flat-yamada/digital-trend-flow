@@ -28,10 +28,7 @@ OpenAIが新しいGPT-5モデルを発表しました。このモデルは従来
 `;
 
   test("gives high score to well-formatted summary", () => {
-    const result = evaluateQuality(goodSummary, [
-      "https://openai.com/blog/gpt5",
-      "https://anthropic.com/research",
-    ]);
+    const result = evaluateQuality(goodSummary, ["https://openai.com/blog/gpt5", "https://anthropic.com/research"]);
 
     expect(result.overallScore).toBeGreaterThan(70);
     expect(result.passCount).toBeGreaterThanOrEqual(4);

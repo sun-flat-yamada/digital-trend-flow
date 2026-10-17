@@ -17,7 +17,8 @@ jest.mock("../src/core/retry", () => {
   return { ...actual, __esModule: true, pRetry, default: pRetry };
 });
 
-const httpError = (status: number) => Object.assign(new Error(`Request failed with status code ${status}`), { response: { status } });
+const httpError = (status: number) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), { response: { status } });
 
 describe("extractMarkdown", () => {
   beforeEach(() => {
@@ -72,7 +73,7 @@ describe("extractMarkdown", () => {
     mockedAxios.get.mockRejectedValue(httpError(403));
 
     const results = await Promise.allSettled(
-      ["https://slow.example/1", "https://slow.example/2", "https://slow.example/3"].map(extractMarkdown)
+      ["https://slow.example/1", "https://slow.example/2", "https://slow.example/3"].map(extractMarkdown),
     );
     expect(results.every((r) => r.status === "rejected")).toBe(true);
 

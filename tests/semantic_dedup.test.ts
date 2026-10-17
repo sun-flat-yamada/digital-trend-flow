@@ -29,9 +29,24 @@ describe("semanticDedup", () => {
 
   test("removes near-duplicate Japanese titles", () => {
     const articles = [
-      { url: "https://ja-a.com", title: "OpenAIが次世代モデル「GPT-5」を電撃発表、推論性能が劇的に進化", score: 25, purpose: "ai" },
-      { url: "https://ja-b.com", title: "【速報】OpenAIが次世代モデル「GPT-5」を発表！推論性能が劇的進化", score: 18, purpose: "ai" },
-      { url: "https://ja-c.com", title: "Googleが量子コンピューティングの新マイルストーンを達成", score: 12, purpose: "ai" },
+      {
+        url: "https://ja-a.com",
+        title: "OpenAIが次世代モデル「GPT-5」を電撃発表、推論性能が劇的に進化",
+        score: 25,
+        purpose: "ai",
+      },
+      {
+        url: "https://ja-b.com",
+        title: "【速報】OpenAIが次世代モデル「GPT-5」を発表！推論性能が劇的進化",
+        score: 18,
+        purpose: "ai",
+      },
+      {
+        url: "https://ja-c.com",
+        title: "Googleが量子コンピューティングの新マイルストーンを達成",
+        score: 12,
+        purpose: "ai",
+      },
     ];
 
     const result = semanticDedup(articles);

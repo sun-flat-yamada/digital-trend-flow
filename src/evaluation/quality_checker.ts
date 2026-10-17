@@ -26,7 +26,7 @@ interface QualityCheck {
 export function evaluateQuality(
   summaryMarkdown: string,
   expectedSourceUrls: string[],
-  targetLanguage: string = "en"
+  targetLanguage: string = "en",
 ): QualityCheckResult {
   const checks: QualityCheck[] = [];
 
@@ -61,10 +61,7 @@ export function evaluateQuality(
 function checkRequiredSections(markdown: string): QualityCheck {
   const lower = markdown.toLowerCase();
   const hasTopNews =
-    markdown.includes("🔥") ||
-    markdown.includes("最重要") ||
-    lower.includes("top story") ||
-    lower.includes("top news");
+    markdown.includes("🔥") || markdown.includes("最重要") || lower.includes("top story") || lower.includes("top news");
   const hasSections = (markdown.match(/^## /gm) ?? []).length >= 2;
 
   const passed = hasTopNews && hasSections;
@@ -134,7 +131,7 @@ function checkLanguage(markdown: string, targetLanguage: string = "en"): Quality
   if (isEn) {
     const latinChars = (markdown.match(/[a-zA-Z]/g) ?? []).length;
     const latinRatio = totalChars > 0 ? latinChars / totalChars : 0;
-    const passed = latinRatio >= 0.40; // At least 40% Latin letters for English markdown
+    const passed = latinRatio >= 0.4; // At least 40% Latin letters for English markdown
     return {
       name: "Language Check",
       passed,

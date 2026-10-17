@@ -118,7 +118,13 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     }
     console.log(`  ⏸️ Source "${source.name}" disabled: ${reason}`);
     recordSourceHealth(source.name, source.type, "disabled", 0, reason);
-    metrics.recordSourceStatus({ name: source.name, type: source.type, status: "disabled", article_count: 0, error_message: reason });
+    metrics.recordSourceStatus({
+      name: source.name,
+      type: source.type,
+      status: "disabled",
+      article_count: 0,
+      error_message: reason,
+    });
   }
 
   const raindropResultSets: (RaindropFetchResult & { collectionId: number; archiveId: number | undefined })[] = [];
@@ -168,7 +174,9 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     recordSourceHealth(source.name, source.type, status, articleCount, errorMessage);
     const failureStreak = status === "ok" ? 0 : getSourceFailureStreak(source.name);
     if (failureStreak >= SOURCE_ALERT_STREAK) {
-      console.warn(`⚠️ ALERT: "${source.name}" has failed or returned 0 articles for ${failureStreak} consecutive runs!`);
+      console.warn(
+        `⚠️ ALERT: "${source.name}" has failed or returned 0 articles for ${failureStreak} consecutive runs!`,
+      );
     }
     metrics.recordSourceStatus({
       name: source.name,
@@ -186,7 +194,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   const duplicateCount = allNewItems.length - uniqueItems.length;
   console.log(
     `  → Found ${uniqueItems.length} new (unprocessed) articles` +
-      (duplicateCount > 0 ? ` (${duplicateCount} duplicate URLs dropped).` : ".")
+      (duplicateCount > 0 ? ` (${duplicateCount} duplicate URLs dropped).` : "."),
   );
   await registry.events.emit("ingestion:complete", { count: uniqueItems.length });
 
@@ -278,7 +286,9 @@ export async function runDailyPipeline(): Promise<RunStatus> {
         const threshold = purposeDef?.scoring?.threshold ?? config.settings.daily_threshold_score;
 
         if (finalScore < threshold) {
-          console.log(`  ⬇️ Below threshold [${scoreResult.purposeLabel}]: "${item.title}" (score: ${finalScore.toFixed(1)} < ${threshold})`);
+          console.log(
+            `  ⬇️ Below threshold [${scoreResult.purposeLabel}]: "${item.title}" (score: ${finalScore.toFixed(1)} < ${threshold})`,
+          );
           return null;
         }
       }
@@ -295,7 +305,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
       };
     },
     Math.max(env.API_CONCURRENCY, 3),
-    200
+    200,
   );
 
   for (const result of extractionResults) {
@@ -338,13 +348,17 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     for (const sa of selectedArticles) {
       console.log(`  🧪 [${sa.purposeLabel}] ${sa.article.title} (score: ${sa.score.toFixed(1)}) ${sa.article.url}`);
     }
-    return finishSkipped(`Dry run: stopped after selecting ${selectedArticles.length} articles; no LLM summary was generated and nothing was published.`);
+    return finishSkipped(
+      `Dry run: stopped after selecting ${selectedArticles.length} articles; no LLM summary was generated and nothing was published.`,
+    );
   }
 
   // ==========================
   // Phase 3: Map Processing
   // ==========================
-  console.log(`\n🗺️ Phase 3: Map Processing - Extracting facts via LLM (concurrency: ${env.API_CONCURRENCY}, interval: ${env.API_INTERVAL_MS}ms)...`);
+  console.log(
+    `\n🗺️ Phase 3: Map Processing - Extracting facts via LLM (concurrency: ${env.API_CONCURRENCY}, interval: ${env.API_INTERVAL_MS}ms)...`,
+  );
 
   const mapInputs: MapInput[] = selectedArticles.map((sa) => ({
     title: sa.article.title,
@@ -405,15 +419,16 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   }
 
   const targetLanguage =
-    process.env.OUTPUT_LANGUAGE ||
-    process.env.SUMMARY_LANGUAGE ||
-    config.settings.language ||
-    "en";
+    process.env.OUTPUT_LANGUAGE || process.env.SUMMARY_LANGUAGE || config.settings.language || "en";
   console.log(`  🌐 Output language: ${targetLanguage}`);
 
   const reduceResult = await reduceSummarize(allFacts, today, activePurposes, targetLanguage);
   const summaryMarkdown = reduceResult.markdown;
-  console.log(reduceResult.usedFallback ? "  → Reduce failed; raw-facts fallback produced." : "  → Summary generated successfully.");
+  console.log(
+    reduceResult.usedFallback
+      ? "  → Reduce failed; raw-facts fallback produced."
+      : "  → Summary generated successfully.",
+  );
   await registry.events.emit("reduce:complete", { length: summaryMarkdown.length });
 
   // ==========================
@@ -443,7 +458,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
       reduceUsedFallback: reduceResult.usedFallback,
       qualityScore: qualityResult.overallScore,
     },
-    gateThresholds
+    gateThresholds,
   );
   if (gate.status === "degraded") {
     return finishDegraded(gate);
@@ -475,12 +490,15 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   metrics.setArticlesByPurpose(purposeDistribution);
 
   // Find top purpose
-  const topPurpose = Object.entries(purposeDistribution)
-    .reduce<[string, number] | undefined>((best, entry) => (best === undefined || entry[1] > best[1] ? entry : best), undefined)?.[0] ?? "";
+  const topPurpose =
+    Object.entries(purposeDistribution).reduce<[string, number] | undefined>(
+      (best, entry) => (best === undefined || entry[1] > best[1] ? entry : best),
+      undefined,
+    )?.[0] ?? "";
   // Highest-scoring article, without reordering summarizedArticles
   const topArticle = summarizedArticles.reduce<ScoredArticle | undefined>(
     (best, sa) => (best === undefined || sa.score > best.score ? sa : best),
-    undefined
+    undefined,
   );
 
   const frontmatterMeta: SummaryFrontmatter = {
@@ -503,7 +521,15 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   };
 
   const outputDir = path.join(PATHS.ARTIFACTS_DAILY.absolute, yyyy, mm);
-  saveMarkdownFile(outputDir, filename, title, summaryMarkdown, summarizedArticles.length, config.settings.author, frontmatterMeta);
+  saveMarkdownFile(
+    outputDir,
+    filename,
+    title,
+    summaryMarkdown,
+    summarizedArticles.length,
+    config.settings.author,
+    frontmatterMeta,
+  );
 
   // Item B: Generate and save Obsidian JSON Canvas
   try {
@@ -552,7 +578,9 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     console.warn(`⚠️ Podcast generation failed: ${podcastErr.message}`);
   }
 
-  await registry.events.emit("publish:complete", { channels: ["obsidian", "discord", "slack", "teams", "rss", "pages", "podcast"] });
+  await registry.events.emit("publish:complete", {
+    channels: ["obsidian", "discord", "slack", "teams", "rss", "pages", "podcast"],
+  });
 
   // Mark processed URLs
   for (const sa of summarizedArticles) {
@@ -600,7 +628,9 @@ export async function runDailyPipeline(): Promise<RunStatus> {
 
   // Cost summary
   console.log(`\n💰 Total LLM Cost: $${finalMetrics.total_cost_usd.toFixed(4)}`);
-  console.log(`   Tokens: ${finalMetrics.total_tokens.input.toLocaleString()} in / ${finalMetrics.total_tokens.output.toLocaleString()} out`);
+  console.log(
+    `   Tokens: ${finalMetrics.total_tokens.input.toLocaleString()} in / ${finalMetrics.total_tokens.output.toLocaleString()} out`,
+  );
 
   await registry.events.emit("pipeline:complete", {
     articles: summarizedArticles.length,
@@ -608,7 +638,9 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     quality: qualityResult.overallScore,
   });
 
-  console.log(`\n🎉 Pipeline complete! Processed ${summarizedArticles.length} articles across ${activePurposes.length} categories.`);
+  console.log(
+    `\n🎉 Pipeline complete! Processed ${summarizedArticles.length} articles across ${activePurposes.length} categories.`,
+  );
   return "success";
 }
 
@@ -619,9 +651,18 @@ export async function runDailyPipeline(): Promise<RunStatus> {
  * kept candidates with their verdicts, or null when the keyword pre-screen should decide instead
  * (triage disabled, or a triage call failed).
  */
-async function triageCandidates(candidates: ArticleItem[]): Promise<Map<ArticleItem, TriageDecision<ArticleItem>> | null> {
+async function triageCandidates(
+  candidates: ArticleItem[],
+): Promise<Map<ArticleItem, TriageDecision<ArticleItem>> | null> {
   const settings = config.settings.triage;
-  const emptyStats = { candidates: candidates.length, kept: 0, dropped_irrelevant: 0, dropped_duplicate: 0, dropped_over_limit: 0, batches: 0 };
+  const emptyStats = {
+    candidates: candidates.length,
+    kept: 0,
+    dropped_irrelevant: 0,
+    dropped_duplicate: 0,
+    dropped_over_limit: 0,
+    batches: 0,
+  };
   if (!settings.enabled) {
     metrics.setTriage({ status: "disabled", ...emptyStats });
     return null;
@@ -631,7 +672,13 @@ async function triageCandidates(candidates: ArticleItem[]): Promise<Map<ArticleI
     return new Map();
   }
 
-  const result = await triageArticles(candidates, triagePurposes(config.purposes), settings, llmCall, env.API_INTERVAL_MS);
+  const result = await triageArticles(
+    candidates,
+    triagePurposes(config.purposes),
+    settings,
+    llmCall,
+    env.API_INTERVAL_MS,
+  );
   if (result.status === "failed") {
     console.warn(`  ⚠️ Triage failed; falling back to the keyword title pre-screen: ${result.error}`);
     metrics.recordError(`Triage failed (keyword fallback): ${result.error}`);
@@ -642,7 +689,7 @@ async function triageCandidates(candidates: ArticleItem[]): Promise<Map<ArticleI
   const { stats } = result;
   console.log(
     `  🧭 Triage kept ${stats.kept}/${stats.candidates} candidates ` +
-      `(${stats.dropped_irrelevant} irrelevant, ${stats.dropped_duplicate} duplicate, ${stats.dropped_over_limit} over the limit of ${settings.max_candidates}).`
+      `(${stats.dropped_irrelevant} irrelevant, ${stats.dropped_duplicate} duplicate, ${stats.dropped_over_limit} over the limit of ${settings.max_candidates}).`,
   );
   metrics.setTriage({ status: "ok", ...stats });
   return new Map(result.kept.map((d) => [d.item, d]));

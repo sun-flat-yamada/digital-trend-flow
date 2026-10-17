@@ -130,10 +130,12 @@ export const ExcludeSchema = z.object({
   domains: z.array(z.string()).default([]),
   url_strip_parameters: z.array(z.string()).default([]),
   keywords: z.array(ExcludeKeywordSchema).default([]),
-  content_length: z.object({
-    min: z.number().default(0),
-    max: z.number().default(Number.MAX_SAFE_INTEGER),
-  }).default({ min: 0, max: Number.MAX_SAFE_INTEGER }),
+  content_length: z
+    .object({
+      min: z.number().default(0),
+      max: z.number().default(Number.MAX_SAFE_INTEGER),
+    })
+    .default({ min: 0, max: Number.MAX_SAFE_INTEGER }),
 });
 
 export type ExcludeRules = z.infer<typeof ExcludeSchema>;
@@ -148,11 +150,13 @@ export const ModelProviderSchema = z.object({
   thinking: z.boolean().default(false),
 });
 
-export const FallbackModelSchema = z.object({
-  platform: z.string(),
-  map: z.string(),
-  reduce: z.string(),
-}).optional();
+export const FallbackModelSchema = z
+  .object({
+    platform: z.string(),
+    map: z.string(),
+    reduce: z.string(),
+  })
+  .optional();
 
 // --- Main Config Schema ---
 export const ConfigSchema = z.object({
@@ -168,35 +172,43 @@ export const ConfigSchema = z.object({
     fallback_models: FallbackModelSchema,
     author: z.string().default("sun.flat.yamada"),
     // Item 2.5: Freshness scoring
-    freshness: z.object({
-      enabled: z.boolean().default(true),
-      decay_lambda: z.number().default(0.02), // exponential decay factor
-      max_age_hours: z.number().default(72),
-    }).default({ enabled: true, decay_lambda: 0.02, max_age_hours: 72 }),
+    freshness: z
+      .object({
+        enabled: z.boolean().default(true),
+        decay_lambda: z.number().default(0.02), // exponential decay factor
+        max_age_hours: z.number().default(72),
+      })
+      .default({ enabled: true, decay_lambda: 0.02, max_age_hours: 72 }),
     // Item 5.2: State TTL
     state_ttl_days: z.number().default(90),
     // Plan 2-1: batch LLM triage of titles/descriptions before any body is fetched
     // (see filtering/llm_triage.ts). When it fails, the run falls back to the keyword pre-screen.
-    triage: z.object({
-      enabled: z.boolean().default(true),
-      model: z.string().optional(), // defaults to models.map
-      max_candidates: z.number().int().positive().default(30), // candidates whose body is fetched
-      batch_size: z.number().int().positive().default(150), // candidates per LLM call
-      min_relevance: z.number().min(0).max(100).default(50), // below this a candidate is dropped
-    }).default({ enabled: true, max_candidates: 30, batch_size: 150, min_relevance: 50 }),
+    triage: z
+      .object({
+        enabled: z.boolean().default(true),
+        model: z.string().optional(), // defaults to models.map
+        max_candidates: z.number().int().positive().default(30), // candidates whose body is fetched
+        batch_size: z.number().int().positive().default(150), // candidates per LLM call
+        min_relevance: z.number().min(0).max(100).default(50), // below this a candidate is dropped
+      })
+      .default({ enabled: true, max_candidates: 30, batch_size: 150, min_relevance: 50 }),
     // Item 2.4: Semantic deduplication
-    semantic_dedup: z.object({
-      enabled: z.boolean().default(false),
-      similarity_threshold: z.number().default(0.92),
-    }).default({ enabled: false, similarity_threshold: 0.92 }),
+    semantic_dedup: z
+      .object({
+        enabled: z.boolean().default(false),
+        similarity_threshold: z.number().default(0.92),
+      })
+      .default({ enabled: false, similarity_threshold: 0.92 }),
     // Output language (default: "en")
     language: z.string().default("en"),
     // Publication gate: a run below these limits is "degraded" — it is not published,
     // its URLs are not marked as processed, and the job fails (see evaluation/run_gate.ts).
-    quality_gate: z.object({
-      min_map_success_rate: z.number().min(0).max(1).default(0.5), // share of selected articles with extracted facts
-      min_quality_score: z.number().min(0).max(100).default(60), // evaluateQuality() overall score
-    }).default({ min_map_success_rate: 0.5, min_quality_score: 60 }),
+    quality_gate: z
+      .object({
+        min_map_success_rate: z.number().min(0).max(1).default(0.5), // share of selected articles with extracted facts
+        min_quality_score: z.number().min(0).max(100).default(60), // evaluateQuality() overall score
+      })
+      .default({ min_map_success_rate: 0.5, min_quality_score: 60 }),
   }),
   purposes: z.record(z.string(), PurposeSchema),
   exclude: ExcludeSchema,
@@ -223,12 +235,9 @@ export const EnvSchema = z.object({
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.preprocess(
     (val) => (val === "" || val === undefined ? 587 : Number(val)),
-    z.number().int().positive().default(587)
+    z.number().int().positive().default(587),
   ),
-  SMTP_SECURE: z.preprocess(
-    (val) => (val === "true" || val === true ? true : false),
-    z.boolean().default(false)
-  ),
+  SMTP_SECURE: z.preprocess((val) => (val === "true" || val === true ? true : false), z.boolean().default(false)),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().optional(),
@@ -245,11 +254,11 @@ export const EnvSchema = z.object({
   // Concurrency & Rate Limiting (Defaults configured for Free Tier: 5 RPM)
   API_CONCURRENCY: z.preprocess(
     (val) => (val === "" || val === undefined ? 1 : Number(val)),
-    z.number().int().positive().default(1)
+    z.number().int().positive().default(1),
   ),
   API_INTERVAL_MS: z.preprocess(
     (val) => (val === "" || val === undefined ? 13000 : Number(val)),
-    z.number().int().nonnegative().default(13000)
+    z.number().int().nonnegative().default(13000),
   ),
   // Output language specification (default: "en")
   OUTPUT_LANGUAGE: z.string().default("en"),
@@ -261,10 +270,7 @@ export const EnvSchema = z.object({
   GEMINI_MAP_MODEL: z.string().optional(),
   GEMINI_REDUCE_MODEL: z.string().optional(),
   // Dry run: ingest, extract and score, then stop before the Map phase (no publishing)
-  DRY_RUN: z.preprocess(
-    (val) => (val === "true" || val === true ? true : false),
-    z.boolean().default(false)
-  ),
+  DRY_RUN: z.preprocess((val) => (val === "true" || val === true ? true : false), z.boolean().default(false)),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;

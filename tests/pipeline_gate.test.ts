@@ -47,7 +47,9 @@ jest.mock("../src/ingestion/state_manager", () => ({
   closeDb: jest.fn(),
 }));
 jest.mock("../src/ingestion/rss", () => ({ fetchRss: jest.fn() }));
-jest.mock("../src/ingestion/jina_reader", () => ({ extractMarkdown: jest.fn(async () => "Article body. ".repeat(50)) }));
+jest.mock("../src/ingestion/jina_reader", () => ({
+  extractMarkdown: jest.fn(async () => "Article body. ".repeat(50)),
+}));
 jest.mock("../src/filtering/scorer", () => ({
   normalizeUrl: (url: string) => url,
   excludeByMetadata: () => ({ excluded: false }),
@@ -158,7 +160,7 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
       sourceType: "rss",
       purpose: "tech",
       publishedAt: new Date().toISOString(),
-    }))
+    })),
   );
   configure(mocks);
 
@@ -247,7 +249,7 @@ describe("daily pipeline publication gate", () => {
   test("a run whose Reduce phase falls back to raw facts is degraded", async () => {
     const run = await runPipeline((mocks) => {
       mocks["mapExtractFacts"]!.mockImplementation(async (input: { url: string; title: string }) =>
-        mapOutput(input.url, input.title)
+        mapOutput(input.url, input.title),
       );
       mocks["reduceSummarize"]!.mockResolvedValue({ markdown: "# Fallback Mode", usedFallback: true });
     });
@@ -263,7 +265,7 @@ describe("daily pipeline publication gate", () => {
   test("a healthy run publishes and marks every summarized article as processed", async () => {
     const run = await runPipeline((mocks) => {
       mocks["mapExtractFacts"]!.mockImplementation(async (input: { url: string; title: string }) =>
-        mapOutput(input.url, input.title)
+        mapOutput(input.url, input.title),
       );
       mocks["reduceSummarize"]!.mockResolvedValue({ markdown: GOOD_SUMMARY, usedFallback: false });
     });
@@ -274,7 +276,10 @@ describe("daily pipeline publication gate", () => {
     expect(run.mocks["markAsProcessed"]).toHaveBeenCalledTimes(2);
     expect(run.githubOutput).toContain("run_status=success");
     // Frontmatter lists source names and the headline the summary leads with.
-    expect(run.mocks["saveMarkdownFile"]!.mock.calls[0][6]).toMatchObject({ sources: ["Test Feed"], topStory: "Article A" });
+    expect(run.mocks["saveMarkdownFile"]!.mock.calls[0][6]).toMatchObject({
+      sources: ["Test Feed"],
+      topStory: "Article A",
+    });
   });
 
   test("an article whose Map phase failed is left unprocessed so the next run retries it", async () => {
@@ -304,22 +309,22 @@ describe("daily pipeline publication gate", () => {
           purpose: "tech",
           publishedAt: new Date().toISOString(),
           ...(a.url.endsWith("/b") ? { description } : {}),
-        }))
+        })),
       );
       mocks["extractMarkdown"]!.mockImplementation(async (url: string) => {
         if (url.endsWith("/b")) throw new Error("Jina returned HTTP 403");
         return "Article body. ".repeat(50);
       });
       mocks["mapExtractFacts"]!.mockImplementation(async (input: { url: string; title: string }) =>
-        mapOutput(input.url, input.title)
+        mapOutput(input.url, input.title),
       );
       mocks["reduceSummarize"]!.mockResolvedValue({ markdown: GOOD_SUMMARY, usedFallback: false });
     });
 
     expect(run.exitCode).toBe(0);
-    const mapInputB = run.mocks["mapExtractFacts"]!.mock.calls
-      .map((call) => call[0] as { url: string; content: string })
-      .find((input) => input.url.endsWith("/b"));
+    const mapInputB = run.mocks["mapExtractFacts"]!.mock.calls.map(
+      (call) => call[0] as { url: string; content: string },
+    ).find((input) => input.url.endsWith("/b"));
     expect(mapInputB?.content).toContain(description.trim());
     expect(run.stepSummary).toContain("| Content Extraction (Failed / Description Fallback) | 0 / 1 of 2 |");
   });
@@ -344,7 +349,7 @@ describe("daily pipeline publication gate", () => {
 
     const healthy = (mocks: Record<string, jest.Mock>) => {
       mocks["mapExtractFacts"]!.mockImplementation(async (input: { url: string; title: string }) =>
-        mapOutput(input.url, input.title)
+        mapOutput(input.url, input.title),
       );
       mocks["reduceSummarize"]!.mockResolvedValue({ markdown: GOOD_SUMMARY, usedFallback: false });
     };

@@ -136,9 +136,7 @@ function migrateLegacyJson(): void {
 
 function purgeExpired(): void {
   const database = getDb();
-  const result = database.prepare(
-    `DELETE FROM processed_urls WHERE expires_at < datetime('now')`
-  ).run();
+  const result = database.prepare(`DELETE FROM processed_urls WHERE expires_at < datetime('now')`).run();
 
   if (result.changes > 0) {
     console.log(`🧹 Purged ${result.changes} expired entries from state DB`);
@@ -155,9 +153,9 @@ function purgeExpired(): void {
  */
 export function isProcessed(url: string): boolean {
   const database = getDb();
-  const row = database.prepare(
-    `SELECT 1 FROM processed_urls WHERE url IN (?, ?) AND expires_at > datetime('now')`
-  ).get(normalizeUrl(url), url);
+  const row = database
+    .prepare(`SELECT 1 FROM processed_urls WHERE url IN (?, ?) AND expires_at > datetime('now')`)
+    .get(normalizeUrl(url), url);
   return !!row;
 }
 
@@ -165,17 +163,16 @@ export function isProcessed(url: string): boolean {
  * Records a URL (in canonical form) as successfully processed with metadata.
  * The entry expires after `settings.state_ttl_days`.
  */
-export function markAsProcessed(
-  url: string,
-  title: string,
-  score: number,
-  purpose?: string
-): void {
+export function markAsProcessed(url: string, title: string, score: number, purpose?: string): void {
   const database = getDb();
-  database.prepare(`
+  database
+    .prepare(
+      `
     INSERT OR REPLACE INTO processed_urls (url, title, score, purpose, processed_at, expires_at)
     VALUES (?, ?, ?, ?, datetime('now'), datetime('now', ?))
-  `).run(normalizeUrl(url), title, score, purpose ?? null, `+${config.settings.state_ttl_days} days`);
+  `,
+    )
+    .run(normalizeUrl(url), title, score, purpose ?? null, `+${config.settings.state_ttl_days} days`);
 }
 
 /**
@@ -199,30 +196,34 @@ export function flushState(): void {
  */
 export function savePipelineRun(metrics: PipelineRunMetrics): void {
   const database = getDb();
-  database.prepare(`
+  database
+    .prepare(
+      `
     INSERT OR REPLACE INTO pipeline_runs
     (run_id, date, started_at, finished_at, duration_ms,
      articles_ingested, articles_scored, articles_selected,
      articles_by_purpose, total_input_tokens, total_output_tokens,
      total_cost_usd, error_count, quality_score, metrics_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    metrics.run_id,
-    metrics.date,
-    metrics.started_at,
-    metrics.finished_at ?? null,
-    metrics.duration_ms ?? null,
-    metrics.articles_ingested,
-    metrics.articles_scored,
-    metrics.articles_selected,
-    JSON.stringify(metrics.articles_by_purpose),
-    metrics.total_tokens.input,
-    metrics.total_tokens.output,
-    metrics.total_cost_usd,
-    metrics.errors.length,
-    metrics.quality_score ?? null,
-    JSON.stringify(metrics)
-  );
+  `,
+    )
+    .run(
+      metrics.run_id,
+      metrics.date,
+      metrics.started_at,
+      metrics.finished_at ?? null,
+      metrics.duration_ms ?? null,
+      metrics.articles_ingested,
+      metrics.articles_scored,
+      metrics.articles_selected,
+      JSON.stringify(metrics.articles_by_purpose),
+      metrics.total_tokens.input,
+      metrics.total_tokens.output,
+      metrics.total_cost_usd,
+      metrics.errors.length,
+      metrics.quality_score ?? null,
+      JSON.stringify(metrics),
+    );
 }
 
 /**
@@ -233,15 +234,19 @@ export function recordSourceHealth(
   sourceType: string,
   status: SourceHealthStatus,
   articleCount: number,
-  errorMessage?: string
+  errorMessage?: string,
 ): void {
   const database = getDb();
   const today = new Date().toISOString().split("T")[0] ?? "unknown";
-  database.prepare(`
+  database
+    .prepare(
+      `
     INSERT OR REPLACE INTO source_health
     (source_name, source_type, check_date, status, article_count, error_message)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(sourceName, sourceType, today, status, articleCount, errorMessage ?? null);
+  `,
+    )
+    .run(sourceName, sourceType, today, status, articleCount, errorMessage ?? null);
 }
 
 export type SourceHealthStatus = "ok" | "empty" | "error" | "disabled";
@@ -266,12 +271,16 @@ export function computeFailureStreak(rows: ReadonlyArray<{ status: string; artic
  */
 export function getSourceFailureStreak(sourceName: string): number {
   const database = getDb();
-  const rows = database.prepare(`
+  const rows = database
+    .prepare(
+      `
     SELECT status, article_count FROM source_health
     WHERE source_name = ?
     ORDER BY check_date DESC
     LIMIT 14
-  `).all(sourceName) as Array<{ status: string; article_count: number }>;
+  `,
+    )
+    .all(sourceName) as Array<{ status: string; article_count: number }>;
   return computeFailureStreak(rows);
 }
 
@@ -280,9 +289,9 @@ export function getSourceFailureStreak(sourceName: string): number {
  */
 export function getProcessedCount(): number {
   const database = getDb();
-  const row = database.prepare(
-    `SELECT COUNT(*) as count FROM processed_urls WHERE expires_at > datetime('now')`
-  ).get() as { count: number } | undefined;
+  const row = database
+    .prepare(`SELECT COUNT(*) as count FROM processed_urls WHERE expires_at > datetime('now')`)
+    .get() as { count: number } | undefined;
   return row?.count ?? 0;
 }
 
@@ -296,12 +305,16 @@ export function getRecentRuns(days: number = 30): Array<{
   duration_ms: number;
 }> {
   const database = getDb();
-  return database.prepare(`
+  return database
+    .prepare(
+      `
     SELECT date, articles_selected, total_cost_usd, duration_ms
     FROM pipeline_runs
     WHERE date >= date('now', '-' || ? || ' days')
     ORDER BY date DESC
-  `).all(days) as Array<{
+  `,
+    )
+    .all(days) as Array<{
     date: string;
     articles_selected: number;
     total_cost_usd: number;

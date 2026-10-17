@@ -13,15 +13,36 @@ describe("toGitHubSummary run status", () => {
 
     expect(summary).toContain("| Run Status | ⚠️ degraded |");
     expect(summary).toContain("| Map Success (Articles) | 3/10 |");
-    expect(summary).toContain("### ⚠️ Run Status Reasons\n- Map success rate 30% (3/10 articles) is below the minimum of 50%");
+    expect(summary).toContain(
+      "### ⚠️ Run Status Reasons\n- Map success rate 30% (3/10 articles) is below the minimum of 50%",
+    );
   });
 });
 
 describe("toGitHubSummary source alerts", () => {
   test("lists failing sources and long empty streaks, but not disabled or healthy ones", () => {
-    metrics.recordSourceStatus({ name: "Dead Feed", type: "rss", status: "error", article_count: 0, failure_streak: 1, error_message: "Status code 404" });
-    metrics.recordSourceStatus({ name: "Quiet Feed", type: "rss", status: "empty", article_count: 0, failure_streak: 3 });
-    metrics.recordSourceStatus({ name: "Paused Feed", type: "reddit", status: "disabled", article_count: 0, error_message: "enabled: false in config.yml" });
+    metrics.recordSourceStatus({
+      name: "Dead Feed",
+      type: "rss",
+      status: "error",
+      article_count: 0,
+      failure_streak: 1,
+      error_message: "Status code 404",
+    });
+    metrics.recordSourceStatus({
+      name: "Quiet Feed",
+      type: "rss",
+      status: "empty",
+      article_count: 0,
+      failure_streak: 3,
+    });
+    metrics.recordSourceStatus({
+      name: "Paused Feed",
+      type: "reddit",
+      status: "disabled",
+      article_count: 0,
+      error_message: "enabled: false in config.yml",
+    });
     metrics.recordSourceStatus({ name: "Good Feed", type: "rss", status: "ok", article_count: 5, failure_streak: 0 });
 
     const summary = metrics.toGitHubSummary();

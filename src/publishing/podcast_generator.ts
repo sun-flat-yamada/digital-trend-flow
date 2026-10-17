@@ -165,14 +165,12 @@ export function isEdgeTtsAvailable(): boolean {
 export async function generatePodcast(
   summaryMarkdown: string,
   date: string,
-  outputDir?: string
+  outputDir?: string,
 ): Promise<PodcastGenerationResult> {
   const script = buildDialogueScript(summaryMarkdown, date);
   const [yyyy = "unknown", mm = "unknown"] = date.split("-");
 
-  const targetDir =
-    outputDir ??
-    path.join(PATHS.ARTIFACTS_AUDIO.absolute, yyyy, mm);
+  const targetDir = outputDir ?? path.join(PATHS.ARTIFACTS_AUDIO.absolute, yyyy, mm);
 
   fs.mkdirSync(targetDir, { recursive: true });
 
@@ -196,11 +194,9 @@ export async function generatePodcast(
       const fullText = script.turns.map((t) => `${t.speakerName}。${t.text}`).join(" ");
       // The text derives from LLM output over scraped articles, so it is passed as a plain
       // argument without a shell: `$(...)`, backticks and quotes are never interpreted.
-      execFileSync(
-        "edge-tts",
-        ["--voice", "ja-JP-KeitaNeural", "--text", fullText, "--write-media", audioPath],
-        { timeout: 60000 }
-      );
+      execFileSync("edge-tts", ["--voice", "ja-JP-KeitaNeural", "--text", fullText, "--write-media", audioPath], {
+        timeout: 60000,
+      });
       console.log(`🔊 Podcast audio synthesized: ${audioPath}`);
       return {
         scriptPath: jsonPath,

@@ -19,7 +19,7 @@ export async function fetchArxiv(
   query: string,
   sourceName: string = "arXiv",
   maxResults: number = 20,
-  purpose: string = "ai_research"
+  purpose: string = "ai_research",
 ): Promise<ArticleItem[]> {
   try {
     const response = await axios.get(ARXIV_API_BASE, {

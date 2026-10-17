@@ -2,10 +2,7 @@
  * Tests for keyword_expansion.ts — keyword discovery from article titles.
  */
 
-import {
-  discoverCandidateKeywords,
-  formatSuggestionReport,
-} from "../src/filtering/keyword_expansion";
+import { discoverCandidateKeywords, formatSuggestionReport } from "../src/filtering/keyword_expansion";
 
 jest.mock("../src/core/config", () => ({
   config: {
@@ -79,9 +76,7 @@ describe("discoverCandidateKeywords", () => {
 
 describe("formatSuggestionReport", () => {
   test("formats non-empty suggestions as markdown table", () => {
-    const suggestions = [
-      { word: "RLHF", frequency: 5, suggestedPurpose: "ai_research", suggestedWeight: 2 },
-    ];
+    const suggestions = [{ word: "RLHF", frequency: 5, suggestedPurpose: "ai_research", suggestedWeight: 2 }];
     const report = formatSuggestionReport(suggestions);
     expect(report).toContain("RLHF");
     expect(report).toContain("ai_research");

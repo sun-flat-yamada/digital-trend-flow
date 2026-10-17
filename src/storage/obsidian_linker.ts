@@ -31,38 +31,83 @@ export interface EnrichedFrontmatter {
 
 // Known entity lists for extraction
 const KNOWN_COMPANIES = [
-  "OpenAI", "Google", "Anthropic", "Meta", "Microsoft", "Apple", "NVIDIA",
-  "Amazon", "AWS", "Tesla", "xAI", "Mistral", "Cohere", "Stability AI",
-  "Hugging Face", "DeepMind", "Inflection", "Character.AI", "Perplexity",
-  "Databricks", "Snowflake", "Palantir", "Scale AI", "Anyscale",
-  "GitHub", "GitLab", "Vercel", "Cloudflare", "Stripe",
+  "OpenAI",
+  "Google",
+  "Anthropic",
+  "Meta",
+  "Microsoft",
+  "Apple",
+  "NVIDIA",
+  "Amazon",
+  "AWS",
+  "Tesla",
+  "xAI",
+  "Mistral",
+  "Cohere",
+  "Stability AI",
+  "Hugging Face",
+  "DeepMind",
+  "Inflection",
+  "Character.AI",
+  "Perplexity",
+  "Databricks",
+  "Snowflake",
+  "Palantir",
+  "Scale AI",
+  "Anyscale",
+  "GitHub",
+  "GitLab",
+  "Vercel",
+  "Cloudflare",
+  "Stripe",
 ];
 
 const KNOWN_TECHNOLOGIES = [
-  "transformer", "fine-tuning", "LLM", "GPT", "BERT", "diffusion",
-  "RAG", "vector database", "embedding", "tokenizer", "RLHF", "DPO",
-  "MoE", "attention", "KV-cache", "quantization", "distillation",
-  "LoRA", "QLoRA", "PEFT", "prompt engineering", "chain-of-thought",
-  "agentic", "multi-agent", "function calling", "tool use",
-  "Kubernetes", "Docker", "WebAssembly", "Rust", "TypeScript",
+  "transformer",
+  "fine-tuning",
+  "LLM",
+  "GPT",
+  "BERT",
+  "diffusion",
+  "RAG",
+  "vector database",
+  "embedding",
+  "tokenizer",
+  "RLHF",
+  "DPO",
+  "MoE",
+  "attention",
+  "KV-cache",
+  "quantization",
+  "distillation",
+  "LoRA",
+  "QLoRA",
+  "PEFT",
+  "prompt engineering",
+  "chain-of-thought",
+  "agentic",
+  "multi-agent",
+  "function calling",
+  "tool use",
+  "Kubernetes",
+  "Docker",
+  "WebAssembly",
+  "Rust",
+  "TypeScript",
 ];
 
 /**
  * Extracts mentioned companies from summary text.
  */
 export function extractMentionedCompanies(text: string): string[] {
-  return KNOWN_COMPANIES.filter((company) =>
-    text.toLowerCase().includes(company.toLowerCase())
-  );
+  return KNOWN_COMPANIES.filter((company) => text.toLowerCase().includes(company.toLowerCase()));
 }
 
 /**
  * Extracts mentioned technologies from summary text.
  */
 export function extractMentionedTechnologies(text: string): string[] {
-  return KNOWN_TECHNOLOGIES.filter((tech) =>
-    text.toLowerCase().includes(tech.toLowerCase())
-  );
+  return KNOWN_TECHNOLOGIES.filter((tech) => text.toLowerCase().includes(tech.toLowerCase()));
 }
 
 /**
@@ -72,7 +117,7 @@ export function extractMentionedTechnologies(text: string): string[] {
 export function generateRelatedLinks(
   currentDate: string,
   currentTopics: string[],
-  _recentDates: string[] = []
+  _recentDates: string[] = [],
 ): string[] {
   // Generate navigation links
   const links: string[] = [];
@@ -90,15 +135,9 @@ export function generateRelatedLinks(
 /**
  * Generates the footer section with Obsidian navigation links.
  */
-export function generateObsidianFooter(
-  currentDate: string,
-  topics: string[]
-): string {
+export function generateObsidianFooter(currentDate: string, topics: string[]): string {
   const prevDate = getPreviousDate(currentDate);
-  const parts: string[] = [
-    "\n\n---\n",
-    `← [[${dailySummaryNoteName(prevDate)}|前日のサマリー]]`,
-  ];
+  const parts: string[] = ["\n\n---\n", `← [[${dailySummaryNoteName(prevDate)}|前日のサマリー]]`];
 
   if (topics.length > 0) {
     parts.push("");

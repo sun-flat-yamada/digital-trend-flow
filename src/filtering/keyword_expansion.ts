@@ -18,28 +18,118 @@ interface KeywordSuggestion {
 
 // Stopwords to exclude from suggestions (common words with no scoring value)
 const STOPWORDS = new Set([
-  "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-  "have", "has", "had", "do", "does", "did", "will", "would", "could",
-  "should", "may", "might", "can", "shall", "with", "from", "that",
-  "this", "these", "those", "they", "them", "their", "there", "here",
-  "where", "when", "what", "which", "who", "whom", "how", "and", "but",
-  "or", "nor", "not", "no", "all", "each", "every", "both", "few",
-  "more", "most", "other", "some", "such", "than", "too", "very",
-  "also", "just", "about", "above", "after", "again", "for", "new",
-  "own", "same", "into", "over", "only", "out", "its", "top",
+  "the",
+  "a",
+  "an",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "could",
+  "should",
+  "may",
+  "might",
+  "can",
+  "shall",
+  "with",
+  "from",
+  "that",
+  "this",
+  "these",
+  "those",
+  "they",
+  "them",
+  "their",
+  "there",
+  "here",
+  "where",
+  "when",
+  "what",
+  "which",
+  "who",
+  "whom",
+  "how",
+  "and",
+  "but",
+  "or",
+  "nor",
+  "not",
+  "no",
+  "all",
+  "each",
+  "every",
+  "both",
+  "few",
+  "more",
+  "most",
+  "other",
+  "some",
+  "such",
+  "than",
+  "too",
+  "very",
+  "also",
+  "just",
+  "about",
+  "above",
+  "after",
+  "again",
+  "for",
+  "new",
+  "own",
+  "same",
+  "into",
+  "over",
+  "only",
+  "out",
+  "its",
+  "top",
   // Japanese stopwords
-  "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "さ",
-  "ある", "いる", "する", "こと", "それ", "これ", "その", "この", "よう",
-  "なる", "から", "まで", "など", "また", "ない",
+  "の",
+  "に",
+  "は",
+  "を",
+  "た",
+  "が",
+  "で",
+  "て",
+  "と",
+  "し",
+  "れ",
+  "さ",
+  "ある",
+  "いる",
+  "する",
+  "こと",
+  "それ",
+  "これ",
+  "その",
+  "この",
+  "よう",
+  "なる",
+  "から",
+  "まで",
+  "など",
+  "また",
+  "ない",
 ]);
 
 /**
  * Extracts candidate keywords from article titles that are NOT currently
  * in any purpose's keyword list.
  */
-export function discoverCandidateKeywords(
-  articleTitles: string[]
-): KeywordSuggestion[] {
+export function discoverCandidateKeywords(articleTitles: string[]): KeywordSuggestion[] {
   // Collect all existing keywords across all purposes
   const existingKeywords = new Set<string>();
   for (const [, purpose] of Object.entries(config.purposes)) {
@@ -106,9 +196,7 @@ function guessPurpose(word: string): string {
 export function formatSuggestionReport(suggestions: KeywordSuggestion[]): string {
   if (suggestions.length === 0) return "No new keyword suggestions this period.";
 
-  const rows = suggestions.map(
-    (s) => `| ${s.word} | ${s.frequency} | ${s.suggestedPurpose} | ${s.suggestedWeight} |`
-  );
+  const rows = suggestions.map((s) => `| ${s.word} | ${s.frequency} | ${s.suggestedPurpose} | ${s.suggestedWeight} |`);
 
   return `## 🔑 Keyword Expansion Suggestions
 

@@ -232,14 +232,10 @@ async function callOpenAI(request: LLMRequest, model: string): Promise<LLMRespon
   }
 
   const start = Date.now();
-  const response = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    body,
-    {
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      timeout: 60000,
-    }
-  );
+  const response = await axios.post("https://api.openai.com/v1/chat/completions", body, {
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    timeout: 60000,
+  });
 
   const latencyMs = Date.now() - start;
   const choice = response.data?.choices?.[0];
@@ -276,7 +272,7 @@ async function callAnthropic(request: LLMRequest, model: string): Promise<LLMRes
         "Content-Type": "application/json",
       },
       timeout: 60000,
-    }
+    },
   );
 
   const latencyMs = Date.now() - start;
@@ -302,9 +298,7 @@ interface ProviderConfig {
 
 function getProviderConfigs(phase: "map" | "reduce"): ProviderConfig[] {
   const primary = config.settings.models;
-  const providers: ProviderConfig[] = [
-    { platform: primary.platform, model: primary[phase] },
-  ];
+  const providers: ProviderConfig[] = [{ platform: primary.platform, model: primary[phase] }];
 
   // In-provider fallback: when this phase's Google model is rejected or unavailable, retry with
   // the other phase's model before moving to an external provider. For Reduce this covers Free
@@ -324,10 +318,7 @@ function getProviderConfigs(phase: "map" | "reduce"): ProviderConfig[] {
   return providers;
 }
 
-async function callProvider(
-  provider: ProviderConfig,
-  request: LLMRequest
-): Promise<LLMResponse> {
+async function callProvider(provider: ProviderConfig, request: LLMRequest): Promise<LLMResponse> {
   switch (provider.platform) {
     case "google":
       return callGemini(request, provider.model);
@@ -340,10 +331,7 @@ async function callProvider(
   }
 }
 
-export async function callProviderWithRetry(
-  provider: ProviderConfig,
-  request: LLMRequest
-): Promise<LLMResponse> {
+export async function callProviderWithRetry(provider: ProviderConfig, request: LLMRequest): Promise<LLMResponse> {
   return pRetry(
     async () => {
       try {
@@ -358,7 +346,9 @@ export async function callProviderWithRetry(
         // Abort immediately so fallback provider/model can take over without wasting minutes.
         const msg = String(error?.message || "");
         if (isRateLimitError(error) && (msg.includes("limit: 0") || msg.includes('"limit":0'))) {
-          console.warn(`  ⚠️ Quota limit is 0 for ${provider.platform}/${provider.model}. Aborting retries immediately to allow fallback.`);
+          console.warn(
+            `  ⚠️ Quota limit is 0 for ${provider.platform}/${provider.model}. Aborting retries immediately to allow fallback.`,
+          );
           throw new AbortError(error);
         }
         if (!isTransientError(error)) {
@@ -377,14 +367,14 @@ export async function callProviderWithRetry(
         const errorType = isRateLimit ? "RateLimit (429)" : "TransientError (503/Timeout)";
         const delayHint = extractRetryDelayMs(error);
         console.warn(
-          `  ⚠️ [${errorType}] ${provider.platform}/${provider.model} attempt ${attemptNumber} failed: ${error.message}. (${retriesLeft} retries left)`
+          `  ⚠️ [${errorType}] ${provider.platform}/${provider.model} attempt ${attemptNumber} failed: ${error.message}. (${retriesLeft} retries left)`,
         );
         if (delayHint && delayHint > 0 && retriesLeft > 0) {
           console.log(`  ⏳ Respecting upstream retry delay: waiting ${Math.ceil(delayHint / 1000)}s...`);
           await new Promise((resolve) => setTimeout(resolve, delayHint));
         }
       },
-    }
+    },
   );
 }
 
@@ -439,6 +429,6 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
   }
 
   throw new Error(
-    `All LLM providers failed for phase: ${request.phase} (last error: ${lastError ?? "every provider was skipped by its circuit breaker"})`
+    `All LLM providers failed for phase: ${request.phase} (last error: ${lastError ?? "every provider was skipped by its circuit breaker"})`,
   );
 }

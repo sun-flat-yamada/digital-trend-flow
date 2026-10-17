@@ -21,15 +21,13 @@ interface TopicOccurrence {
 /**
  * Scans daily summaries to extract topic frequencies over time.
  */
-export function analyzeTopicTrends(
-  daysBack: number = 30
-): TopicOccurrence[] {
+export function analyzeTopicTrends(daysBack: number = 30): TopicOccurrence[] {
   const dailyDir = PATHS.ARTIFACTS_DAILY.absolute;
   if (!fs.existsSync(dailyDir)) return [];
 
   const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
   const filesToProcess: string[] = [];
-  
+
   for (let i = 0; i < daysBack; i++) {
     const d = new Date(Date.now() - i * 86400000);
     const yyyy = d.getFullYear().toString();
@@ -37,7 +35,7 @@ export function analyzeTopicTrends(
     const dd = d.getDate().toString().padStart(2, "0");
     const dateStr = `${yyyy}-${mm}-${dd}`;
     const filePath = path.join(dailyDir, yyyy, mm, `${dateStr}_digital-trend_daily_summary.md`);
-    
+
     if (fs.existsSync(filePath)) {
       filesToProcess.push(filePath);
     }
@@ -97,23 +95,30 @@ export function analyzeTopicTrends(
     });
   }
 
-  return results
-    .sort((a, b) => b.totalMentions - a.totalMentions)
-    .slice(0, 50);
+  return results.sort((a, b) => b.totalMentions - a.totalMentions).slice(0, 50);
 }
 
 const TRACKED_TERMS = [
-  "OpenAI", "Google", "Anthropic", "Meta", "NVIDIA",
-  "GPT", "Claude", "Gemini", "LLaMA", "Mistral",
-  "AI Agent", "RAG", "fine-tuning", "RLHF",
-  "transformer", "multi-modal", "regulation",
+  "OpenAI",
+  "Google",
+  "Anthropic",
+  "Meta",
+  "NVIDIA",
+  "GPT",
+  "Claude",
+  "Gemini",
+  "LLaMA",
+  "Mistral",
+  "AI Agent",
+  "RAG",
+  "fine-tuning",
+  "RLHF",
+  "transformer",
+  "multi-modal",
+  "regulation",
 ];
 
-function extractTopicsFromBody(
-  body: string,
-  date: string,
-  topicDates: Map<string, string[]>
-): void {
+function extractTopicsFromBody(body: string, date: string, topicDates: Map<string, string[]>): void {
   for (const term of TRACKED_TERMS) {
     if (body.toLowerCase().includes(term.toLowerCase())) {
       const existing = topicDates.get(term) ?? [];

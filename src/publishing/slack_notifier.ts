@@ -11,11 +11,7 @@ import { env } from "../core/config";
 /**
  * Sends a summary to Slack via Webhook.
  */
-export async function notifySlack(
-  title: string,
-  summaryMarkdown: string,
-  articleCount: number
-): Promise<void> {
+export async function notifySlack(title: string, summaryMarkdown: string, articleCount: number): Promise<void> {
   const webhookUrl = env.SLACK_WEBHOOK_URL;
 
   if (!webhookUrl) {
@@ -25,31 +21,36 @@ export async function notifySlack(
 
   try {
     // Truncate for Slack's 3000 char block limit
-    const truncated = summaryMarkdown.length > 2800
-      ? summaryMarkdown.slice(0, 2800).trim() + "\n\n> 📄 全文は GitHub リポジトリを参照してください。"
-      : summaryMarkdown;
+    const truncated =
+      summaryMarkdown.length > 2800
+        ? summaryMarkdown.slice(0, 2800).trim() + "\n\n> 📄 全文は GitHub リポジトリを参照してください。"
+        : summaryMarkdown;
 
-    await axios.post(webhookUrl, {
-      blocks: [
-        {
-          type: "header",
-          text: { type: "plain_text", text: `📊 ${title}`, emoji: true },
-        },
-        {
-          type: "section",
-          text: { type: "mrkdwn", text: truncated },
-        },
-        {
-          type: "context",
-          elements: [
-            {
-              type: "mrkdwn",
-              text: `Processed ${articleCount} articles | Digital Trend Flow`,
-            },
-          ],
-        },
-      ],
-    }, { timeout: 15000 }); // a hung webhook must not stall the run
+    await axios.post(
+      webhookUrl,
+      {
+        blocks: [
+          {
+            type: "header",
+            text: { type: "plain_text", text: `📊 ${title}`, emoji: true },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: truncated },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `Processed ${articleCount} articles | Digital Trend Flow`,
+              },
+            ],
+          },
+        ],
+      },
+      { timeout: 15000 },
+    ); // a hung webhook must not stall the run
 
     console.log("✅ Slack notification sent successfully.");
   } catch (error: any) {

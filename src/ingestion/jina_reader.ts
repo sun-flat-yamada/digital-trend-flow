@@ -91,7 +91,7 @@ async function extractViaFirecrawl(url: string): Promise<string> {
         "Content-Type": "application/json",
       },
       timeout: 30000,
-    }
+    },
   );
 
   const markdown = response.data?.data?.markdown;
@@ -135,7 +135,7 @@ async function extractViaJina(url: string): Promise<string> {
     retries: 2,
     onFailedAttempt: (context) => {
       console.warn(
-        `⚠️ Jina extraction attempt ${context.attemptNumber} failed for ${url} (${context.error.message}). ${context.retriesLeft} retries left.`
+        `⚠️ Jina extraction attempt ${context.attemptNumber} failed for ${url} (${context.error.message}). ${context.retriesLeft} retries left.`,
       );
     },
   });

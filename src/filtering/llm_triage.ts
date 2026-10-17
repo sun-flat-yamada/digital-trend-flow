@@ -93,7 +93,7 @@ export function buildTriageUserPrompt(purposes: TriagePurpose[], batch: { id: nu
         title: item.title,
         source: `${item.sourceName} (${item.sourceType})`,
         ...(item.description ? { description: item.description.replace(/\s+/g, " ").slice(0, DESCRIPTION_CHARS) } : {}),
-      })
+      }),
     )
     .join("\n");
   return `Purposes:\n${purposeLines}\n\nCandidates (one JSON object per line):\n${candidateLines}`;
@@ -112,7 +112,10 @@ const ResponseSchema = z.object({ items: z.array(VerdictSchema) });
 
 /** Parses one batch's response. Throws when it is malformed or leaves out too much of the batch. */
 export function parseTriageResponse(text: string, batchIds: number[]): TriageVerdict[] {
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  const cleaned = text
+    .replace(/```json\n?/g, "")
+    .replace(/```\n?/g, "")
+    .trim();
   const parsed = ResponseSchema.parse(JSON.parse(cleaned));
   const expected = new Set(batchIds);
   const byId = new Map<number, TriageVerdict>();
@@ -144,7 +147,7 @@ const byRank = (a: TriageVerdict, b: TriageVerdict) =>
 export function resolveTriage(
   verdicts: TriageVerdict[],
   purposes: TriagePurpose[],
-  settings: Pick<TriageSettings, "max_candidates" | "min_relevance">
+  settings: Pick<TriageSettings, "max_candidates" | "min_relevance">,
 ): { kept: TriageVerdict[]; dropped_irrelevant: number; dropped_duplicate: number; dropped_over_limit: number } {
   const purposeKeys = new Set(purposes.map((p) => p.key));
   const isRelevant = (v: TriageVerdict) => v.relevance >= settings.min_relevance && purposeKeys.has(v.purpose);
@@ -210,7 +213,7 @@ export async function triageArticles<T extends ArticleItem>(
   purposes: TriagePurpose[],
   settings: TriageSettings,
   call: LlmCall,
-  intervalMs: number
+  intervalMs: number,
 ): Promise<TriageResult<T>> {
   const batchSize = Math.max(1, settings.batch_size);
   const batches: { id: number; item: T }[][] = [];
@@ -238,10 +241,13 @@ export async function triageArticles<T extends ArticleItem>(
         temperature: 0.1,
         ...(settings.model ? { model: settings.model } : {}),
       });
-      return parseTriageResponse(response.text, batch.map((b) => b.id));
+      return parseTriageResponse(
+        response.text,
+        batch.map((b) => b.id),
+      );
     },
     1,
-    intervalMs
+    intervalMs,
   );
 
   const verdicts: TriageVerdict[] = [];

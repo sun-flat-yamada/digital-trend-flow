@@ -4,7 +4,7 @@ import { config } from "../core/config";
  * ============================================================================
  * Configuration Validation Script (MECE)
  * ============================================================================
- * 
+ *
  * Ensures logical consistency across the nested purpose -> sources structure.
  * Tests go beyond Zod's schema validation (which already passed if `config` loaded)
  * to check uniqueness, valid quoting, and sufficient data presence.
@@ -54,7 +54,9 @@ function runConfigTests() {
   for (const [key, purpose] of Object.entries(config.purposes)) {
     // Priority uniqueness
     if (priorities.has(purpose.priority)) {
-      warn(`Purpose '${key}' shares priority level ${purpose.priority} with another purpose. Tying priorities may lead to unstable sorting.`);
+      warn(
+        `Purpose '${key}' shares priority level ${purpose.priority} with another purpose. Tying priorities may lead to unstable sorting.`,
+      );
     }
     priorities.add(purpose.priority);
 
@@ -81,7 +83,7 @@ function runConfigTests() {
   for (const [key, purpose] of Object.entries(config.purposes)) {
     const min = purpose.quota.min;
     const max = purpose.quota.max;
-    
+
     if (min > max) {
       error(`Purpose '${key}' has invalid quota: min (${min}) > max (${max}).`);
     }

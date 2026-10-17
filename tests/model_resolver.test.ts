@@ -43,10 +43,7 @@ describe("Model Resolver", () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        models: [
-          { name: "models/gemini-2.5-flash-lite" },
-          { name: "models/gemini-3.1-flash-lite" },
-        ],
+        models: [{ name: "models/gemini-2.5-flash-lite" }, { name: "models/gemini-3.1-flash-lite" }],
       }),
     } as any);
 
@@ -118,7 +115,7 @@ describe("Model Resolver", () => {
     expect(isTextGenerationModel({ name: "models/gemini-2.0-flash-preview-image-generation" })).toBe(false);
     expect(isTextGenerationModel({ name: "models/gemini-embedding-001" })).toBe(false);
     expect(
-      isTextGenerationModel({ name: "models/gemini-3.5-flash", supportedGenerationMethods: ["embedContent"] })
+      isTextGenerationModel({ name: "models/gemini-3.5-flash", supportedGenerationMethods: ["embedContent"] }),
     ).toBe(false);
   });
 

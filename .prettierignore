@@ -1,0 +1,14 @@
+# Prettier formats TypeScript and JavaScript only. JSON and YAML are checked by ESLint
+# (eslint-plugin-jsonc / eslint-plugin-yml); Markdown and prompts are left as written.
+node_modules/
+dist/
+coverage/
+artifacts/
+_tmp_ai/
+_site/
+*.json
+*.jsonc
+*.yml
+*.yaml
+*.md
+prompts/

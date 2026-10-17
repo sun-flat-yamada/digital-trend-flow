@@ -49,12 +49,22 @@ describe("computeFailureStreak", () => {
         { status: "error", article_count: 0 },
         { status: "ok", article_count: 4 },
         { status: "error", article_count: 0 },
-      ])
+      ]),
     ).toBe(3);
   });
 
   test("a successful or disabled check ends the streak", () => {
-    expect(computeFailureStreak([{ status: "ok", article_count: 2 }, { status: "error", article_count: 0 }])).toBe(0);
-    expect(computeFailureStreak([{ status: "empty", article_count: 0 }, { status: "disabled", article_count: 0 }])).toBe(1);
+    expect(
+      computeFailureStreak([
+        { status: "ok", article_count: 2 },
+        { status: "error", article_count: 0 },
+      ]),
+    ).toBe(0);
+    expect(
+      computeFailureStreak([
+        { status: "empty", article_count: 0 },
+        { status: "disabled", article_count: 0 },
+      ]),
+    ).toBe(1);
   });
 });

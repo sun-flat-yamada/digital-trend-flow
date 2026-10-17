@@ -37,7 +37,8 @@ export async function generateMonthlyDigest(yearMonth: string): Promise<string |
   }
 
   // Find all daily summaries for the given month
-  const dailyFiles = fs.readdirSync(dailyDir)
+  const dailyFiles = fs
+    .readdirSync(dailyDir)
     .filter((f) => f.startsWith(yearMonth) && f.endsWith("_digital-trend_daily_summary.md"))
     .sort();
 
@@ -118,7 +119,7 @@ Generate a comprehensive monthly trend analysis.`;
       response.text,
       totalArticles,
       config.settings.author,
-      frontmatter
+      frontmatter,
     );
 
     console.log(`✅ Monthly digest generated: ${outputPath}`);

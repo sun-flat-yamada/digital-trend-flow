@@ -11,14 +11,14 @@ jest.mock("../src/core/config", () => ({
 describe("canonicalizeUrl", () => {
   test("drops utm_* parameters and keeps content parameters", () => {
     expect(canonicalizeUrl("https://example.com/a?utm_source=x&utm_term=y&id=123")).toBe(
-      "https://example.com/a?id=123"
+      "https://example.com/a?id=123",
     );
   });
 
   test("drops ad click IDs and the BBC's at_* campaign tags", () => {
-    expect(
-      canonicalizeUrl("https://www.bbc.com/news/articles/c1?at_medium=RSS&at_campaign=rss&fbclid=abc")
-    ).toBe("https://www.bbc.com/news/articles/c1");
+    expect(canonicalizeUrl("https://www.bbc.com/news/articles/c1?at_medium=RSS&at_campaign=rss&fbclid=abc")).toBe(
+      "https://www.bbc.com/news/articles/c1",
+    );
   });
 
   test("matches parameter names case-insensitively", () => {

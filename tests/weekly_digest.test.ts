@@ -1,10 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import {
-  getIsoWeekString,
-  getDatesForIsoWeek,
-  generateWeeklyDigest,
-} from "../src/aggregation/weekly_digest";
+import { getIsoWeekString, getDatesForIsoWeek, generateWeeklyDigest } from "../src/aggregation/weekly_digest";
 import { PATHS } from "../src/core/paths";
 
 describe("weekly_digest", () => {

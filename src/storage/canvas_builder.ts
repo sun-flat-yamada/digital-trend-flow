@@ -89,12 +89,12 @@ export function buildDailyCanvas(params: DailyCanvasParams): JSONCanvasData {
   const technologies = (params.mentionedTechnologies ?? []).slice(0, 8);
 
   if (companies.length > 0 || technologies.length > 0) {
-    const compText = companies.length > 0
-      ? `### 🏢 注目企業\n${companies.map((c) => `- [[Entities/${c}|${c}]]`).join("\n")}\n\n`
-      : "";
-    const techText = technologies.length > 0
-      ? `### ⚙️ 注目技術\n${technologies.map((t) => `- [[Technologies/${t}|${t}]]`).join("\n")}`
-      : "";
+    const compText =
+      companies.length > 0 ? `### 🏢 注目企業\n${companies.map((c) => `- [[Entities/${c}|${c}]]`).join("\n")}\n\n` : "";
+    const techText =
+      technologies.length > 0
+        ? `### ⚙️ 注目技術\n${technologies.map((t) => `- [[Technologies/${t}|${t}]]`).join("\n")}`
+        : "";
 
     nodes.push({
       id: entitiesId,
@@ -185,9 +185,7 @@ export function saveDailyCanvas(params: DailyCanvasParams): string {
   const canvasData = buildDailyCanvas(params);
   const [yyyy = "unknown", mm = "unknown"] = params.date.split("-");
 
-  const targetDir =
-    params.outputDir ??
-    path.join(PATHS.ARTIFACTS_DAILY.absolute, yyyy, mm);
+  const targetDir = params.outputDir ?? path.join(PATHS.ARTIFACTS_DAILY.absolute, yyyy, mm);
 
   fs.mkdirSync(targetDir, { recursive: true });
 

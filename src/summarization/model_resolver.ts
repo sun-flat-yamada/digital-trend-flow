@@ -52,18 +52,11 @@ export async function resolveModel(configuredModel: string, platform: string = "
     return resolvedCache[cacheKey]!;
   }
 
-  const isFlashLite =
-    modelLower.includes("lite") ||
-    modelLower === "cheapest" ||
-    modelLower === "cost-effective";
+  const isFlashLite = modelLower.includes("lite") || modelLower === "cheapest" || modelLower === "cost-effective";
   const isPro = !isFlashLite && modelLower.includes("pro");
 
   // Fallback models as of 2026-09
-  const fallbackModel = isFlashLite
-    ? "gemini-3.1-flash-lite"
-    : isPro
-    ? "gemini-2.5-pro"
-    : "gemini-3.8-flash";
+  const fallbackModel = isFlashLite ? "gemini-3.1-flash-lite" : isPro ? "gemini-2.5-pro" : "gemini-3.8-flash";
 
   try {
     const url = "https://generativelanguage.googleapis.com/v1beta/models";

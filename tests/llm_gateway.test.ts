@@ -20,8 +20,10 @@ describe("LLM Gateway - Error Classification", () => {
     expect(isRateLimitError({ statusCode: 429 })).toBe(true);
     expect(
       isRateLimitError(
-        new Error("[429 Too Many Requests] You exceeded your current quota, please check your plan and billing details.")
-      )
+        new Error(
+          "[429 Too Many Requests] You exceeded your current quota, please check your plan and billing details.",
+        ),
+      ),
     ).toBe(true);
     expect(isRateLimitError(new Error("RESOURCE_EXHAUSTED: Quota exceeded for metric"))).toBe(true);
     expect(isRateLimitError(new Error("rate_limit_exceeded"))).toBe(true);
@@ -43,7 +45,9 @@ describe("LLM Gateway - Error Classification", () => {
     expect(isTransientError({ statusCode: 504 })).toBe(true);
 
     // Common transient messages
-    expect(isTransientError(new Error("[503 Service Unavailable] This model is currently experiencing high demand"))).toBe(true);
+    expect(
+      isTransientError(new Error("[503 Service Unavailable] This model is currently experiencing high demand")),
+    ).toBe(true);
     expect(isTransientError(new Error("socket hang up"))).toBe(true);
     expect(isTransientError(new Error("ETIMEDOUT: Connection timed out"))).toBe(true);
     expect(isTransientError(new Error("ECONNRESET"))).toBe(true);
@@ -126,7 +130,7 @@ describe("LLM Gateway - Circuit Breaker Separation", () => {
 
   test("quota error with limit: 0 is recognized as rate limit and aborts retries", async () => {
     const errorWithLimit0 = new Error(
-      "[429 Too Many Requests] Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-3.1-pro"
+      "[429 Too Many Requests] Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-3.1-pro",
     );
     expect(isRateLimitError(errorWithLimit0)).toBe(true);
     expect(isTransientError(errorWithLimit0)).toBe(true);

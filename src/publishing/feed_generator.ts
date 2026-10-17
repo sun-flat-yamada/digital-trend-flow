@@ -48,7 +48,7 @@ export function buildAtomFeed(entries: readonly FeedEntry[], siteUrl: string | n
     <id>urn:digital-trend-flow:${escapeXml(entry.date)}</id>
     <updated>${escapeXml(entry.date)}T04:00:00+09:00</updated>
     <summary>${escapeXml(entry.topStory ? `${entry.topStory} (${entry.articleCount} articles)` : `${entry.articleCount} articles`)}</summary>
-  </entry>`
+  </entry>`,
     )
     .join("\n");
 

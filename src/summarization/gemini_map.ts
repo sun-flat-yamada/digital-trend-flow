@@ -65,9 +65,7 @@ export async function mapExtractFacts(article: MapInput): Promise<MapOutput> {
   // Slice first to avoid cleansing the entire document, then cleanse
   const truncatedContent = cleanseMarkdownContext(article.content.slice(0, 15000)).slice(0, 10000);
 
-  const languageHint = article.language
-    ? `\nArticle Language: ${article.language}`
-    : "";
+  const languageHint = article.language ? `\nArticle Language: ${article.language}` : "";
 
   const userPrompt = `Article Title: ${article.title}
 Article URL: ${article.url}${languageHint}
@@ -116,7 +114,7 @@ function parseFacts(responseText: string): ExtractedFact[] {
 
   const facts = rawFacts.filter(
     (fact): fact is ExtractedFact =>
-      typeof fact?.text === "string" && fact.text.trim().length > 0 && typeof fact?.importance === "number"
+      typeof fact?.text === "string" && fact.text.trim().length > 0 && typeof fact?.importance === "number",
   );
   if (facts.length === 0) {
     throw new Error("Map response contained no usable facts");
