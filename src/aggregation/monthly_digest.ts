@@ -14,6 +14,7 @@ import { llmCall } from "../summarization/llm_gateway";
 import { getMonthlyReducePrompt } from "../summarization/prompts";
 import { saveMarkdownFile, SummaryFrontmatter } from "../storage/markdown_builder";
 import { config } from "../core/config";
+import { errorMessage } from "../core/errors";
 
 interface DailySummaryMeta {
   date: string;
@@ -124,9 +125,11 @@ Generate a comprehensive monthly trend analysis.`;
 
     console.log(`✅ Monthly digest generated: ${outputPath}`);
     return outputPath;
-  } catch (error: any) {
+  } catch (error) {
     // Throw rather than return null: null means "no daily summaries", which the workflow treats
     // as success, so an LLM failure would otherwise go unnoticed.
-    throw new Error(`Monthly digest generation failed for ${yearMonth}: ${error.message}`, { cause: error });
+    throw new Error(`Monthly digest generation failed for ${yearMonth}: ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
 }

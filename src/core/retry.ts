@@ -18,7 +18,7 @@ export class AbortError extends Error {
 }
 
 export interface RetryContext {
-  readonly error: any;
+  readonly error: unknown;
   readonly attemptNumber: number;
   readonly retriesLeft: number;
 }
@@ -45,7 +45,7 @@ export async function pRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}
     attempt++;
     try {
       return await fn();
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof AbortError) {
         throw error;
       }

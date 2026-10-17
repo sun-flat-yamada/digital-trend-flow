@@ -6,7 +6,6 @@
  */
 
 import { generatePagesSite } from "../publishing/pages_generator";
-import { PATHS } from "../core/paths";
 
 function run() {
   const language = process.argv[2] || process.env.OUTPUT_LANGUAGE || process.env.SUMMARY_LANGUAGE || "en";

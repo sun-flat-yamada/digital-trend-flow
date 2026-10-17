@@ -5,6 +5,7 @@
 
 import Parser from "rss-parser";
 import { isProcessed } from "./state_manager";
+import { errorMessage } from "../core/errors";
 
 export interface ArticleItem {
   sourceName: string;
@@ -67,8 +68,10 @@ export async function fetchRss(sourceName: string, url: string, purpose: string)
     }
 
     return newItems;
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`Failed to fetch RSS feed [${sourceName}]: ${error.message}`, { cause: error });
+    throw new Error(`Failed to fetch RSS feed [${sourceName}]: ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
 }

@@ -10,6 +10,7 @@ import axios from "axios";
 import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
+import { errorMessage } from "../core/errors";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
@@ -78,8 +79,8 @@ export async function fetchYouTube(
 
     console.log(`  📹 YouTube [${sourceName}]: ${newItems.length} new videos`);
     return newItems;
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`YouTube fetch failed: ${error.message}`, { cause: error });
+    throw new Error(`YouTube fetch failed: ${errorMessage(error)}`, { cause: error });
   }
 }

@@ -33,7 +33,7 @@ describe("Model Resolver", () => {
           { name: "models/gemini-3.8-flash" },
         ],
       }),
-    } as any);
+    });
 
     const result = await resolveModel("latest-flash-lite", "google");
     expect(result).toBe("gemini-3.1-flash-lite");
@@ -45,7 +45,7 @@ describe("Model Resolver", () => {
       json: async () => ({
         models: [{ name: "models/gemini-2.5-flash-lite" }, { name: "models/gemini-3.1-flash-lite" }],
       }),
-    } as any);
+    });
 
     const resultCostEffective = await resolveModel("cost-effective", "google");
     expect(resultCostEffective).toBe("gemini-3.1-flash-lite");
@@ -66,7 +66,7 @@ describe("Model Resolver", () => {
           { name: "models/gemini-3.8-flash-exp" }, // should be excluded
         ],
       }),
-    } as any);
+    });
 
     const result = await resolveModel("latest-flash", "google");
     expect(result).toBe("gemini-3.8-flash");
@@ -86,7 +86,7 @@ describe("Model Resolver", () => {
           { name: "models/gemini-3.8-flash-lite-live", supportedGenerationMethods: ["bidiGenerateContent"] },
         ],
       }),
-    } as any);
+    });
 
     const result = await resolveModel("latest-flash-lite", "google");
     expect(result).toBe("gemini-3.5-flash-lite");
@@ -101,7 +101,7 @@ describe("Model Resolver", () => {
           { name: "models/gemini-3.9-flash", supportedGenerationMethods: ["countTokens"] },
         ],
       }),
-    } as any);
+    });
 
     const result = await resolveModel("latest-flash", "google");
     expect(result).toBe("gemini-3.5-flash");

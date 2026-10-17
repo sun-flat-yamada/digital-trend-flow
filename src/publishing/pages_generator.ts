@@ -13,6 +13,7 @@ import * as path from "path";
 import * as yaml from "yaml";
 import { PATHS } from "../core/paths";
 import { buildAtomFeed, resolveSiteUrl } from "./feed_generator";
+import { errorMessage } from "../core/errors";
 
 export type ReportType = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -379,7 +380,7 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
     const content = fs.readFileSync(filePath, "utf8");
 
     // Extract frontmatter
-    let frontmatter: Record<string, any> = {};
+    let frontmatter: Record<string, unknown> = {};
     let markdownBody = content;
 
     if (content.startsWith("---")) {
@@ -400,9 +401,9 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
                 v = v.slice(1, -1);
               }
               if (/^\d+$/.test(v)) {
-                (frontmatter as any)[k] = parseInt(v, 10);
+                frontmatter[k] = parseInt(v, 10);
               } else {
-                (frontmatter as any)[k] = v;
+                frontmatter[k] = v;
               }
             }
           }
@@ -428,7 +429,7 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
 
     // Determine reportType: "daily" | "weekly" | "monthly" | "yearly"
     let reportType: ReportType = "daily";
-    const rawType = (frontmatter.type || "").toLowerCase();
+    const rawType = String(frontmatter["type"] || "").toLowerCase();
     const basename = path.basename(filePath).toLowerCase();
     const normPath = filePath.replace(/\\/g, "/").toLowerCase();
 
@@ -468,8 +469,8 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
             ? `Yearly Report ${date.slice(0, 4)}`
             : `Daily Summary ${date}`;
 
-    const title = frontmatter.title || defaultTitle;
-    let topStory = frontmatter.top_story || "";
+    const title = String(frontmatter["title"] || defaultTitle);
+    let topStory = String(frontmatter["top_story"] || "");
     if (!topStory) {
       const h3Match = markdownBody.match(/###\s+(.+)/);
       if (h3Match && h3Match[1]) {
@@ -531,14 +532,14 @@ export function parseDailySummary(filePath: string): PageSummaryItem | null {
       tags,
       articleCount,
       qualityScore,
-      ...(frontmatter.top_purpose ? { topPurpose: frontmatter.top_purpose } : {}),
+      ...(frontmatter.top_purpose ? { topPurpose: String(frontmatter.top_purpose) } : {}),
       ...(language ? { language } : {}),
       contentHtml,
       rawMarkdown: markdownBody,
       ...(sourceUrl ? { sourceUrl } : {}),
     };
-  } catch (err: any) {
-    console.warn(`⚠️ Failed to parse summary at ${filePath}: ${err.message}`);
+  } catch (err) {
+    console.warn(`⚠️ Failed to parse summary at ${filePath}: ${errorMessage(err)}`);
     return null;
   }
 }
@@ -679,7 +680,7 @@ export function generatePagesSite(
   fs.writeFileSync(path.join(outDir, "app.js"), generateJs(i18n), "utf8");
 
   const latestSummary = daily[0] ?? all[0] ?? null;
-  fs.writeFileSync(path.join(outDir, "index.html"), generateHtml(all, daily, reports, latestSummary, i18n), "utf8");
+  fs.writeFileSync(path.join(outDir, "index.html"), generateHtml(daily, reports, latestSummary, i18n), "utf8");
   fs.writeFileSync(path.join(outDir, "404.html"), generate404Html(i18n), "utf8");
   fs.writeFileSync(
     path.join(outDir, "feed.xml"),
@@ -706,7 +707,6 @@ export function generatePagesSite(
  * Generates the main HTML page with embedded initial state for instant load.
  */
 function generateHtml(
-  allSummaries: PageSummaryItem[],
   dailySummaries: PageSummaryItem[],
   periodicReports: PageSummaryItem[],
   initial: PageSummaryItem | null,

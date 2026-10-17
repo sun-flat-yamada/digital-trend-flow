@@ -12,6 +12,7 @@
 import axios from "axios";
 import pRetry, { AbortError } from "../core/retry";
 import { env } from "../core/config";
+import { asErrorLike, errorMessage } from "../core/errors";
 
 const JINA_API_BASE = "https://r.jina.ai/";
 const FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v1";
@@ -66,8 +67,8 @@ async function extractWithFallback(url: string): Promise<string> {
   if (env.FIRECRAWL_API_KEY) {
     try {
       return await extractViaFirecrawl(url);
-    } catch (error: any) {
-      console.warn(`  ⚠️ Firecrawl failed for ${url}: ${error.message}. Falling back to Jina...`);
+    } catch (error) {
+      console.warn(`  ⚠️ Firecrawl failed for ${url}: ${errorMessage(error)}. Falling back to Jina...`);
     }
   }
 
@@ -121,10 +122,11 @@ async function extractViaJina(url: string): Promise<string> {
         throw new AbortError("Jina returned empty content");
       }
       return content;
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof AbortError) throw error;
-      const status: number | undefined = error.response?.status;
-      const reason = status !== undefined ? `Jina returned HTTP ${status}` : `Jina request failed: ${error.message}`;
+      const status: number | undefined = asErrorLike(error).response?.status;
+      const reason =
+        status !== undefined ? `Jina returned HTTP ${status}` : `Jina request failed: ${errorMessage(error)}`;
       // A client error (blocked, not found, paywalled) will not change on retry.
       if (!isRetryableStatus(status)) throw new AbortError(reason);
       throw new Error(reason);
@@ -135,7 +137,7 @@ async function extractViaJina(url: string): Promise<string> {
     retries: 2,
     onFailedAttempt: (context) => {
       console.warn(
-        `⚠️ Jina extraction attempt ${context.attemptNumber} failed for ${url} (${context.error.message}). ${context.retriesLeft} retries left.`,
+        `⚠️ Jina extraction attempt ${context.attemptNumber} failed for ${url} (${errorMessage(context.error)}). ${context.retriesLeft} retries left.`,
       );
     },
   });

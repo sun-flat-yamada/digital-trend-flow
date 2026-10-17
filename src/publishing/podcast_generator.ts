@@ -8,6 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "child_process";
 import { PATHS } from "../core/paths";
+import { errorMessage } from "../core/errors";
 
 export interface DialogueTurn {
   speaker: "HostA" | "HostB";
@@ -204,8 +205,8 @@ export async function generatePodcast(
         audioPath,
         status: "synthesized",
       };
-    } catch (e: any) {
-      console.warn(`⚠️ Edge-TTS synthesis failed: ${e.message}. Saving script only.`);
+    } catch (e) {
+      console.warn(`⚠️ Edge-TTS synthesis failed: ${errorMessage(e)}. Saving script only.`);
     }
   }
 

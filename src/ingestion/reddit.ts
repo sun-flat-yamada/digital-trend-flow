@@ -7,6 +7,7 @@
 import axios from "axios";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
+import { errorMessage } from "../core/errors";
 
 interface RedditPostData {
   id: string;
@@ -84,8 +85,10 @@ export async function fetchReddit(
 
     console.log(`  🤖 Reddit [r/${cleanSubreddit}]: ${articles.length} posts (score ≥ ${minScore})`);
     return articles;
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`Reddit fetch failed for r/${cleanSubreddit}: ${error.message}`, { cause: error });
+    throw new Error(`Reddit fetch failed for r/${cleanSubreddit}: ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
 }

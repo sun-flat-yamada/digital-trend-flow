@@ -9,6 +9,7 @@
 import { llmCall } from "./llm_gateway";
 import { buildReducePrompt } from "./prompts";
 import { MapOutput } from "./gemini_map";
+import { errorMessage } from "../core/errors";
 
 // Token management: conservative character limit for reduce input.
 const MAX_REDUCE_INPUT_CHARS = 200_000;
@@ -90,8 +91,8 @@ Based on these facts, generate the daily briefing with purpose-sectioned format.
     });
 
     return { markdown: response.text, usedFallback: false };
-  } catch (error: any) {
-    console.error(`❌ Reduce summarization failed: ${error.message}`);
+  } catch (error) {
+    console.error(`❌ Reduce summarization failed: ${errorMessage(error)}`);
     // Fallback: generate a purpose-grouped raw fact dump
     const grouped = new Map<string, typeof allFacts>();
     for (const f of allFacts) {

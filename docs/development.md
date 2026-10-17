@@ -33,12 +33,14 @@ cp .env.example .env
 | `npm run test:unit` | Jest テストのみ |
 | `npm run test:golden` | Golden regression テスト |
 | `npm run test:config` | config.yml の論理検証 |
-| `npm run type-check` | TypeScript 型チェック |
+| `npm run type-check` | TypeScript 型チェック（`src/` と、`tests/tsconfig.json` で `tests/`） |
 | `npm run build` | `tsc` → `dist/` |
 | `npm start` | フルパイプライン実行（`dist/cli/daily.js`。`src/main.ts` は import しても何も実行しない） |
 | `npm run debug:filter <URL>` | Dry-run (LLM 不要・API コストなし) |
 | `npm run lint` | ESLint (TypeScript, JSON, YAML) |
-| `npm run format` | ESLint --fix |
+| `npm run lint:fix` | ESLint --fix |
+| `npm run format` | Prettier で TypeScript / JavaScript を整形する（JSON・YAML は ESLint が検査する） |
+| `npm run format:check` | 整形の確認（CI で実行） |
 
 ## CI
 
@@ -46,7 +48,7 @@ PR と `main` への push で `.github/workflows/ci.yml` が動く。手元で�
 
 | Job | Steps |
 |:---|:---|
-| `test` | `npm ci` → `npm audit --audit-level=high` → `npm run type-check` → `npm run lint` → `npm run test:config` → `npx jest` → `npm run build`（`GEMINI_API_KEY=dummy`） |
+| `test` | `npm ci` → `npm audit --audit-level=high` → `npm run type-check` → `npm run lint` → `npm run format:check` → `npm run test:config` → `npx jest` → `npm run build`（`GEMINI_API_KEY=dummy`） |
 | `actionlint` | `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`（ワークフローを変えたら手元でも実行する） |
 
 - テストは設定を import 時に検証するため `GEMINI_API_KEY` が要る。ダミーでよく、実際の API は呼ばない

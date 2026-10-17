@@ -3,6 +3,7 @@ import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
 import { normalizeUrl } from "../core/url";
+import { errorMessage } from "../core/errors";
 
 const RAINDROP_API_BASE = "https://api.raindrop.io/rest/v1";
 const MAX_PER_PAGE = 50; // API maximum
@@ -171,9 +172,11 @@ export async function fetchRaindropBookmarks(
     );
 
     return { articles: newArticles, processedIds: processedRaindropIds, idByUrl };
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`Failed to fetch Raindrop bookmarks for "${collectionName}": ${error.message}`, { cause: error });
+    throw new Error(`Failed to fetch Raindrop bookmarks for "${collectionName}": ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
 }
 
@@ -219,9 +222,9 @@ export async function archiveProcessedRaindrops(
     );
 
     console.log(`  📦 Raindrop: Archived ${raindropIds.length} items → collection #${archiveCollectionId}`);
-  } catch (error: any) {
+  } catch (error) {
     // Non-fatal: don't crash the pipeline for an archive failure.
     // Items will simply be picked up again but skipped by Layer 2 (state DB).
-    console.warn(`⚠️ Raindrop archive failed: ${error.message}`);
+    console.warn(`⚠️ Raindrop archive failed: ${errorMessage(error)}`);
   }
 }

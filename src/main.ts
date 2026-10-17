@@ -38,7 +38,7 @@ import {
 import { triageArticles, triagePurposes, triageScore, type TriageDecision } from "./filtering/llm_triage";
 import { llmCall } from "./summarization/llm_gateway";
 import { semanticDedup } from "./filtering/semantic_dedup";
-import { discoverCandidateKeywords, formatSuggestionReport } from "./filtering/keyword_expansion";
+import { discoverCandidateKeywords } from "./filtering/keyword_expansion";
 import { mapExtractFacts, MapInput, MapOutput } from "./summarization/gemini_map";
 import { reduceSummarize } from "./summarization/gemini_reduce";
 import { saveMarkdownFile, extractTopStoryTitle, SummaryFrontmatter } from "./storage/markdown_builder";
@@ -52,7 +52,7 @@ import { generatePagesSite } from "./publishing/pages_generator";
 import { generatePodcast } from "./publishing/podcast_generator";
 import { evaluateQuality } from "./evaluation/quality_checker";
 import { evaluateRunGate, RunGateResult } from "./evaluation/run_gate";
-import { analyzeTopicTrends, formatTrendAnalysis } from "./aggregation/trend_analyzer";
+import { analyzeTopicTrends } from "./aggregation/trend_analyzer";
 import {
   markAsProcessed,
   flushState,
@@ -65,6 +65,7 @@ import { Purpose, Source } from "./core/types";
 import { PATHS } from "./core/paths";
 import { dedupeByUrl } from "./core/url";
 import { mapWithConcurrency } from "./core/concurrency";
+import { errorMessage } from "./core/errors";
 
 // ── Types for pipeline internal state ──
 
@@ -127,7 +128,10 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     });
   }
 
-  const raindropResultSets: (RaindropFetchResult & { collectionId: number; archiveId: number | undefined })[] = [];
+  const raindropResultSets: (RaindropFetchResult & {
+    collectionId: number;
+    archiveId: number | undefined;
+  })[] = [];
   const fetchSource = async (s: Source & { purpose: string }): Promise<ArticleItem[]> => {
     switch (s.type) {
       case "rss":
@@ -554,8 +558,8 @@ export async function runDailyPipeline(): Promise<RunStatus> {
       mentionedTechnologies: frontmatterMeta.mentionedTechnologies,
       outputDir,
     });
-  } catch (canvasErr: any) {
-    console.warn(`⚠️ Obsidian Canvas generation failed: ${canvasErr.message}`);
+  } catch (canvasErr) {
+    console.warn(`⚠️ Obsidian Canvas generation failed: ${errorMessage(canvasErr)}`);
   }
 
   // Publishing (Items 6.4, 6.5)
@@ -567,15 +571,15 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   // GitHub Pages static site generation (also writes the Atom feed, Item 6.5)
   try {
     generatePagesSite(undefined, undefined, targetLanguage);
-  } catch (pagesErr: any) {
-    console.warn(`⚠️ GitHub Pages site generation failed: ${pagesErr.message}`);
+  } catch (pagesErr) {
+    console.warn(`⚠️ GitHub Pages site generation failed: ${errorMessage(pagesErr)}`);
   }
 
   // Item C: Generate AI conversational podcast & audio briefing
   try {
     await generatePodcast(summaryMarkdown, today);
-  } catch (podcastErr: any) {
-    console.warn(`⚠️ Podcast generation failed: ${podcastErr.message}`);
+  } catch (podcastErr) {
+    console.warn(`⚠️ Podcast generation failed: ${errorMessage(podcastErr)}`);
   }
 
   await registry.events.emit("publish:complete", {
@@ -808,8 +812,8 @@ function twoPassSelect(articles: ScoredArticle[]): ScoredArticle[] {
 export async function shutdownPipeline(): Promise<void> {
   try {
     flushState();
-  } catch (e: any) {
-    console.error("⚠️ Failed to flush state:", e.message);
+  } catch (e) {
+    console.error("⚠️ Failed to flush state:", errorMessage(e));
   }
   try {
     await flushLangfuse();

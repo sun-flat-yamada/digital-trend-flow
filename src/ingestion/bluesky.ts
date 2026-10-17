@@ -7,6 +7,7 @@
 import axios from "axios";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
+import { errorMessage } from "../core/errors";
 
 const BSKY_PUBLIC_API = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts";
 
@@ -107,8 +108,10 @@ export async function fetchBluesky(
 
     console.log(`  🦋 Bluesky [${query}]: ${articles.length} posts (likes ≥ ${minLikes})`);
     return articles;
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`Bluesky fetch failed for query "${query}": ${error.message}`, { cause: error });
+    throw new Error(`Bluesky fetch failed for query "${query}": ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
 }
