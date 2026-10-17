@@ -31,6 +31,7 @@ cp .env.example .env
 |:---|:---|
 | `npm test` | 型チェック (`tsc --noEmit`) + 設定 MECE 検証 + Jest (75+ tests) |
 | `npm run test:unit` | Jest テストのみ |
+| `npm run test:coverage` | Jest をカバレッジ付きで実行し、重要モジュールの行カバレッジ 70% 以上（`package.json` の `jest.coverageThreshold`）を検査する |
 | `npm run test:golden` | Golden regression テスト |
 | `npm run test:config` | config.yml の論理検証 |
 | `npm run type-check` | TypeScript 型チェック（`src/` と、`tests/tsconfig.json` で `tests/`） |
@@ -48,7 +49,7 @@ PR と `main` への push で `.github/workflows/ci.yml` が動く。手元で�
 
 | Job | Steps |
 |:---|:---|
-| `test` | `npm ci` → `npm audit --audit-level=high` → `npm run type-check` → `npm run lint` → `npm run format:check` → `npm run test:config` → `npx jest` → `npm run build`（`GEMINI_API_KEY=dummy`） |
+| `test` | `npm ci` → `npm audit --audit-level=high` → `npm run type-check` → `npm run lint` → `npm run format:check` → `npm run test:config` → `npm run test:coverage` → `npm run build`（`GEMINI_API_KEY=dummy`） |
 | `actionlint` | `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`（ワークフローを変えたら手元でも実行する） |
 
 - テストは設定を import 時に検証するため `GEMINI_API_KEY` が要る。ダミーでよく、実際の API は呼ばない

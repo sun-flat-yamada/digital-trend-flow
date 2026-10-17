@@ -1,0 +1,186 @@
+/**
+ * Tests for the LLM gateway's external providers, retries and circuit breaker in llmCall():
+ * the candidate order (primary, other Google model, fallback provider), the OpenAI and Anthropic
+ * request formats, retry and abort decisions, and skipping a provider whose circuit is open.
+ */
+
+import axios from "axios";
+
+const mockEnv: Record<string, string | undefined> = { GEMINI_API_KEY: "test-key" };
+jest.mock("../src/core/config", () => ({
+  env: new Proxy({}, { get: (_t, key: string) => mockEnv[key] }),
+  config: {
+    settings: {
+      models: { platform: "google", map: "map-model", reduce: "reduce-model", thinking: false },
+      fallback_models: { platform: "openai", map: "gpt-4.1-mini", reduce: "gpt-4.1" },
+    },
+  },
+}));
+jest.mock("../src/summarization/model_resolver", () => ({
+  resolveModel: jest.fn(async (model: string) => model),
+}));
+
+const mockGenerateContent = jest.fn();
+jest.mock("@google/generative-ai", () => ({
+  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+    getGenerativeModel: ({ model }: { model: string }) => ({
+      generateContent: (request: unknown) => mockGenerateContent(model, request),
+    }),
+  })),
+}));
+
+jest.mock("axios");
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+import {
+  CIRCUIT_COOLDOWN_MS,
+  callProviderWithRetry,
+  getCircuit,
+  isCircuitOpen,
+  llmCall,
+  recordFailure,
+  resetCircuits,
+} from "../src/summarization/llm_gateway";
+
+const outage = () => Object.assign(new Error("[503 Service Unavailable] The model is overloaded"), { status: 503 });
+const geminiOk = (text: string) => ({
+  response: { text: () => text, usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 } },
+});
+const request = { systemPrompt: "system", userPrompt: "user", phase: "map" as const };
+
+beforeAll(() => {
+  jest.spyOn(console, "log").mockImplementation(() => undefined);
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+afterAll(() => jest.restoreAllMocks());
+beforeEach(() => {
+  resetCircuits();
+  mockGenerateContent.mockReset();
+  mockedAxios.post.mockReset();
+  mockEnv["OPENAI_API_KEY"] = "openai-key";
+  delete mockEnv["ANTHROPIC_API_KEY"];
+});
+afterEach(() => jest.useRealTimers());
+
+describe("llmCall candidate order", () => {
+  test("falls back to the external provider after both Google models fail, and sends structured output", async () => {
+    mockGenerateContent.mockRejectedValue(Object.assign(new Error("[400 Bad Request] bad"), { status: 400 }));
+    mockedAxios.post.mockResolvedValue({
+      data: { choices: [{ message: { content: '{"facts":[]}' } }], usage: { prompt_tokens: 7, completion_tokens: 3 } },
+    });
+
+    const response = await llmCall({ ...request, responseSchema: { type: "object" }, temperature: 0.1 });
+
+    expect(mockGenerateContent.mock.calls.map(([model]) => model)).toEqual(["map-model", "reduce-model"]);
+    expect(response).toMatchObject({ provider: "openai", model: "gpt-4.1-mini", text: '{"facts":[]}', inputTokens: 7 });
+    const [url, body, options] = mockedAxios.post.mock.calls[0]!;
+    expect(url).toBe("https://api.openai.com/v1/chat/completions");
+    expect(body).toMatchObject({
+      model: "gpt-4.1-mini",
+      temperature: 0.1,
+      messages: [
+        { role: "system", content: "system" },
+        { role: "user", content: "user" },
+      ],
+      response_format: { type: "json_schema", json_schema: { schema: { type: "object" }, strict: true } },
+    });
+    expect(options).toMatchObject({ headers: { Authorization: "Bearer openai-key" } });
+  });
+
+  test("a per-call model overrides only the primary candidate", async () => {
+    mockGenerateContent.mockResolvedValue(geminiOk("ok"));
+
+    const response = await llmCall({ ...request, model: "triage-model" });
+
+    expect(response.model).toBe("triage-model");
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
+  test("skips a provider whose circuit is open, and lets it back in after the cooldown", async () => {
+    for (let i = 0; i < 3; i++) recordFailure("google", outage());
+    expect(isCircuitOpen("google")).toBe(true);
+    mockedAxios.post.mockResolvedValue({ data: { choices: [{ message: { content: "from openai" } }] } });
+
+    await expect(llmCall(request)).resolves.toMatchObject({ provider: "openai", text: "from openai" });
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+
+    getCircuit("google").lastFailure = Date.now() - CIRCUIT_COOLDOWN_MS - 1;
+    mockGenerateContent.mockResolvedValue(geminiOk("from gemini"));
+    await expect(llmCall(request)).resolves.toMatchObject({ provider: "google", text: "from gemini" });
+    expect(getCircuit("google").isOpen).toBe(false);
+  });
+
+  test("reports when every provider was skipped by its circuit breaker", async () => {
+    for (let i = 0; i < 3; i++) {
+      recordFailure("google", outage());
+      recordFailure("openai", outage());
+    }
+
+    await expect(llmCall(request)).rejects.toThrow(
+      "All LLM providers failed for phase: map (last error: every provider was skipped by its circuit breaker)",
+    );
+  });
+
+  test("a missing fallback key is recorded as that candidate's failure", async () => {
+    delete mockEnv["OPENAI_API_KEY"];
+    mockGenerateContent.mockRejectedValue(Object.assign(new Error("[401 Unauthorized]"), { status: 401 }));
+
+    await expect(llmCall(request)).rejects.toThrow(/last error: openai\/gpt-4.1-mini: OPENAI_API_KEY not set/);
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+});
+
+describe("callProviderWithRetry", () => {
+  test("retries a transient error with backoff and returns the later success", async () => {
+    jest.useFakeTimers();
+    mockGenerateContent.mockRejectedValueOnce(outage()).mockResolvedValueOnce(geminiOk("second try"));
+
+    const pending = callProviderWithRetry({ platform: "google", model: "map-model" }, request);
+    await jest.advanceTimersByTimeAsync(10_000);
+
+    await expect(pending).resolves.toMatchObject({ text: "second try" });
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+  });
+
+  test("does not retry a client error or a quota of 0", async () => {
+    mockGenerateContent.mockRejectedValueOnce(Object.assign(new Error("[403 Forbidden]"), { status: 403 }));
+    await expect(callProviderWithRetry({ platform: "google", model: "map-model" }, request)).rejects.toThrow(
+      "[403 Forbidden]",
+    );
+
+    mockGenerateContent.mockRejectedValueOnce(new Error("[429 Too Many Requests] Quota exceeded, limit: 0"));
+    await expect(callProviderWithRetry({ platform: "google", model: "reduce-model" }, request)).rejects.toThrow(
+      /limit: 0/,
+    );
+
+    mockGenerateContent.mockRejectedValueOnce(new Error("Unexpected token < in JSON"));
+    await expect(callProviderWithRetry({ platform: "google", model: "map-model" }, request)).rejects.toThrow(
+      "Unexpected token",
+    );
+    expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+  });
+
+  test("calls Anthropic's Messages API with its version header", async () => {
+    mockEnv["ANTHROPIC_API_KEY"] = "anthropic-key";
+    mockedAxios.post.mockResolvedValue({
+      data: { content: [{ text: "from claude" }], usage: { input_tokens: 11, output_tokens: 4 } },
+    });
+
+    const response = await callProviderWithRetry(
+      { platform: "anthropic", model: "claude-haiku-4" },
+      { ...request, maxOutputTokens: 512 },
+    );
+
+    expect(response).toMatchObject({ provider: "anthropic", text: "from claude", inputTokens: 11, outputTokens: 4 });
+    const [url, body, options] = mockedAxios.post.mock.calls[0]!;
+    expect(url).toBe("https://api.anthropic.com/v1/messages");
+    expect(body).toMatchObject({ model: "claude-haiku-4", system: "system", max_tokens: 512 });
+    expect(options).toMatchObject({ headers: { "x-api-key": "anthropic-key", "anthropic-version": "2023-06-01" } });
+  });
+
+  test("rejects an unknown platform", async () => {
+    await expect(callProviderWithRetry({ platform: "mystery", model: "m" }, request)).rejects.toThrow(
+      "Unknown platform: mystery",
+    );
+  });
+});

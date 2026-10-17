@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title type="html">ArXiv Query: search_query=cat:cs.AI</title>
+  <entry>
+    <id>http://arxiv.org/abs/2610.01234v1</id>
+    <updated>2026-10-16T17:59:59Z</updated>
+    <published>2026-10-16T17:59:59Z</published>
+    <title>Scaling Test-Time Compute
+      for Agentic Coding</title>
+    <summary>  We study how test-time compute
+  scales for coding agents.
+</summary>
+    <author><name>A. Researcher</name></author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2610.05678v2</id>
+    <published>2026-10-15T10:00:00Z</published>
+    <title>A Paper Already Processed</title>
+    <summary>Processed in an earlier run.</summary>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2610.09999v1</id>
+    <published>2026-10-15T09:00:00Z</published>
+    <title></title>
+    <summary>An entry without a title is skipped.</summary>
+  </entry>
+</feed>

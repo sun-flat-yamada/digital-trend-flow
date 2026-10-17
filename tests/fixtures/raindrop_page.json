@@ -1,0 +1,34 @@
+{
+  "result": true,
+  "items": [
+    {
+      "_id": 101,
+      "title": "Clipped article about agent frameworks",
+      "link": "https://blog.example.com/agents?utm_source=raindrop",
+      "created": "{{HOURS_AGO:1}}",
+      "tags": ["ai"]
+    },
+    {
+      "_id": 102,
+      "title": "Clipped and already summarized",
+      "link": "https://blog.example.com/already",
+      "created": "{{HOURS_AGO:3}}",
+      "tags": []
+    },
+    {
+      "_id": 103,
+      "title": "",
+      "link": "https://blog.example.com/untitled",
+      "created": "{{HOURS_AGO:4}}",
+      "tags": []
+    },
+    {
+      "_id": 104,
+      "title": "Clipped long ago",
+      "link": "https://blog.example.com/old",
+      "created": "{{HOURS_AGO:100}}",
+      "tags": []
+    }
+  ],
+  "count": 4
+}

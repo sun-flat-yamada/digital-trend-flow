@@ -277,7 +277,7 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | :-- | :-- | :-- | :-- | :-- |
 | QL-1 | P1 | `tests/concurrency.test.ts` が `src/main.ts` を import するため、import 時に `main()` が実行される。検証時も実際に Hacker News へのリクエストが発生し、Jest がワーカーを強制終了した。`.env` があれば、ローカルの `pipeline_state.db` への書き込み・LLM 課金・Discord 投稿が起こり得る。`--forceExit` がこれを隠している | `main.ts:706-717`、`tests/concurrency.test.ts:5`、`package.json` | エントリーポイントを分離する |
 | QL-2 | P1 | ESLint が TypeScript を 1 ファイルも検査していない（docs には「TypeScript, JSON, YAML を Lint」とある） | `eslint.config.mjs` | typescript-eslint を導入する |
-| QL-3 | P1 | 重要経路のテストがない（22 ファイル・2,985 行がどのテストからも読み込まれない） | §1.4 | Phase 3 の 3-4 |
+| QL-3 | P1 | 重要経路のテストがない（22 ファイル・2,985 行がどのテストからも読み込まれない） | §1.4 | Phase 3 の 3-4（✅ #48） |
 | QL-4 | P2 | 「ゴールデン回帰テスト」は、モックした設定の上でのスコアラー単体テストにすぎず、実際の `config.yml` も要約の品質も検証していない | `tests/golden_regression.test.ts:14-60` | 実 config と本番由来のデータで構成し直す |
 | QL-5 | P2 | 未使用のコード・依存が多い（下表） | 静的解析 | `noUnusedLocals` を有効にし、削除するか配線する |
 | QL-6 | P2 | `main.ts` の `main()` が約 530 行あり、9 種のソースでほぼ同一のブロックが並ぶ | `main.ts:94-621` | ステージに分割し、アダプターのレジストリで解決する |
@@ -402,7 +402,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 - [x] 3-1 `ci.yml`（pull_request / push）を追加する。`npm ci` → type-check → lint → test → build の順に実行し、actionlint と `npm audit --audit-level=high` も行う
 - [x] 3-2 typescript-eslint（`no-floating-promises`、`no-unused-vars` など）を導入する。tsconfig の `noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch` を有効にし、フォーマッタも導入する（#36。Prettier を採用）
 - [x] 3-3 エントリーポイントを分離する（`src/cli/daily.ts`）。`mapWithConcurrency` を `core/` へ移し、`--forceExit` をやめる（#35）
-- [ ] 3-4 テストを拡充する
+- [x] 3-4 テストを拡充する（#48。重要モジュールの行カバレッジは main 91%、状態管理 85%、ゲートウェイ 98%、Map 88%、Reduce 83%、取得の各アダプター 84〜100%。`npm run test:coverage` が `jest.coverageThreshold`〔各 70%〕を CI で強制する。無効化中の `xai_grok.ts` は対象外）
   - `state_manager`（`:memory:` の DB を使う）
   - 各アダプター（HTTP フィクスチャを使う）
   - ゲートウェイのエラー分類とフォールバック
