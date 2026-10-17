@@ -65,6 +65,7 @@ The pipeline ingests data from seven types of sources. Each module is designed t
 ## 5. Environment Context
 
 *   **Execution Environment**: Node.js 24+ via GitHub Actions (ubuntu-latest).
+*   **Claude Code on the web**: The SessionStart hook (`.claude/settings.json` → `.claude/hooks/session-start.sh`) runs `npm ci` when `node_modules` is missing or `package-lock.json` changed. It runs only when `CLAUDE_CODE_REMOTE=true` (no-op locally) and never blocks the session: on failure it prints a warning (log: `_tmp_ai/session-start-npm-ci.log`); run `npm ci` manually then.
 *   **DOM APIs**: This is a backend script. **DO NOT** use browser-specific APIs (`window`, `document`, DOM manipulators).
 *   **Secrets**: All sensitive keys must be loaded from `process.env` via Zod validation in `src/core/types.ts` (`EnvSchema`). Never hardcode keys.
     *   **Local**: `.env` file (git-ignored).

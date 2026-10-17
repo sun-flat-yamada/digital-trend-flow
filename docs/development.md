@@ -16,6 +16,15 @@ cp .env.example .env
 # .env に GEMINI_API_KEY を設定
 ```
 
+### Claude Code on the web
+
+セッションの開始時に、SessionStart フック（`.claude/settings.json` から `.claude/hooks/session-start.sh` を実行）が依存を入れる。
+
+- `CLAUDE_CODE_REMOTE=true`（クラウドのセッション）のときだけ動く。ローカルでは何もしない
+- `node_modules` がないとき、または `package-lock.json` が前回のインストールから変わったときに `npm ci` を実行する（ハッシュを `node_modules/.session-start-lock.sha256` に記録する）
+- 失敗してもセッションは止めず、警告を出すだけにする。ログは `_tmp_ai/session-start-npm-ci.log`。その場合は手動で `npm ci` を実行する
+- テストには `GEMINI_API_KEY` が要る（ダミーの値でよい）: `GEMINI_API_KEY=dummy npx jest tests/url.test.ts`
+
 ## Commands
 
 | Command | Description |
