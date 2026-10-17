@@ -54,6 +54,7 @@ describe("change_dev_branch", () => {
   it("warns on a cloud-assigned name only with --warn-cloud", () => {
     expect(checkBranch("claude/project-thread-8r6ziw", true).code).toBe(0);
     expect(checkBranch("claude/project-thread-8r6ziw", false).code).toBe(1);
+    expect(checkBranch("claude/project-thread-8r6ziw", false).lines.join("\n")).toMatch(/change-dev:branch -- rename/);
     expect(checkBranch("feature/foo", true).code).toBe(1);
     expect(checkBranch("docs/82-adopt-change-dev-workflow", false).code).toBe(0);
   });
