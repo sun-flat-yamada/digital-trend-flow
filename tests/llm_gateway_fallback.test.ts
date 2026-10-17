@@ -75,8 +75,8 @@ describe("LLM Gateway - provider fallback", () => {
       await llmCall({ systemPrompt: "system", userPrompt: "user", phase: "map" });
     }
 
-    expect(getCircuit("google").failures).toBe(0);
-    expect(isCircuitOpen("google")).toBe(false);
+    expect(getCircuit("google/map-model").failures).toBe(0);
+    expect(isCircuitOpen("google/map-model")).toBe(false);
     // The primary model is still attempted on every call because the circuit stays closed.
     expect(mockGenerateContent.mock.calls.filter(([model]) => model === "map-model")).toHaveLength(4);
   });

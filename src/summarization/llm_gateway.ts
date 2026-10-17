@@ -108,6 +108,9 @@ export function extractRetryDelayMs(error: unknown): number | null {
 
 // ── Circuit Breaker ──
 
+// Circuits are kept per candidate ("platform/model"), so one overloaded model does not lock out
+// the healthy models of the same platform.
+
 export interface CircuitState {
   failures: number;
   lastFailure: number;
@@ -211,6 +214,43 @@ async function callGemini(request: LLMRequest, modelAlias: string): Promise<LLMR
   };
 }
 
+// ── Structured Output for OpenAI and Anthropic ──
+
+/** Name of the JSON schema (OpenAI) and of the forced tool (Anthropic) that carry structured output. */
+const STRUCTURED_OUTPUT_NAME = "structured_output";
+
+/**
+ * Converts a response schema in Gemini's OpenAPI subset (upper-case types such as "OBJECT", see
+ * prompts.ts) to JSON Schema: lower-case types, and `additionalProperties: false` on every object.
+ */
+export function toJsonSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(toJsonSchema);
+  if (typeof schema !== "object" || schema === null) return schema;
+  const converted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === "type" && typeof value === "string") converted[key] = value.toLowerCase();
+    else if (key === "properties" && typeof value === "object" && value !== null) {
+      converted[key] = Object.fromEntries(Object.entries(value).map(([name, sub]) => [name, toJsonSchema(sub)]));
+    } else converted[key] = toJsonSchema(value);
+  }
+  if (converted["type"] === "object" && !("additionalProperties" in converted)) {
+    converted["additionalProperties"] = false;
+  }
+  return converted;
+}
+
+/** OpenAI's strict mode needs every property of every object to be required. */
+function requiresAllProperties(schema: unknown): boolean {
+  if (Array.isArray(schema)) return schema.every(requiresAllProperties);
+  if (typeof schema !== "object" || schema === null) return true;
+  const { properties, required } = schema as { properties?: Record<string, unknown>; required?: unknown };
+  if (properties) {
+    const requiredNames = Array.isArray(required) ? required : [];
+    if (!Object.keys(properties).every((name) => requiredNames.includes(name))) return false;
+  }
+  return Object.values(schema).every(requiresAllProperties);
+}
+
 async function callOpenAI(request: LLMRequest, model: string): Promise<LLMResponse> {
   const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not set");
@@ -225,13 +265,10 @@ async function callOpenAI(request: LLMRequest, model: string): Promise<LLMRespon
   };
 
   if (request.responseSchema) {
+    const schema = toJsonSchema(request.responseSchema);
     body["response_format"] = {
       type: "json_schema",
-      json_schema: {
-        name: "extraction",
-        schema: request.responseSchema,
-        strict: true,
-      },
+      json_schema: { name: STRUCTURED_OUTPUT_NAME, schema, strict: requiresAllProperties(schema) },
     };
   }
 
@@ -255,32 +292,56 @@ async function callOpenAI(request: LLMRequest, model: string): Promise<LLMRespon
   };
 }
 
+interface AnthropicContentBlock {
+  type: string;
+  text?: string;
+  name?: string;
+  input?: unknown;
+}
+
 async function callAnthropic(request: LLMRequest, model: string): Promise<LLMResponse> {
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-  const start = Date.now();
-  const response = await axios.post(
-    "https://api.anthropic.com/v1/messages",
-    {
-      model,
-      system: request.systemPrompt,
-      messages: [{ role: "user", content: request.userPrompt }],
-      max_tokens: request.maxOutputTokens ?? 4096,
-      temperature: request.temperature ?? 0.3,
-    },
-    {
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01", // the only version the Messages API accepts
-        "Content-Type": "application/json",
+  const body: Record<string, unknown> = {
+    model,
+    system: request.systemPrompt,
+    messages: [{ role: "user", content: request.userPrompt }],
+    max_tokens: request.maxOutputTokens ?? 4096,
+    temperature: request.temperature ?? 0.3,
+  };
+  // Structured output: a single tool whose input schema is the response schema, and a forced
+  // call to it. The tool call's input is the structured result.
+  if (request.responseSchema) {
+    body["tools"] = [
+      {
+        name: STRUCTURED_OUTPUT_NAME,
+        description: "Return the result in this structure.",
+        input_schema: toJsonSchema(request.responseSchema),
       },
-      timeout: 60000,
+    ];
+    body["tool_choice"] = { type: "tool", name: STRUCTURED_OUTPUT_NAME };
+  }
+
+  const start = Date.now();
+  const response = await axios.post("https://api.anthropic.com/v1/messages", body, {
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01", // the only version the Messages API accepts
+      "Content-Type": "application/json",
     },
-  );
+    timeout: 60000,
+  });
 
   const latencyMs = Date.now() - start;
-  const text = response.data?.content?.[0]?.text ?? "";
+  const content: AnthropicContentBlock[] = response.data?.content ?? [];
+  const toolCall = content.find((block) => block.type === "tool_use" && block.name === STRUCTURED_OUTPUT_NAME);
+  const text = toolCall
+    ? JSON.stringify(toolCall.input)
+    : content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text ?? "")
+        .join("");
   const usage = response.data?.usage;
 
   return {
@@ -395,14 +456,15 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
   let lastError: string | undefined;
 
   for (const provider of providers) {
-    if (isCircuitOpen(provider.platform)) {
-      console.warn(`  ⚡ Skipping ${provider.platform} (circuit open)`);
+    const circuitKey = `${provider.platform}/${provider.model}`;
+    if (isCircuitOpen(circuitKey)) {
+      console.warn(`  ⚡ Skipping ${circuitKey} (circuit open)`);
       continue;
     }
 
     try {
       const response = await callProviderWithRetry(provider, request);
-      recordSuccess(provider.platform);
+      recordSuccess(circuitKey);
 
       // Record metrics (Item 4.1)
       const cost = estimateCost(response.model, response.inputTokens, response.outputTokens);
@@ -419,10 +481,9 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
     } catch (error) {
       const originalError = error instanceof AbortError ? error.originalError : error;
       // Only infrastructure failures (5xx, timeouts, network) count toward the circuit breaker.
-      // Client errors such as a 400 from a model that cannot serve this request are specific to
-      // that model, so they must not lock out the other models on the same platform.
+      // Client errors such as a 400 from a model that cannot serve this request do not open it.
       if (isTransientError(originalError)) {
-        recordFailure(provider.platform, originalError);
+        recordFailure(circuitKey, originalError);
       }
       // Every failure is recorded and the next candidate is tried: a client error from one model
       // (e.g. "Developer instruction is not enabled for this model") says nothing about the others.

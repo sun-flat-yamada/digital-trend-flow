@@ -11,7 +11,9 @@ import {
   isCircuitOpen,
   getCircuit,
   resetCircuits,
+  toJsonSchema,
 } from "../src/summarization/llm_gateway";
+import { MAP_RESPONSE_SCHEMA, TRIAGE_RESPONSE_SCHEMA } from "../src/summarization/prompts";
 import { ApiError } from "@google/genai";
 
 describe("LLM Gateway - Error Classification", () => {
@@ -165,5 +167,25 @@ describe("LLM Gateway - Circuit Breaker Separation", () => {
     );
     expect(isRateLimitError(errorWithLimit0)).toBe(true);
     expect(isTransientError(errorWithLimit0)).toBe(true);
+  });
+});
+
+describe("LLM Gateway - response schemas for OpenAI and Anthropic", () => {
+  test("the pipeline's schemas convert to JSON Schema with lower-case types and closed objects", () => {
+    const map = toJsonSchema(MAP_RESPONSE_SCHEMA) as Record<string, unknown>;
+    expect(map).toMatchObject({
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        source_title: { type: "string", description: "Original article title" },
+        facts: {
+          type: "array",
+          items: { type: "object", additionalProperties: false, properties: { importance: { type: "integer" } } },
+        },
+      },
+    });
+    expect(JSON.stringify(toJsonSchema(TRIAGE_RESPONSE_SCHEMA))).not.toMatch(/"type":"[A-Z]+"/);
+    // The conversion leaves the input unchanged (the Gemini call still uses it).
+    expect(MAP_RESPONSE_SCHEMA.type).toBe("OBJECT");
   });
 });

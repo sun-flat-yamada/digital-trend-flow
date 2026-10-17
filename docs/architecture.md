@@ -533,14 +533,23 @@ Final Markdown + SummaryFrontmatter
 ### Circuit Breaker Pattern
 
 ```txt
-Provider A (primary) → 失敗 3 回 → Circuit OPEN → Provider B にフォールバック
-                            ↓ (5 分 cooldown)
-                       Circuit CLOSED → Provider A に復帰
+候補 A (google/map-model) → 失敗 3 回 → Circuit OPEN → 次の候補にフォールバック
+                                  ↓ (5 分 cooldown)
+                             Circuit CLOSED → 候補 A に復帰
 ```
 
+- **単位**: サーキットは候補（`platform/model`）ごと。過負荷の 1 モデルが、同じプラットフォームの健全なモデルまで止めない
 - **閾値**: 連続 3 回失敗で回路 OPEN（5xx・タイムアウト・ネットワーク障害のみを数える）
 - **Cooldown**: 5 分で自動復帰
 - **クライアントエラー** (400/401/403 など): 再試行せずにエラーを記録し、次の候補（同一プラットフォーム上のもう一方のフェーズのモデル → `fallback_models`）へフォールバックする。モデル固有の失敗で同じプラットフォームの健全なモデルまで遮断しないよう、サーキットブレーカーには数えない
+
+### Structured Output
+
+`responseSchema`（`prompts.ts` の Gemini 形式の OpenAPI サブセット。型は `OBJECT` などの大文字）は、プロバイダーごとに次の形で送ります。
+
+- **Gemini**: `responseMimeType: application/json` と `responseSchema` をそのまま
+- **OpenAI**: JSON Schema（型を小文字にし、各オブジェクトに `additionalProperties: false`）を `response_format.json_schema` で。全プロパティが必須のスキーマだけ `strict: true`
+- **Anthropic**: 同じ JSON Schema を `input_schema` にしたツールを 1 つ定義し、`tool_choice` でその呼び出しを強制する。ツール呼び出しの `input` を JSON 文字列にして返す
 
 ### Auto Model Resolution
 
