@@ -1,28 +1,7 @@
 import axios from "axios";
 import { env } from "../core/config";
-import { PATHS } from "../core/paths";
 import { errorMessage } from "../core/errors";
-
-/**
- * Truncates Markdown content at section boundaries to preserve document structure.
- * Prefers cutting at `---` or `## ` markers over arbitrary character positions,
- * ensuring the truncated output remains valid Markdown.
- */
-function smartTruncateForDiscord(markdown: string, maxLength: number): string {
-  if (markdown.length <= maxLength) return markdown;
-
-  // Find the last section boundary before maxLength
-  const candidates = [markdown.lastIndexOf("\n---\n", maxLength), markdown.lastIndexOf("\n## ", maxLength)].filter(
-    (i) => i > maxLength * 0.4,
-  ); // Don't cut too aggressively
-
-  const cutPoint = candidates.length > 0 ? Math.max(...candidates) : maxLength;
-
-  return (
-    markdown.slice(0, cutPoint).trim() +
-    `\n\n> 📄 **全文は GitHub リポジトリの \`${PATHS.ARTIFACTS_DAILY.relative}/\` を参照してください。**`
-  );
-}
+import { notifyStrings, truncateAtSection } from "./notify_common";
 
 /**
  * Sends a summary digest to a Discord channel via Webhook.
@@ -35,8 +14,14 @@ function smartTruncateForDiscord(markdown: string, maxLength: number): string {
  * @param title Title of the summary (e.g., "Daily Summary 2026-03-14")
  * @param summaryMarkdown The full Markdown summary (will be truncated for Discord)
  * @param articleCount Number of articles processed
+ * @param language Language of the report; the boilerplate is Japanese for "ja", English otherwise
  */
-export async function notifyDiscord(title: string, summaryMarkdown: string, articleCount: number): Promise<void> {
+export async function notifyDiscord(
+  title: string,
+  summaryMarkdown: string,
+  articleCount: number,
+  language: string = "en",
+): Promise<void> {
   const webhookUrl = env.DISCORD_WEBHOOK_URL;
 
   if (!webhookUrl) {
@@ -47,7 +32,8 @@ export async function notifyDiscord(title: string, summaryMarkdown: string, arti
   try {
     // Discord embed description has a 4096 char limit.
     // Smart truncation: cut at section boundaries to preserve structure.
-    const truncatedContent = smartTruncateForDiscord(summaryMarkdown, 3900);
+    const strings = notifyStrings(language);
+    const truncatedContent = truncateAtSection(summaryMarkdown, 3900, `> ${strings.fullReport}`);
 
     await axios.post(
       webhookUrl,
@@ -58,7 +44,7 @@ export async function notifyDiscord(title: string, summaryMarkdown: string, arti
             description: truncatedContent,
             color: 0x5865f2, // Discord blurple
             footer: {
-              text: `Processed ${articleCount} articles | Obsidian HeadQuarter`,
+              text: `${strings.processed(articleCount)} | Obsidian HeadQuarter`,
             },
             timestamp: new Date().toISOString(),
           },

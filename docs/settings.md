@@ -60,7 +60,11 @@ When a language is specified, the following components automatically adapt:
    - Localizes UI elements: navigation tabs (`📅 Calendar` / `📋 Archive List`), calendar weekdays and month headers, search placeholders, headline badges, article counter badges, copy link notifications, and 404 error page.
    - Parses both `**Source**:` and `**出典**:` citation links.
 
-4. **Frontmatter & Markdown Storage (`src/storage/markdown_builder.ts`)**:
+4. **Notifications (`src/publishing/*_notifier.ts`, `notify_common.ts`)**:
+   - The boilerplate (the "read the full report" notice, `Processed N articles`, the email subject, badge and footer) is Japanese for `ja` and English for any other language.
+   - Slack receives the summary converted to Slack mrkdwn (`<url|text>` links, `*bold*`, headings as bold lines). Discord, Slack and Teams cut a long summary at a section boundary.
+
+5. **Frontmatter & Markdown Storage (`src/storage/markdown_builder.ts`)**:
    - Serializes `language: en` in the Markdown YAML frontmatter.
    - Adjusts Obsidian backlink anchor text (`[[...|Previous Summary]]` for English vs. `[[...|前日のサマリー]]` for Japanese).
 

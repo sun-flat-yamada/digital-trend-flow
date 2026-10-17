@@ -1,6 +1,7 @@
 /**
  * [Role] Slack notification via Webhook.
- * [Mechanism] Sends a summary digest to Slack using Incoming Webhook API.
+ * [Mechanism] Sends a summary digest to Slack using Incoming Webhook API, converted to Slack mrkdwn
+ * and cut at a section boundary to fit a section block.
  *
  * Item: 6.4 Slack / Teams 配信
  */
@@ -8,11 +9,20 @@
 import axios from "axios";
 import { env } from "../core/config";
 import { errorMessage } from "../core/errors";
+import { markdownToSlackMrkdwn, notifyStrings, truncateAtSection } from "./notify_common";
+
+/** Slack limits the text of a section block to 3,000 characters. */
+const SLACK_SECTION_LIMIT = 3000;
 
 /**
  * Sends a summary to Slack via Webhook.
  */
-export async function notifySlack(title: string, summaryMarkdown: string, articleCount: number): Promise<void> {
+export async function notifySlack(
+  title: string,
+  summaryMarkdown: string,
+  articleCount: number,
+  language: string = "en",
+): Promise<void> {
   const webhookUrl = env.SLACK_WEBHOOK_URL;
 
   if (!webhookUrl) {
@@ -21,11 +31,8 @@ export async function notifySlack(title: string, summaryMarkdown: string, articl
   }
 
   try {
-    // Truncate for Slack's 3000 char block limit
-    const truncated =
-      summaryMarkdown.length > 2800
-        ? summaryMarkdown.slice(0, 2800).trim() + "\n\n> 📄 全文は GitHub リポジトリを参照してください。"
-        : summaryMarkdown;
+    const strings = notifyStrings(language);
+    const text = truncateAtSection(markdownToSlackMrkdwn(summaryMarkdown), SLACK_SECTION_LIMIT, strings.fullReport);
 
     await axios.post(
       webhookUrl,
@@ -37,14 +44,14 @@ export async function notifySlack(title: string, summaryMarkdown: string, articl
           },
           {
             type: "section",
-            text: { type: "mrkdwn", text: truncated },
+            text: { type: "mrkdwn", text },
           },
           {
             type: "context",
             elements: [
               {
                 type: "mrkdwn",
-                text: `Processed ${articleCount} articles | Digital Trend Flow`,
+                text: `${strings.processed(articleCount)} | Digital Trend Flow`,
               },
             ],
           },

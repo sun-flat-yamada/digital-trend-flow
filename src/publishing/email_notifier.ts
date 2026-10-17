@@ -8,14 +8,17 @@ import type { Transporter } from "nodemailer";
 import { env } from "../core/config";
 import { markdownToHtml } from "./pages_generator";
 import { errorMessage } from "../core/errors";
+import { isJapanese } from "../core/language";
+import { notifyStrings } from "./notify_common";
 
 /**
  * Helper to build responsive, clean HTML email body.
  */
-function buildHtmlEmail(title: string, summaryMarkdown: string, articleCount: number): string {
+function buildHtmlEmail(title: string, summaryMarkdown: string, articleCount: number, language: string): string {
   const contentHtml = markdownToHtml(summaryMarkdown);
+  const strings = notifyStrings(language);
   return `<!DOCTYPE html>
-<html>
+<html lang="${isJapanese(language) ? "ja" : "en"}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -90,13 +93,13 @@ function buildHtmlEmail(title: string, summaryMarkdown: string, articleCount: nu
   <div class="container">
     <div class="header">
       <h1>📊 ${title}</h1>
-      <span class="badge">Processed ${articleCount} articles</span>
+      <span class="badge">${strings.processed(articleCount)}</span>
     </div>
     <div class="content">
       ${contentHtml}
     </div>
     <div class="footer">
-      <p>Digital Trend Flow — Automated Trend Harvesting &amp; Summarization</p>
+      <p>${strings.emailFooter.replace(/&/g, "&amp;")}</p>
     </div>
   </div>
 </body>
@@ -130,12 +133,14 @@ export function createEmailTransport(): Transporter | null {
  * @param title Title of the summary (e.g., "Daily Summary 2026-03-14")
  * @param summaryMarkdown The full Markdown summary
  * @param articleCount Number of articles processed
+ * @param language Language of the report; the boilerplate is Japanese for "ja", English otherwise
  * @param transportOverride Optional nodemailer Transporter for mocking/testing
  */
 export async function notifyEmail(
   title: string,
   summaryMarkdown: string,
   articleCount: number,
+  language: string = "en",
   transportOverride?: Transporter,
 ): Promise<void> {
   const mailTo = env.MAIL_TO;
@@ -153,10 +158,10 @@ export async function notifyEmail(
   }
 
   const mailFrom = env.MAIL_FROM || env.SMTP_USER || "noreply@digitaltrendflow.internal";
-  const subject = `📊 ${title} (${articleCount} articles) | Digital Trend Flow`;
+  const subject = `📊 ${title} (${notifyStrings(language).articles(articleCount)}) | Digital Trend Flow`;
 
   try {
-    const htmlBody = buildHtmlEmail(title, summaryMarkdown, articleCount);
+    const htmlBody = buildHtmlEmail(title, summaryMarkdown, articleCount, language);
 
     await transporter.sendMail({
       from: mailFrom,
