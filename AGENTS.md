@@ -97,7 +97,7 @@ All scheduled workflows also support manual trigger via `workflow_dispatch`. A m
 
 When an AI agent finishes a task or refactor, verify via:
 
-1.  **Type-checking & Config Validation**: `npm run test` — runs `tsc --noEmit`, MECE config validation (`test:config`), and the full Jest test suite (`test:unit`: 30+ suites, 200+ tests). Never import `src/main.ts` from a test without mocking every dependency: importing it starts the real pipeline.
+1.  **Type-checking & Config Validation**: `npm run test` — runs `tsc --noEmit`, MECE config validation (`test:config`), and the full Jest test suite (`test:unit`: 30+ suites, 200+ tests). `src/main.ts` exports `runDailyPipeline()` and has no import side effects; the daily entry point is `src/cli/daily.ts` (`npm start`). Tests that run the pipeline must still mock every external dependency (see `tests/pipeline_gate.test.ts`).
 2.  **Golden Regression**: `npm run test:golden` — validates output quality against reference datasets in `tests/golden/`.
 3.  **Dry-run Testing**: `npm run debug:filter <URL>` — validates ingestion + scoring logic without LLM/API costs.
 4.  **Build Check**: `npm run build` — ensures `tsc` compilation to `dist/` succeeds.
