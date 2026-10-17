@@ -35,7 +35,7 @@ Adapted from `sun-flat-yamada/github-copilot-dashboard` (`.agents/rules/developm
 
 - Name: `<type>/<issue>-<slug>` ([`git-rules-commit.md`](git-rules-commit.md) §2). Generate it with `npm run change-dev:branch -- name --issue <n>`.
 - Local work starts from the latest base: `git fetch origin main && git checkout -b <name> origin/main`.
-- Claude Code cloud session: the session VM is the isolation unit (no worktree). The platform assigns `claude/<adjective>-<name>-<id>`; see [`instructions-rules-precedence.md`](instructions-rules-precedence.md) §2 for when it may be renamed.
+- Claude Code cloud session: the session VM is the isolation unit (no worktree). The platform assigns `claude/<adjective>-<name>-<id>`: before the first push, rename it with `npm run change-dev:branch -- rename <type> <issue> "<title>"` and push only to the renamed branch (owner-approved exception, [`instructions-rules-precedence.md`](instructions-rules-precedence.md) §2).
 
 ### Step 4: Implement and run the quality gate
 

@@ -35,7 +35,8 @@ A branch is named after the change it carries, so that `git branch -r`, the PR l
 
 - Generate and check names with the helper: `npm run change-dev:branch -- name <type> <issue> "<title>"` (or `name --issue <n>`, which reads the type and title from the Issue through `gh api`), and `npm run change-dev:branch -- check [branch]`.
 - `main` and `dependabot/**` are exempt.
-- The `Change-dev Check` workflow fails a PR whose head branch does not follow this rule. Names the Claude Code cloud platform assigns (`claude/<adjective>-<name>-<id>`) are reported as a **warning** until the owner approves the rename exception ([`instructions-rules-precedence.md`](instructions-rules-precedence.md) §2).
+- **Names that do not describe the change are not used for PRs**, in particular the names the Claude Code cloud platform assigns (`claude/<adjective>-<name>-<id>`, `ccr-<hex>-<id>`). A cloud session renames its assigned branch before the first push: `npm run change-dev:branch -- rename <type> <issue> "<title>"` (or `--slug <slug>`), then `git push -u origin <new name>` ([`instructions-rules-precedence.md`](instructions-rules-precedence.md) §2).
+- The `Change-dev Check` workflow fails a PR whose head branch does not follow this rule, including cloud-assigned names.
 
 ## 3. Language
 

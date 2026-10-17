@@ -90,7 +90,14 @@ Commit both **by themselves** (`docs(<scope>): plan <change> (#<issue>)`) before
 ### Phase 3: Branch
 
 - Local: `git fetch origin main && git checkout -b <type>/<issue>-<slug> origin/main`.
-- Claude Code cloud session (`CLAUDE_CODE_REMOTE=true`): work on the session's branch. Rename it with `npm run change-dev:branch -- rename <type> <issue> "<title>"` (then `git push -u origin <new name>`) only when `instructions-rules-precedence.md` §2 says the owner approved it; otherwise keep the assigned name.
+- Claude Code cloud session (`CLAUDE_CODE_REMOTE=true`): the platform starts the session on `claude/<adjective>-<name>-<id>`. Right after Phase 1, before the first push, rename it and push only to the new name (owner-approved exception, `instructions-rules-precedence.md` §2):
+
+  ```bash
+  npm run change-dev:branch -- rename feat 42 "Add Reddit source"   # or: rename --issue 42 / --slug <slug>
+  git push -u origin feat/42-add-reddit-source
+  ```
+
+  The helper refuses when the assigned branch already has pushed work of its own, when the new name exists locally or on `origin`, or when the current branch is `main`. After a merge, the next task in the same session starts with `git fetch origin main && git checkout -b <type>/<issue>-<slug> origin/main`.
 
 ### Phase 4: Implementation and quality gate
 
