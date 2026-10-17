@@ -23,7 +23,7 @@ describe("Email Notifier", () => {
       const mockSendMail = jest.fn();
       const mockTransport = { sendMail: mockSendMail } as unknown as Transporter;
 
-      await notifyEmail("Test Summary", "## Content", 5, mockTransport);
+      await notifyEmail("Test Summary", "## Content", 5, "en", mockTransport);
 
       expect(mockSendMail).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("MAIL_TO not set"));
@@ -62,7 +62,7 @@ describe("Email Notifier", () => {
       const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
       const sampleMarkdown = "# Daily Tech\n\nSome important news.\n\n- [Link](https://example.com)";
-      await notifyEmail("Daily Summary 2026-09-21", sampleMarkdown, 3, mockTransport);
+      await notifyEmail("Daily Summary 2026-09-21", sampleMarkdown, 3, "en", mockTransport);
 
       expect(mockSendMail).toHaveBeenCalledTimes(1);
       const callArgs = mockSendMail.mock.calls[0]?.[0];
@@ -77,6 +77,21 @@ describe("Email Notifier", () => {
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Email notification sent successfully"));
     });
 
+    test("writes the subject and boilerplate in Japanese for a Japanese report", async () => {
+      env.MAIL_TO = "subscriber@example.com";
+      env.SMTP_USER = "news@example.com";
+      const mockSendMail = jest.fn().mockResolvedValue({ messageId: "msg-ja" });
+      jest.spyOn(console, "log").mockImplementation();
+
+      await notifyEmail("日次サマリー", "本文", 4, "ja", { sendMail: mockSendMail } as unknown as Transporter);
+
+      const args = mockSendMail.mock.calls[0]?.[0];
+      expect(args.subject).toBe("📊 日次サマリー (4 件) | Digital Trend Flow");
+      expect(args.html).toContain('<html lang="ja">');
+      expect(args.html).toContain("4 件の記事を処理");
+      expect(args.html).toContain("トレンドの自動収集と要約");
+    });
+
     test("falls back to default from address if MAIL_FROM is omitted", async () => {
       env.MAIL_TO = "subscriber@example.com";
       env.MAIL_FROM = undefined;
@@ -87,7 +102,7 @@ describe("Email Notifier", () => {
 
       jest.spyOn(console, "log").mockImplementation();
 
-      await notifyEmail("Title", "Body", 1, mockTransport);
+      await notifyEmail("Title", "Body", 1, "en", mockTransport);
 
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -106,7 +121,7 @@ describe("Email Notifier", () => {
       const mockTransport = { sendMail: mockSendMail } as unknown as Transporter;
 
       // Should not throw
-      await expect(notifyEmail("Failed Email", "Content", 1, mockTransport)).resolves.not.toThrow();
+      await expect(notifyEmail("Failed Email", "Content", 1, "en", mockTransport)).resolves.not.toThrow();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining("Email notification failed: Connection timeout"),

@@ -8,11 +8,17 @@
 import axios from "axios";
 import { env } from "../core/config";
 import { errorMessage } from "../core/errors";
+import { notifyStrings, truncateAtSection } from "./notify_common";
 
 /**
  * Sends a summary to Microsoft Teams via Webhook.
  */
-export async function notifyTeams(title: string, summaryMarkdown: string, articleCount: number): Promise<void> {
+export async function notifyTeams(
+  title: string,
+  summaryMarkdown: string,
+  articleCount: number,
+  language: string = "en",
+): Promise<void> {
   const webhookUrl = env.TEAMS_WEBHOOK_URL;
 
   if (!webhookUrl) {
@@ -21,10 +27,8 @@ export async function notifyTeams(title: string, summaryMarkdown: string, articl
   }
 
   try {
-    const truncated =
-      summaryMarkdown.length > 5000
-        ? summaryMarkdown.slice(0, 5000).trim() + "\n\n> 📄 全文は GitHub リポジトリを参照してください。"
-        : summaryMarkdown;
+    const strings = notifyStrings(language);
+    const truncated = truncateAtSection(summaryMarkdown, 5000, strings.fullReport);
 
     await axios.post(
       webhookUrl,
@@ -51,7 +55,7 @@ export async function notifyTeams(title: string, summaryMarkdown: string, articl
                 },
                 {
                   type: "TextBlock",
-                  text: `Processed ${articleCount} articles | Digital Trend Flow`,
+                  text: `${strings.processed(articleCount)} | Digital Trend Flow`,
                   size: "small",
                   isSubtle: true,
                 },

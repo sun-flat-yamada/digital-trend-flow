@@ -227,7 +227,7 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | PUB-2 | P1 | Obsidian の前日リンク `[[YYYY-MM-DD_summary]]` が、実ファイル名 `YYYY-MM-DD_digital-trend_daily_summary.md` と一致せず、常にリンク切れになる | `markdown_builder.ts:67, 131`、`main.ts:468` | リンク先を直すか、`aliases` を付ける |
 | PUB-3 | P1 | Atom フィードのリンク先が `https://github.com/artifacts/...` という存在しない URL で、フィード自体も Pages に置かれないため購読できない | `feed_generator.ts:27, 69-81` | Pages の URL で `_site/feed.xml` に出力する |
 | PUB-4 | P2 | frontmatter の `sources` に目的キーが入る。`top_story` は LLM が選んだトップではなく、キーワードスコアの最大値。`selectedArticles.sort` で配列を破壊的に並べ替えている | `main.ts:493-494, 528` | 出典名を格納し、Reduce の出力からトップを取り出す |
-| PUB-5 | P2 | Slack に Markdown をそのまま送っている（`**bold**`・`[text](url)`・`##` は mrkdwn で解釈されない）。2,800 字で機械的に切断する。Discord・Slack の案内文は日本語固定 | `slack_notifier.ts:28-52`、`discord_notifier.ts:25` | mrkdwn に変換し、出力言語に合わせる |
+| PUB-5 | P2 | Slack に Markdown をそのまま送っている（`**bold**`・`[text](url)`・`##` は mrkdwn で解釈されない）。2,800 字で機械的に切断する。Discord・Slack の案内文は日本語固定 | `slack_notifier.ts:28-52`、`discord_notifier.ts:25` | mrkdwn に変換し、出力言語に合わせる（✅ #58。Slack は mrkdwn に変換し、Discord・Slack・Teams は節の区切りで切る。定型文は日本語なら日本語、それ以外は英語） |
 | PUB-6 | P2 | `publish:complete` イベントが、実際に配信したかどうかに関係なく固定のチャネル一覧を通知する | `main.ts:561` | 配信結果を集計して通知する |
 | PUB-7 | P2 | 月次レポートの frontmatter `type` が `daily_summary` に固定されている | `markdown_builder.ts:47` | `type` を引数にする |
 | PUB-8 | P3 | `pages_generator.ts` は 2,288 行（CSS とクライアント JS をテンプレート文字列で内包）。自作の Markdown パーサーは番号付きリスト等に未対応 | `pages_generator.ts:969-2288` | 静的アセットに分離し、ライブラリを使う（✅ #56） |
