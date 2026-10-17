@@ -27,11 +27,12 @@ Strictly follow these boundaries when creating or modifying files:
 | `src/aggregation`     | Periodic reports + insights                         | `weekly_digest.ts`, `monthly_digest.ts`, `yearly_report.ts`, `periodic_common.ts`, `trend_analyzer.ts`, `insights.ts`                         |
 | `src/storage`         | Markdown file writing + Obsidian integration        | `markdown_builder.ts`, `obsidian_linker.ts`                                                                                                   |
 | `src/publishing`      | External platform integrations                      | `discord_notifier.ts`, `slack_notifier.ts`, `teams_notifier.ts`, `email_notifier.ts`, `note_api.ts` (Zenn + note.com), `podcast_generator.ts`, `pages_generator.ts`, `feed_generator.ts` |
-| `src/cli`             | Developer tooling + periodic report entry point     | `dry_run.ts`, `test_config.ts`, `build_pages.ts`, `report.ts` (weekly / monthly / yearly)                                                     |
+| `src/cli`             | Developer tooling + periodic report entry point     | `dry_run.ts`, `test_config.ts`, `build_pages.ts`, `report.ts` (weekly / monthly / yearly), `change_dev_branch.ts`, `plan_check.ts` (change-dev helpers) |
 | `prompts/`            | Versioned prompt templates (Markdown)               | `map_v1.md`, `triage_v1.md`, `weekly_reduce_v1.md`, `monthly_reduce_v1.md`, `yearly_reduce_v1.md`, `manifest.json`                                                                         |
+| `.devs/changes/`      | change-dev plans and walkthroughs (committed)       | `yyyy-mm-dd_<ChangeTitle>/{implementation_plan,task,walkthrough}.md`                                                                          |
 | `tests/`              | Unit tests, golden regression tests                 | `*.test.ts`, `golden/golden_dataset.json`                                                                                                     |
 | `artifacts/contents/` | Generated output (git-ignored; local working copy of external `sun-flat-yamada/artifacts` repo) | `digital-trend/collection/{daily,weekly,monthly,yearly,insights,audio,metrics}/`, `publish/{note,zenn}/`                                                         |
-| `.github/workflows/`  | CI/CD automation                                    | `ci.yml`, `daily_summary.yml`, `weekly_digest.yml`, `monthly_digest.yml`, `yearly_report.yml`, `pages.yml`; composite action `.github/actions/sync-zenn` |
+| `.github/workflows/`  | CI/CD automation                                    | `ci.yml`, `change_dev.yml`, `daily_summary.yml`, `weekly_digest.yml`, `monthly_digest.yml`, `yearly_report.yml`, `pages.yml`; composite action `.github/actions/sync-zenn` |
 
 ## 3. Information Sources
 
@@ -108,7 +109,18 @@ When an AI agent finishes a task or refactor, verify via:
 4.  **Build Check**: `npm run build` — ensures `tsc` compilation to `dist/` succeeds.
 5.  **Lint & Format**: `npm run lint` — ESLint (typescript-eslint with type-aware promise rules, JSON, YAML). `npm run format:check` — Prettier on TypeScript/JavaScript (`npm run format` to fix). `npm run type-check` also type-checks `tests/` (`tests/tsconfig.json`).
 
-## 8. Key Design Decisions (for context)
+## 8. Change Workflow (change-dev)
+
+Every change follows the change-dev lifecycle, adapted from `sun-flat-yamada/github-copilot-dashboard`: **Issue → plan committed first → `<type>/<issue>-<slug>` branch → quality gate → walkthrough → draft PR → CI green → ready → Rebase & Merge**. Read these before changing anything:
+
+*   [`.agents/rules/development-workflow.md`](.agents/rules/development-workflow.md) — the lifecycle and merge rules (never push `main`; Dependabot PRs are reported, never merged by agents).
+*   [`.agents/rules/git-rules-commit.md`](.agents/rules/git-rules-commit.md) — Conventional Commits and branch naming (`npm run change-dev:branch`).
+*   [`.agents/rules/quality-rules-gate.md`](.agents/rules/quality-rules-gate.md) — the mandatory gate before every push (includes `npm run change-dev:plan-check`).
+*   [`.agents/rules/language-rules-output.md`](.agents/rules/language-rules-output.md) — Japanese replies / PR descriptions, English commits and code.
+*   [`.agents/rules/instructions-rules-precedence.md`](.agents/rules/instructions-rules-precedence.md) — the owner's word > repository rules > execution-environment defaults; conflicts are reported in the result.
+*   [`.agents/skills/change-dev/SKILL.md`](.agents/skills/change-dev/SKILL.md) — the step-by-step procedure and the plan / task / walkthrough schemas. Contributor summary: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## 9. Key Design Decisions (for context)
 
 *   **Why SQLite (`pipeline_state.db`) instead of a JSON file?** The pipeline migrated from `processed_urls.json` to SQLite (via `better-sqlite3`) for performance, TTL-based automatic cleanup, concurrent access safety (WAL mode), and the ability to store pipeline run statistics and source health data. On first run, legacy JSON is auto-migrated and backed up.
 *   **Why Jina Reader API instead of direct HTML parsing?** Jina handles the complexity of extracting clean content from arbitrary web pages (paywalls, SPA rendering, cookie banners). It returns clean Markdown consistently.

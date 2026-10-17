@@ -1,0 +1,58 @@
+name: "🎫 Work Unit (change-dev task)"
+description: "One task = one Issue = one Pull Request. A fresh agent session starts from this Issue."
+title: "[<task-id>] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        計画の 1 タスクを、1 PR で終わる大きさの Issue として登録する。フェーズの tracking Issue があれば sub-issue として付ける。手順は `.agents/skills/change-dev/SKILL.md`（Work-Unit Issue）。
+  - type: textarea
+    id: why
+    attributes:
+      label: "Why (背景)"
+      description: "このタスクが解決する問題と、関連する指摘・Issue。"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: "What (対応内容)"
+      description: "具体的な変更。対象のファイル・モジュールと、決定済みの事項を書く。"
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: "Done condition (完了条件)"
+      description: "このタスクが完了したと判断できる観測可能な条件。"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance Criteria (受け入れ基準)"
+      description: "チェックリスト。ドキュメント更新と品質ゲートを含める。"
+      value: |
+        - [ ]
+        - [ ] `AGENTS.md` / `docs/` を更新した（該当する場合）
+        - [ ] 品質ゲート（`.agents/rules/quality-rules-gate.md`）が通る
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: "References and Prerequisites (参照・前提)"
+      description: "計画・ドキュメント・決定事項、親 Issue、先にマージが必要なタスクや PR。"
+    validations:
+      required: true
+  - type: textarea
+    id: start
+    attributes:
+      label: "How to start (作業開始方法)"
+      description: "新しいセッションが最初に読むものと始め方。"
+      value: |
+        「この Issue を対応せよ」と依頼する。`.agents/skills/change-dev/SKILL.md` に従い、`AGENTS.md` と上の参照を先に読む。PR には `Closes #<この Issue>` を書く。
+        ブランチ名: `npm run change-dev:branch -- name --issue <この Issue 番号>`（`<type>/<issue>-<slug>`）。
+    validations:
+      required: true

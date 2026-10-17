@@ -42,6 +42,8 @@ cp .env.example .env
 | `npm run lint:fix` | ESLint --fix |
 | `npm run format` | Prettier で TypeScript / JavaScript を整形する（JSON・YAML は ESLint が検査する） |
 | `npm run format:check` | 整形の確認（CI で実行） |
+| `npm run change-dev:branch -- name --issue <n>` | Issue から change-dev のブランチ名（`<type>/<issue>-<slug>`）を作る。`check [branch]` で検査、`rename ...` で現在のブランチを改名 |
+| `npm run change-dev:plan-check` | `implementation_plan.md` が実装より先に単独でコミットされているかを検査する（ドキュメントのみの変更は対象外） |
 
 ## CI
 
@@ -51,6 +53,7 @@ PR と `main` への push で `.github/workflows/ci.yml` が動く。手元で�
 |:---|:---|
 | `test` | `npm ci` → `npm audit --audit-level=high` → `npm run type-check` → `npm run lint` → `npm run format:check` → `npm run test:config` → `npm run test:coverage` → `npm run build`（`GEMINI_API_KEY=dummy`） |
 | `actionlint` | `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`（ワークフローを変えたら手元でも実行する） |
+| `change-dev`（`change_dev.yml`） | PR のブランチ名と plan-first を検査する。クラウドセッションの割り当て名（`claude/...`）は警告にとどめる。Fork と Dependabot の PR は対象外 |
 
 - テストは設定を import 時に検証するため `GEMINI_API_KEY` が要る。ダミーでよく、実際の API は呼ばない
 - Action は SHA でピン留めし、バージョンをコメントで残す（例: `actions/checkout@3d3c42e… # v7.0.1`）
@@ -138,4 +141,5 @@ Category Breakdown:
 
 - 一時ファイルは `_tmp_ai/` に出力 (プロジェクトルート不可)
 - Agent ルールは `AGENTS.md` を参照
+- 変更の進め方（Issue → 計画 → ブランチ → 品質ゲート → ドラフト PR → rebase マージ）は [`CONTRIBUTING.md`](../CONTRIBUTING.md) と `.agents/skills/change-dev/SKILL.md`
 - ワークフロー: `.agents/workflows/` 配下
