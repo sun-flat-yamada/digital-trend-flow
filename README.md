@@ -70,6 +70,7 @@ npm run build && npm start                        # Full pipeline execution
 | `daily_summary.yml`  | Daily 03:47        | Daily summary + push to artifacts repo (also `repository_dispatch`) |
 | `monthly_digest.yml` | 2nd of month 04:30 | Monthly digest of the previous month + Trend analysis               |
 | `yearly_report.yml`  | Jan 1st 05:00      | Yearly report                                                       |
+| `ci.yml`             | PRs / push to main | Audit, type check, lint, config check, Jest, build + actionlint     |
 
 ## Project Structure
 

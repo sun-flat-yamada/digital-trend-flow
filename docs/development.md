@@ -40,6 +40,19 @@ cp .env.example .env
 | `npm run lint` | ESLint (TypeScript, JSON, YAML) |
 | `npm run format` | ESLint --fix |
 
+## CI
+
+PR と `main` への push で `.github/workflows/ci.yml` が動く。手元で同じ検証をするには次を実行する。
+
+| Job | Steps |
+|:---|:---|
+| `test` | `npm ci` → `npm audit --audit-level=high` → `npm run type-check` → `npm run lint` → `npm run test:config` → `npx jest --forceExit` → `npm run build`（`GEMINI_API_KEY=dummy`） |
+| `actionlint` | `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`（ワークフローを変えたら手元でも実行する） |
+
+- テストは設定を import 時に検証するため `GEMINI_API_KEY` が要る。ダミーでよく、実際の API は呼ばない
+- Action は SHA でピン留めし、バージョンをコメントで残す（例: `actions/checkout@3d3c42e… # v7.0.1`）
+- `npm audit` は high 以上で失敗する。moderate は失敗にしない
+
 ## Coding Standards
 
 | Rule | Detail |

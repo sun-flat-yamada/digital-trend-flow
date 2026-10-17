@@ -390,7 +390,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 
 ### Phase 3: エンジニアリング基盤（Phase 1・2 と並行、〜3 週）
 
-- [ ] 3-1 `ci.yml`（pull_request / push）を追加する。`npm ci` → type-check → lint → test → build の順に実行し、actionlint と `npm audit --audit-level=high` も行う
+- [x] 3-1 `ci.yml`（pull_request / push）を追加する。`npm ci` → type-check → lint → test → build の順に実行し、actionlint と `npm audit --audit-level=high` も行う
 - [ ] 3-2 typescript-eslint（`no-floating-promises`、`no-unused-vars` など）を導入する。tsconfig の `noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch` を有効にし、フォーマッタも導入する
 - [ ] 3-3 エントリーポイントを分離する（`src/cli/daily.ts`）。`mapWithConcurrency` を `core/` へ移し、`--forceExit` をやめる
 - [ ] 3-4 テストを拡充する
@@ -406,6 +406,8 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
   - ジョブ単位の permissions にする
   - すべての Action を SHA でピン留めする
   - Secret をスクリプトに直接展開しない
+
+> **進捗（2026-10-17）**: 3-1 を実装した（#29）。`ci.yml` は PR と `main` への push で動き、`test` ジョブ（`npm ci` → `npm audit --audit-level=high` → type-check → lint → test:config → Jest → build）と `actionlint` ジョブ（v1.7.12）からなる。SEC-7 の high は Dependabot の `brace-expansion` 更新（#25）で 0 件になった（残りは moderate 20 件で、CI は失敗させない）。`main` へのマージに CI の成功を必須にする設定はユーザー側で行う
 
 **完了条件**: PR で CI が必須になり、すべての TS ファイルが Lint 対象になり、重要モジュール（main、状態管理、ゲートウェイ、Map / Reduce、取得）の行カバレッジが 70% 以上であること。
 
