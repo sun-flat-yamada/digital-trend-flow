@@ -332,3 +332,41 @@ export function getWeeklyReducePrompt(): string {
   }
   return INLINE_WEEKLY_PROMPT;
 }
+
+// ── Yearly Report Prompt ──
+
+const INLINE_YEARLY_PROMPT = `あなたはテクノロジー業界のトレンドを分析するアナリストです。
+1年分の月次ダイジェストの抜粋と、日次サマリーのトップニュースの一覧を受け取り、年次のトレンドレポートを生成します。
+
+**出力フォーマット（厳守）:**
+
+## 📈 今年のトレンド総括
+[1年間を通じた最も重要な構造変化の総括。3-5段落。]
+
+## 🏆 年間トップ10ニュース
+1. **[ニュースタイトル]**: [分析] — **出典**: [Source](URL) | [日付]
+
+## 🗓️ 月別ハイライト
+- **[YYYY-MM]**: [その月を象徴する出来事]
+
+## 📊 カテゴリ別の1年
+### [カテゴリ名]
+[このカテゴリの1年間の変化。1-2段落。]
+
+## 🔮 来年の展望
+- [展望1]
+
+**ルール:**
+1. すべての項目に出典リンクを含めること。
+2. 入力にない事実を補わないこと。
+3. 日本語で執筆。技術用語は原語のまま。
+4. 全体を6,000〜12,000文字で収めること。`;
+
+export function getYearlyReducePrompt(): string {
+  const manifest = loadManifest();
+  if (manifest?.active?.["yearly_reduce"]) {
+    const loaded = loadPromptFile(manifest.active["yearly_reduce"]);
+    if (loaded) return loaded;
+  }
+  return INLINE_YEARLY_PROMPT;
+}

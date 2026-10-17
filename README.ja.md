@@ -28,7 +28,8 @@
                         ↓ Quality Gate
               Automated Quality Checker (100pt)
                         ↓ Publish
-   Obsidian ─ note.com ─ Discord ─ Slack ─ Teams ─ Atom Feed ─ GitHub Pages
+   Obsidian ─ Discord ─ Slack ─ Teams ─ Email ─ Atom Feed ─ GitHub Pages ─ Podcast
+   (weekly / monthly / yearly reports → Zenn ─ note.com drafts)
 ```
 
 **なぜ Map-Reduce?** → Flash で事前圧縮 → Pro で統合。コスト 1/10 以下、品質安定化。
@@ -70,8 +71,9 @@ npm run build && npm start                        # フルパイプライン実�
 | Workflow             | Schedule (JST)  | Description                                                             |
 | :------------------- | :-------------- | :---------------------------------------------------------------------- |
 | `daily_summary.yml`  | 毎日 03:47      | 日次サマリー + artifacts repo へ push（`repository_dispatch` にも対応） |
+| `weekly_digest.yml`  | 毎週月曜 11:17  | 前週（ISO 週）の週次レポート + トレンド分析                             |
 | `monthly_digest.yml` | 毎月 2 日 04:30 | 前月の月次ダイジェスト + トレンド分析                                   |
-| `yearly_report.yml`  | 1/1 05:00       | 年次レポート                                                            |
+| `yearly_report.yml`  | 1/3 05:43       | 月次ダイジェストから作る年次レポート + トレンド分析                     |
 | `ci.yml`             | PR / main push  | 監査・型チェック・Lint・設定検証・Jest・ビルド + actionlint             |
 
 ## Project Structure
@@ -82,11 +84,11 @@ src/
 ├── ingestion/      # 7 Source Adapters + Jina Reader + SQLite State Manager
 ├── filtering/      # LLM Triage, Scorer, Semantic Dedup, Keyword Expansion
 ├── summarization/  # Map/Reduce, LLM Gateway (multi-provider), Model Resolver
-├── aggregation/    # Monthly Digest, Trend Analyzer
+├── aggregation/    # Weekly / Monthly / Yearly Reports, Trend Analyzer, Insights
 ├── evaluation/     # Quality Checker (automated)
 ├── storage/        # Markdown Builder (Frontmatter), Obsidian Linker
-├── publishing/     # Discord, Slack, Teams, note.com, Atom Feed
-└── cli/            # debug:filter, test_config
+├── publishing/     # Discord, Slack, Teams, Email, Zenn, note.com, Podcast, Pages, Atom Feed
+└── cli/            # debug:filter, test_config, build:pages, report (weekly / monthly / yearly)
 ```
 
 ## Documentation

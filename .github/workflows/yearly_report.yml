@@ -1,13 +1,24 @@
 name: Yearly Trend Report
 
 on:
-  # 毎年1月1日の JST 05:00 (UTC 20:00 前日) に実行
+  # 毎年1月2日 UTC 20:43 (= JST 1月3日 05:43) に実行。前年分を集計する。
+  # 12 月分の月次ダイジェスト (1月1日 UTC 19:30) の後になるよう 1 日空けている
   schedule:
-    - cron: "0 20 1 1 *"
+    - cron: "43 20 2 1 *"
   workflow_dispatch:
+    inputs:
+      year:
+        description: "Target year (YYYY). Empty = the previous year"
+        type: string
+        default: ""
+
+# 日次パイプラインと artifacts リポジトリへの push が競合しないよう直列化する
+concurrency:
+  group: pipeline-state
+  cancel-in-progress: false
 
 env:
-  ARTIFACTS_REPO: "sun-flat-yamada/artifacts"
+  ARTIFACTS_REPO: ${{ vars.ARTIFACTS_REPO || format('{0}/artifacts', github.repository_owner) }}
 
 permissions:
   contents: write
@@ -42,16 +53,40 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate yearly report
+      - name: Type check
+        run: npm run type-check
+
+      - name: Generate and publish yearly report
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_MODEL_REDUCE: ${{ vars.AI_MODEL_REDUCE || '' }}
+          AI_MODEL_PLATFORM: ${{ vars.AI_MODEL_PLATFORM || '' }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_HOST: ${{ vars.LANGFUSE_HOST || '' }}
           NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
-        run: |
-          LAST_YEAR=$(date -d "last year" '+%Y')
-          echo "::warning::Yearly report generation is NOT YET IMPLEMENTED for: $LAST_YEAR"
-          echo "This workflow is a placeholder. See AGENTS.md for planned implementation."
-          exit 0
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          TARGET_YEAR: ${{ inputs.year || '' }}
+        run: npm run build && node dist/cli/report.js yearly "${TARGET_YEAR}"
+
+      - name: Sync Zenn articles
+        continue-on-error: true
+        uses: ./.github/actions/sync-zenn
+        with:
+          zenn-repo: ${{ vars.ZENN_REPO || '' }}
+          zenn-branch: ${{ vars.ZENN_BRANCH || 'main' }}
+          token: ${{ secrets.PAT_GITHUB }}
 
       - name: Commit yearly report to artifacts repo
         run: |
@@ -64,5 +99,6 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add contents/digital-trend/collection/yearly/ || true
-          git diff --staged --quiet || git commit -m "chore: yearly report $(date -u '+%Y')"
+          git add contents/publish/ || true
+          git diff --staged --quiet || git commit -m "chore: yearly report $(date -u -d 'last year' '+%Y')"
           git push -u origin main

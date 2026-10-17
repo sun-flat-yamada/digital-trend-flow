@@ -6,13 +6,15 @@
  * Item: 4.3 Langfuse 統合
  */
 
-import { Langfuse, type LangfuseTraceClient } from "langfuse";
+import type { Langfuse, LangfuseTraceClient } from "langfuse";
 import { env } from "../core/config";
 import { errorMessage } from "./errors";
 
 // Lazy-initialized Langfuse client
 let langfuseClient: Langfuse | null = null;
 let isAvailable = false;
+// Trace of the current run: LLM generations recorded by the gateway are attached to it.
+let activeTrace: LangfuseTraceClient | null = null;
 
 /**
  * Initializes Langfuse if credentials are available.
@@ -24,7 +26,11 @@ export function initLangfuse(): void {
   }
 
   try {
-    langfuseClient = new Langfuse({
+    // Loaded only when tracing is on: the gateway imports this module, and loading the SDK runs a
+    // dynamic import that Jest (and any run without Langfuse keys) has no use for.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Langfuse: LangfuseClient } = require("langfuse") as typeof import("langfuse");
+    langfuseClient = new LangfuseClient({
       publicKey: env.LANGFUSE_PUBLIC_KEY,
       secretKey: env.LANGFUSE_SECRET_KEY,
       baseUrl: env.LANGFUSE_HOST ?? "https://cloud.langfuse.com",
@@ -37,18 +43,44 @@ export function initLangfuse(): void {
 }
 
 /**
- * Creates a new trace for a pipeline run.
+ * Creates a new trace for a run and makes it the active trace, so that every LLM generation of
+ * the run is recorded under it (see `recordGeneration`).
+ * @param name Trace name; defaults to the daily pipeline's `pipeline-run-<date>`.
  */
-export function createTrace(runId: string, date: string): LangfuseTraceClient | null {
+export function createTrace(
+  runId: string,
+  date: string,
+  name: string = `pipeline-run-${date}`,
+): LangfuseTraceClient | null {
   if (!isAvailable || !langfuseClient) return null;
   try {
-    return langfuseClient.trace({
+    activeTrace = langfuseClient.trace({
       id: runId,
-      name: `pipeline-run-${date}`,
+      name,
       metadata: { date, pipeline: "digital-trend-flow" },
     });
+    return activeTrace;
   } catch {
     return null;
+  }
+}
+
+/** Returns the trace created by the last `createTrace` call, or null when tracing is off. */
+export function getActiveTrace(): LangfuseTraceClient | null {
+  return activeTrace;
+}
+
+/** Records a pipeline event (stage boundary) on a trace. */
+export function recordEvent(
+  trace: LangfuseTraceClient | null,
+  name: string,
+  metadata: Record<string, unknown> = {},
+): void {
+  if (!trace) return;
+  try {
+    trace.event({ name, metadata });
+  } catch {
+    // Non-fatal
   }
 }
 
@@ -62,7 +94,8 @@ export function recordGeneration(
     model: string;
     input: string;
     output: string;
-    promptVersion?: string;
+    promptVersion?: string | undefined;
+    provider?: string | undefined;
     inputTokens: number;
     outputTokens: number;
     latencyMs: number;
@@ -71,19 +104,21 @@ export function recordGeneration(
 ): void {
   if (!trace) return;
   try {
+    const endTime = new Date();
     trace.generation({
       name: params.name,
       model: params.model,
       input: params.input.slice(0, 5000), // Truncate for storage
       output: params.output.slice(0, 5000),
-      metadata: { promptVersion: params.promptVersion },
-      usage: {
-        promptTokens: params.inputTokens,
-        completionTokens: params.outputTokens,
-        totalCost: params.costUsd,
+      metadata: { promptVersion: params.promptVersion, provider: params.provider },
+      usageDetails: {
+        input: params.inputTokens,
+        output: params.outputTokens,
+        total: params.inputTokens + params.outputTokens,
       },
-      startTime: new Date(Date.now() - params.latencyMs),
-      endTime: new Date(),
+      costDetails: { total: params.costUsd },
+      startTime: new Date(endTime.getTime() - params.latencyMs),
+      endTime,
     });
   } catch {
     // Non-fatal
@@ -115,4 +150,5 @@ export async function flushLangfuse(): Promise<void> {
   } catch {
     // Non-fatal
   }
+  activeTrace = null;
 }

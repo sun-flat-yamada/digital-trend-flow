@@ -66,6 +66,38 @@ settings:
     min_map_success_rate: 0.5  # 選定記事のうち Map (事実抽出) に成功した割合の下限 (0〜1)
     min_quality_score: 60      # 品質スコア (0〜100) の下限
 
+  # 配信: レポートの種類 (daily / weekly / monthly / yearly) ごとに、どの配信先へ送るかを決める
+  publishing:
+    # Discord / Slack / Teams / メールに送るレポート (Webhook・SMTP が未設定の配信先はスキップ)
+    notify_kinds: [daily, weekly, monthly, yearly]
+    # Zenn: publish/zenn/ に記事ファイルを書く。Actions 変数 ZENN_REPO (Zenn と GitHub 連携したリポジトリ) を
+    # 設定すると、その articles/ へ新しい記事をコピーして push する (既存の記事は上書きしない)
+    zenn:
+      enabled: true
+      published: false          # false = Zenn 上では下書き。true にすると push で公開される
+      topics: [ai, tech]        # 記事のトピック (英小文字と数字。タグと合わせて最大 5 個)
+      kinds: [weekly, monthly, yearly]
+    # note.com: publish/note/ に下書き (HTML) を書く。Secret NOTE_API_TOKEN (ログイン済みブラウザの
+    # _note_session_v5 Cookie) を設定すると note.com 上にも下書きを作る (非公式 API。Cookie は期限切れになる)
+    note:
+      enabled: true
+      kinds: [weekly, monthly, yearly]
+    # 日次の音声ブリーフィング: 台本は常に生成し、edge-tts があれば MP3 も作る (話者ごとに声を変える)
+    podcast:
+      enabled: true
+      voices:
+        ja: {host_a: ja-JP-KeitaNeural, host_b: ja-JP-NanamiNeural}
+        en: {host_a: en-US-GuyNeural, host_b: en-US-JennyNeural}
+
+  # インサイト: トピックの推移とキーワード追加の候補 (LLM は使わない)。日次の実行で
+  # collection/insights/ に保存し、Job Summary にも載せる。トピックの推移は週次・月次・年次のレポートにも付く
+  insights:
+    enabled: true
+    keyword_window_days: 30     # 候補を探す期間 (状態 DB の処理済み記事のタイトル)
+    background_days: 60         # 比較する直前の期間。この期間より出現率が 2 倍以上の語だけを候補にする
+    min_document_frequency: 3   # 候補にする最低の記事数 (加えて 2 日以上に出現すること)
+    trend_window_days: 30       # トピックの推移を見る日数 (日次サマリーの tags / mentioned_*)
+
 # ==========================================
 # PURPOSES & SOURCES (第一レベルカテゴリと情報源)
 # ==========================================

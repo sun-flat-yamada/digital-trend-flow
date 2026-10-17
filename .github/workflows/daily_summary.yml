@@ -59,6 +59,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Podcast audio (the script is generated without it). pipx is preinstalled on the runner.
+      - name: Install edge-tts
+        if: ${{ env.DRY_RUN != 'true' }}
+        continue-on-error: true
+        run: pipx install edge-tts==7.3.1
+
       - name: Type check
         run: npm run type-check
 
@@ -114,6 +120,15 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: '_site'
+
+      - name: Sync Zenn articles
+        if: ${{ env.DRY_RUN != 'true' && success() }}
+        continue-on-error: true
+        uses: ./.github/actions/sync-zenn
+        with:
+          zenn-repo: ${{ vars.ZENN_REPO || '' }}
+          zenn-branch: ${{ vars.ZENN_BRANCH || 'main' }}
+          token: ${{ secrets.PAT_GITHUB || github.token }}
 
       - name: Commit and push generated summaries to artifacts repo
         # A degraded or failed run fails the pipeline step but its run record — metrics JSON and

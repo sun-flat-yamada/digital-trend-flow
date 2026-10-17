@@ -14,6 +14,19 @@ const mockConfig = {
     language: "en",
     author: "test",
     quality_gate: { min_map_success_rate: 0.5, min_quality_score: 60 },
+    publishing: {
+      notify_kinds: ["daily", "weekly", "monthly", "yearly"],
+      zenn: { enabled: true, published: false, topics: ["ai"], kinds: ["weekly", "monthly", "yearly"] },
+      note: { enabled: true, kinds: ["weekly", "monthly", "yearly"] },
+      podcast: { enabled: true, voices: { en: { host_a: "a", host_b: "b" } } },
+    },
+    insights: {
+      enabled: true,
+      keyword_window_days: 30,
+      background_days: 60,
+      min_document_frequency: 3,
+      trend_window_days: 30,
+    },
   },
   purposes: {
     tech: {
@@ -29,11 +42,19 @@ const mockConfig = {
 
 jest.mock("../src/core/config", () => ({
   config: mockConfig,
-  env: { GEMINI_API_KEY: "test-key", API_CONCURRENCY: 1, API_INTERVAL_MS: 0 },
+  env: {
+    GEMINI_API_KEY: "test-key",
+    API_CONCURRENCY: 1,
+    API_INTERVAL_MS: 0,
+    DISCORD_WEBHOOK_URL: "https://discord.example/webhook",
+  },
 }));
 jest.mock("../src/core/langfuse", () => ({
   initLangfuse: jest.fn(),
   createTrace: jest.fn(() => null),
+  getActiveTrace: jest.fn(() => null),
+  recordEvent: jest.fn(),
+  recordGeneration: jest.fn(),
   recordQualityScore: jest.fn(),
   flushLangfuse: jest.fn(async () => undefined),
 }));
@@ -67,10 +88,6 @@ jest.mock("../src/filtering/scorer", () => ({
 }));
 jest.mock("../src/summarization/llm_gateway", () => ({ llmCall: jest.fn() }));
 jest.mock("../src/filtering/semantic_dedup", () => ({ semanticDedup: <T>(articles: T[]) => articles }));
-jest.mock("../src/filtering/keyword_expansion", () => ({
-  discoverCandidateKeywords: () => [],
-  formatSuggestionReport: () => "",
-}));
 jest.mock("../src/summarization/gemini_map", () => ({ mapExtractFacts: jest.fn() }));
 jest.mock("../src/summarization/gemini_reduce", () => ({ reduceSummarize: jest.fn() }));
 jest.mock("../src/storage/markdown_builder", () => ({
@@ -88,9 +105,15 @@ jest.mock("../src/publishing/teams_notifier", () => ({ notifyTeams: jest.fn() })
 jest.mock("../src/publishing/email_notifier", () => ({ notifyEmail: jest.fn() }));
 jest.mock("../src/publishing/pages_generator", () => ({ generatePagesSite: jest.fn() }));
 jest.mock("../src/publishing/podcast_generator", () => ({ generatePodcast: jest.fn() }));
-jest.mock("../src/aggregation/trend_analyzer", () => ({
-  analyzeTopicTrends: () => [],
-  formatTrendAnalysis: () => "",
+jest.mock("../src/publishing/note_api", () => ({ publishZennArticle: jest.fn(), publishNoteDraft: jest.fn() }));
+jest.mock("../src/aggregation/insights", () => ({
+  buildInsightsReport: jest.fn(() => ({
+    date: "",
+    trends: [],
+    suggestions: [],
+    markdown: "## 📈 Topic Trends (mock)",
+  })),
+  saveInsightsReport: jest.fn(),
 }));
 
 const ARTICLES = [
@@ -149,6 +172,9 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
     notifyEmail: require("../src/publishing/email_notifier").notifyEmail,
     generatePagesSite: require("../src/publishing/pages_generator").generatePagesSite,
     generatePodcast: require("../src/publishing/podcast_generator").generatePodcast,
+    publishZennArticle: require("../src/publishing/note_api").publishZennArticle,
+    publishNoteDraft: require("../src/publishing/note_api").publishNoteDraft,
+    saveInsightsReport: require("../src/aggregation/insights").saveInsightsReport,
     markAsProcessed: require("../src/ingestion/state_manager").markAsProcessed,
     isEvaluated: require("../src/ingestion/state_manager").isEvaluated,
     markAsEvaluated: require("../src/ingestion/state_manager").markAsEvaluated,
@@ -190,6 +216,8 @@ const PUBLISHERS = [
   "notifyEmail",
   "generatePagesSite",
   "generatePodcast",
+  "publishZennArticle",
+  "publishNoteDraft",
 ];
 
 describe("daily pipeline publication gate", () => {
@@ -319,6 +347,11 @@ describe("daily pipeline publication gate", () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.mocks["notifyDiscord"]).toHaveBeenCalledTimes(1);
+    expect(run.mocks["notifySlack"]).not.toHaveBeenCalled(); // no webhook configured
+    expect(run.mocks["publishZennArticle"]).not.toHaveBeenCalled(); // Zenn takes periodic reports only
+    expect(run.mocks["generatePodcast"]!.mock.calls[0][2]).toMatchObject({ language: "en" });
+    expect(run.mocks["saveInsightsReport"]).toHaveBeenCalledTimes(1);
+    expect(run.stepSummary).toContain("## 📈 Topic Trends (mock)");
     expect(run.mocks["saveMarkdownFile"]).toHaveBeenCalledTimes(1);
     expect(run.mocks["markAsProcessed"]).toHaveBeenCalledTimes(2);
     expect(run.githubOutput).toContain("run_status=success");

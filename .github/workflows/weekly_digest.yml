@@ -1,0 +1,104 @@
+name: Weekly Trend Digest
+
+on:
+  # 毎週月曜 UTC 02:17 (= JST 月曜 11:17) に実行。前週 (ISO 週、月〜日) を集計する。
+  # 日曜分の日次実行 (UTC 18:47、遅延は最大 3 時間程度) の後になるよう間を空けている
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "Target ISO week (YYYY-Www) or a date in it (YYYY-MM-DD). Empty = the previous week"
+        type: string
+        default: ""
+
+# 日次パイプラインと artifacts リポジトリへの push が競合しないよう直列化する
+concurrency:
+  group: pipeline-state
+  cancel-in-progress: false
+
+env:
+  ARTIFACTS_REPO: ${{ vars.ARTIFACTS_REPO || format('{0}/artifacts', github.repository_owner) }}
+
+permissions:
+  contents: write
+
+jobs:
+  weekly-digest:
+    name: Generate Weekly Digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.PAT_GITHUB }}
+          fetch-depth: 0
+
+      - name: Checkout artifacts
+        uses: actions/checkout@v7
+        continue-on-error: true
+        with:
+          repository: ${{ env.ARTIFACTS_REPO }}
+          token: ${{ secrets.PAT_GITHUB }}
+          path: artifacts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Generate and publish weekly digest
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_MODEL_REDUCE: ${{ vars.AI_MODEL_REDUCE || '' }}
+          AI_MODEL_PLATFORM: ${{ vars.AI_MODEL_PLATFORM || '' }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_HOST: ${{ vars.LANGFUSE_HOST || '' }}
+          NOTE_API_TOKEN: ${{ secrets.NOTE_API_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          TARGET_WEEK: ${{ inputs.week || '' }}
+        run: npm run build && node dist/cli/report.js weekly "${TARGET_WEEK}"
+
+      - name: Sync Zenn articles
+        continue-on-error: true
+        uses: ./.github/actions/sync-zenn
+        with:
+          zenn-repo: ${{ vars.ZENN_REPO || '' }}
+          zenn-branch: ${{ vars.ZENN_BRANCH || 'main' }}
+          token: ${{ secrets.PAT_GITHUB }}
+
+      - name: Commit weekly report to artifacts repo
+        run: |
+          cd artifacts/
+          if [ ! -d .git ]; then
+            git init
+            git branch -M main
+            git remote add origin https://oauth2:${{ secrets.PAT_GITHUB }}@github.com/${{ env.ARTIFACTS_REPO }}.git
+          fi
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add contents/digital-trend/collection/weekly/ || true
+          git add contents/publish/ || true
+          git diff --staged --quiet || git commit -m "chore: weekly digest $(date -u '+%G-W%V')"
+          git push -u origin main

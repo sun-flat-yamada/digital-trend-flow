@@ -7,15 +7,19 @@
 | Workflow | Cron (UTC) | JST | Trigger |
 |:---|:---|:---|:---|
 | `daily_summary.yml` | `47 18 * * *` | 毎日 03:47 | Full pipeline + git push。`repository_dispatch`（`trigger-digest`）にも対応 |
+| `weekly_digest.yml` | `17 2 * * 1` | 毎週月曜 11:17 | 前週（ISO 週）の週次レポート |
 | `monthly_digest.yml` | `30 19 1 * *` | 毎月 2 日 04:30 | 前月の月次ダイジェスト |
-| `yearly_report.yml` | `0 20 1 1 *` | 1/1 05:00 | 年次レポート |
+| `yearly_report.yml` | `43 20 2 1 *` | 1/3 05:43 | 前年の年次レポート（12 月分の月次ダイジェストの翌日） |
 
-全ワークフローは `workflow_dispatch` による手動トリガーも可能。
+全ワークフローは `workflow_dispatch` による手動トリガーも可能。週次・月次・年次は対象期間（`2026-W42`・`2026-09`・`2026`）を入力でき、空なら直前の期間になる。
 
 - 日次の起動時刻は毎時 0 分を避けている（GitHub の定時実行は 0 分に集中し、遅延・欠落しやすい）。
 - 日次を手動実行するときは `dry_run` を選べる。記事の選定まで行って停止し、LLM による要約・配信・コミット・Pages デプロイは行わない。
-- 日次と月次は同じ concurrency グループ（`pipeline-state`）に属し、`pipeline_state.db` と artifacts リポジトリを更新する実行が重ならない。
+- 日次・週次・月次・年次は同じ concurrency グループ（`pipeline-state`）に属し、`pipeline_state.db` と artifacts リポジトリを更新する実行が重ならない。
 - push はリモートが進んでいれば rebase して最大 3 回再試行し、それでも失敗したらジョブを失敗させる。
+- 週次・月次・年次のレポートは生成後に通知・Zenn・note.com へ配信され、artifacts リポジトリにコミットされる。Pages には次の日次実行のサイト生成で載る。
+- 日次は `pipx install edge-tts` で Podcast の音声合成を有効にする（失敗しても台本だけで続行する）。
+- `vars.ZENN_REPO` を設定すると、各ワークフローが新しい Zenn 記事を Zenn 連携リポジトリの `articles/` に push する（composite action `.github/actions/sync-zenn`）。
 - Atom フィードは Pages サイトの `feed.xml` として公開される。リンク先は `vars.PAGES_BASE_URL`、未設定なら `https://<owner>.github.io/<repo>/`。
 
 ### 手動実行

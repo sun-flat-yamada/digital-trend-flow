@@ -25,6 +25,10 @@ export interface SummaryFrontmatter {
   qualityScore?: number | undefined;
   relatedNotes?: string[] | undefined;
   language?: string | undefined;
+  /** Report type; defaults to "daily_summary" ("weekly_report", "monthly_report", "yearly_report"). */
+  type?: string | undefined;
+  /** Period of a periodic report, e.g. "2026-W42", "2026-09", "2026". */
+  period?: string | undefined;
 }
 
 /** Obsidian note name (file name without ".md") of the daily summary for a date. */
@@ -66,7 +70,8 @@ export function saveMarkdownFile(
   const frontmatterObj: Record<string, unknown> = {
     title,
     date: new Date().toISOString(),
-    type: "daily_summary",
+    type: metadata?.type ?? "daily_summary",
+    ...(metadata?.period ? { period: metadata.period } : {}),
     articles_processed: articleCount,
     author,
     generated_by: "digital-trend-flow",

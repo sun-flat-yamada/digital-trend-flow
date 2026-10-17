@@ -14,6 +14,8 @@ import { metrics, estimateCost } from "../core/metrics";
 import type { LLMCallMetrics } from "../core/metrics";
 import { resolveModel } from "./model_resolver";
 import { geminiClient } from "./gemini_client";
+import { getActiveTrace, recordGeneration } from "../core/langfuse";
+import { promptHash } from "./prompts";
 import { asErrorLike, errorMessage, toError } from "../core/errors";
 
 // ── Types ──
@@ -413,6 +415,19 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
         output_tokens: response.outputTokens,
         latency_ms: response.latencyMs,
         estimated_cost_usd: cost,
+      });
+      // Langfuse span for this generation (no-op when tracing is off)
+      recordGeneration(getActiveTrace(), {
+        name: `llm:${request.phase}`,
+        model: response.model,
+        provider: response.provider,
+        input: request.userPrompt,
+        output: response.text,
+        promptVersion: promptHash(request.systemPrompt),
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        latencyMs: response.latencyMs,
+        costUsd: cost,
       });
 
       return response;

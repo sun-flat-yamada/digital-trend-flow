@@ -41,7 +41,6 @@ flowchart TD
         GATE --> MD[Markdown + Frontmatter]
         GATE --> CANVAS[Obsidian JSON Canvas]
         GATE --> PODCAST[AI Podcast Dialogue & Audio]
-        GATE --> NOTE[note.com]
         GATE --> DISCORD[Discord]
         GATE --> SLACK[Slack]
         GATE --> TEAMS[Teams]
@@ -52,9 +51,12 @@ flowchart TD
     subgraph "Phase 7: Post-processing"
         GATE --> KW[Keyword Expansion]
         GATE --> TREND[Trend Analysis]
+        KW & TREND --> INSIGHTS[Insights Report + Job Summary]
         GATE --> METRICS[Metrics Persist]
     end
 ```
+
+週次・月次・年次のレポートは別のワークフローで生成し、Zenn・note.com・通知に配信します（[Periodic Reports](#periodic-reports)）。
 
 ---
 
@@ -469,16 +471,16 @@ LLM による関連性判定は `llm_triage.ts`（本文取得前のバッチト
 ```txt
 Final Markdown + SummaryFrontmatter
     ↓ Publishing Adapter (src/publishing/*.ts)
-外部プラットフォーム (Discord, Slack, Teams, note.com, Atom)
+外部プラットフォーム (Discord, Slack, Teams, Email, Zenn, note.com, Atom)
 ```
 
 **何を隔離しているか**: 各配信先のウェブフック形式・API 仕様・文字数制限・フォーマット変換を個別アダプター内に閉じ込めています。
 
 **変化への耐性**:
 
-- **配信先の追加**: `src/publishing/` にアダプターを追加。`main.ts` から呼ぶだけ。
-- **配信先の無効化**: 環境変数 (Webhook URL 等) 未設定で自動スキップ。
-- **Plugin Registry**: `PluginRegistry.registerPublishing()` で動的登録も可能（Event Bus 経由）。
+- **配信先の追加**: `src/publishing/` にアダプターを追加し、`src/core/builtin_plugins.ts` で `PublishingPlugin` として登録する。日次・週次・月次・年次の各実行は `registry.publishAll()` で登録済みの配信先をすべて呼ぶので、`main.ts` や CLI の変更は不要。
+- **配信先の無効化**: 環境変数 (Webhook URL 等) 未設定で自動スキップ（`isConfigured()`）。レポートの種類ごとの配信先は `config.yml` の `settings.publishing` で決める。
+- **障害の隔離**: 配信先ごとに `Promise.allSettled` で実行し、1 つの失敗が他の配信を止めない。
 
 ### 境界の全体像
 
@@ -492,7 +494,7 @@ Final Markdown + SummaryFrontmatter
 │                                                      │
 │  ┌─── Boundary 1 ───┐  ┌─── Boundary 3 ──────────┐ │
 │  │ Source Adapters   │  │ Scorer (pure functions)  │ │
-│  │ (7 types)         │  │ config-driven rules     │ │
+│  │ (9 types)         │  │ config-driven rules     │ │
 │  │   ↓ ArticleItem   │  │   ↓ PurposeScoreOutput  │ │
 │  └───────────────────┘  └─────────────────────────┘ │
 │                                                      │
@@ -504,7 +506,7 @@ Final Markdown + SummaryFrontmatter
 │                                                      │
 │  ┌─── Boundary 4 ───┐  ┌── Persistence ──────────┐ │
 │  │ Publishing        │  │ SQLite (WAL mode)       │ │
-│  │ (5 channels)      │  │ processed_urls          │ │
+│  │ (6 publishers)    │  │ processed_urls          │ │
 │  │   ↑ Markdown      │  │ pipeline_runs           │ │
 │  └───────────────────┘  │ source_health           │ │
 │                          └────────────────────────┘ │
@@ -548,26 +550,29 @@ Provider A (primary) → 失敗 3 回 → Circuit OPEN → Provider B にフォ�
 
 ## Plugin Architecture
 
-`src/core/plugin_registry.ts` により、ソースとパブリッシャーの追加がコード変更なしで可能です。
+`src/core/plugin_registry.ts` がソースと配信先を解決します。組み込みのソース 9 種と配信先 6 種（Discord・Slack・Teams・Email・Zenn・note.com）は `src/core/builtin_plugins.ts` で登録され、パイプライン（`main.ts`）と定期レポートの CLI（`src/cli/report.ts`）はレジストリだけを呼びます。新しいソース・配信先は、プラグインを登録するだけで追加できます（ソースの場合は `config.yml` のスキーマ `SourceSchema` にも型を追加する）。
 
 ### Plugin Interfaces
 
 ```typescript
-interface IngestionPlugin {
+interface IngestionPlugin<S extends Source = Source> {
   readonly name: string;
-  readonly type: string;
-  fetch(config: Record<string, unknown>, purpose: string): Promise<ArticleItem[]>;
+  readonly type: S["type"];                       // config.yml の source.type
+  fetch(source: S, purpose: string): Promise<ArticleItem[]>; // 失敗時は throw
+  onPublished?(publishedUrls: string[]): Promise<void>;     // 配信後の処理（Raindrop のアーカイブ）
 }
 
 interface PublishingPlugin {
   readonly name: string;
-  publish(title: string, content: string, articleCount: number): Promise<void>;
+  readonly kinds?: readonly ReportKind[];         // "daily" | "weekly" | "monthly" | "yearly"
+  isConfigured?(): boolean;                       // false ならスキップ
+  publish(payload: PublishPayload): Promise<void>; // 失敗時は throw（他の配信先には影響しない）
 }
 ```
 
 ### Event Bus
 
-パイプラインの各フェーズで以下のイベントが発火されます:
+パイプラインの各フェーズで以下のイベントが発火されます。組み込みのハンドラが、各イベントを実行の Langfuse トレースにイベントとして記録します（Langfuse 未設定時は何もしない）:
 
 | Event                | Timing                   |
 | :------------------- | :----------------------- |
@@ -620,7 +625,7 @@ Map で失敗した記事は、degraded でない実行でも Reduce に渡さ�
 | :------------------------- | :---------------------------------------------------------------- |
 | **Cost Tracking**          | LLM コール毎のトークン数・推定コストを記録                        |
 | **Metrics JSON**           | `artifacts/contents/digital-trend/collection/metrics/` に日次出力 |
-| **Langfuse**               | トレース・スパン・品質スコアを送信 (optional)                     |
+| **Langfuse**               | 実行ごとのトレース、LLM 呼び出しごとの generation（モデル・トークン・コスト・レイテンシ・プロンプトのハッシュ）、ステージのイベント、品質スコアを送信 (optional)。週次・月次・年次のレポートも 1 実行 1 トレース |
 | **GitHub Actions Summary** | `$GITHUB_STEP_SUMMARY` にパイプライン結果を出力                   |
 
 ## Output Structure
@@ -630,10 +635,45 @@ artifacts/contents/
 ├── digital-trend/
 │   └── collection/
 │       ├── daily/YYYY/MM/YYYY-MM-DD_digital-trend_daily_summary.md
-│       ├── monthly/YYYY/YYYY-MM-DD_digital-trend_monthly_report.md
-│       ├── yearly/YYYY-MM-DD_digital-trend_yearly_report.md
+│       ├── weekly/YYYY/YYYY-MM-DD_digital-trend_weekly_report.md   (週の最終日)
+│       ├── monthly/YYYY/YYYY-MM-DD_digital-trend_monthly_report.md (生成日)
+│       ├── yearly/YYYY/YYYY_digital-trend_yearly_report.md
+│       ├── insights/YYYY/YYYY-MM-DD_digital-trend_insights.md
+│       ├── audio/YYYY/MM/YYYY-MM-DD_podcast{.mp3,_script.md,_script.json}
 │       └── metrics/YYYY-MM-DD_metrics.json
 └── publish/
-    ├── note/
-    └── zenn/
+    ├── note/dtf-<kind>-<period>.{json,html}   (note.com の下書き)
+    └── zenn/dtf-<kind>-<period>.md            (Zenn の記事。ZENN_REPO の articles/ へ同期)
 ```
+
+## Periodic Reports
+
+| レポート | モジュール | 入力 | ワークフロー |
+| :-- | :-- | :-- | :-- |
+| 週次 | `src/aggregation/weekly_digest.ts` | ISO 週（月〜日）の日次サマリー | `weekly_digest.yml` |
+| 月次 | `src/aggregation/monthly_digest.ts` | 対象月の日次サマリー | `monthly_digest.yml` |
+| 年次 | `src/aggregation/yearly_report.ts` | 対象年の月次ダイジェスト + 日次サマリーのトップニュース | `yearly_report.yml` |
+
+- どれも `node dist/cli/report.js <weekly|monthly|yearly> [period]` で実行する（期間を省略すると直前の完了した期間）。ローカルでは `npm run report:weekly` など
+- 入力は日次サマリー（または月次ダイジェスト）の抜粋で上限があり、Reduce モデルが 1 回だけ呼ばれる。年次は月次ダイジェストを入力にするので、Map-Reduce の段数が 1 つ増えた形になる
+- 生成後、レポートの末尾に「トピックの推移」（`trend_analyzer.ts` による決定的な集計。週次は前週比、月次は前月比、年次は前半と後半の比較）を付ける
+- LLM が失敗したら例外にしてジョブを失敗させる。対象期間のデータがなければ何もせずに成功で終わる
+- 生成したレポートは `registry.publishAll()` で配信する（既定では通知・Zenn・note.com）
+
+## Zenn / note.com
+
+`src/publishing/note_api.ts`:
+
+- **Zenn**: Zenn の記事ファイル（frontmatter + Markdown、`published: false` で下書き）を `publish/zenn/` に書く。Zenn は GitHub 連携したリポジトリの `articles/` から記事を取り込むので、Actions 変数 `ZENN_REPO`（と任意の `ZENN_BRANCH`）を設定すると、composite action `.github/actions/sync-zenn` が新しい記事だけをコピーして push する。既存の記事は上書きしない（Zenn 側での編集を残すため）
+- **note.com**: 公式の API はない。下書き（タイトル・HTML 本文・ハッシュタグ）を `publish/note/` に JSON と HTML で書く。Secret `NOTE_API_TOKEN`（ログイン済みブラウザの `_note_session_v5` Cookie の値）を設定すると、エディターの内部 API（`POST /api/v1/text_notes` → `POST /api/v1/text_notes/draft_save`）で note.com 上にも下書きを作る。非公式の API で、Cookie は 1〜2 週間で期限切れになるため、失敗してもファイルは残り、ジョブは止まらない
+
+## Podcast
+
+`src/publishing/podcast_generator.ts` は日次サマリーから 2 人の掛け合いの台本を作ります。見出しの文言ではなく Markdown の構造（最初の `##` セクションのトップ記事・その段落と箇条書き、各カテゴリの最初の項目）から組み立てるので、出力言語によらず内容が入ります。セリフは言語別のテンプレート（日本語・英語。ほかの言語は英語）から作ります。`edge-tts` があれば話者ごとに別の声で合成して 1 つの MP3 にまとめます（日次ワークフローは `pipx install edge-tts` で導入する）。声は `config.yml` の `settings.publishing.podcast.voices` で変えられます。
+
+## Insights（キーワード拡張・トレンド分析）
+
+日次の実行の最後に `src/aggregation/insights.ts` が次の 2 つをまとめ、`collection/insights/` に保存し、Job Summary にも載せます（LLM は使わない）。
+
+- **トピックの推移**（`trend_analyzer.ts`）: 直近 30 日の日次サマリーの frontmatter（`tags`・`mentioned_companies`・`mentioned_technologies`）を集計し、期間の前半と後半の出現日数で「上昇・新規・下降・横ばい」に分ける
+- **キーワード追加の候補**（`keyword_expansion.ts`）: 状態 DB の処理済み記事のタイトルから、単語と 2 語の句を抽出する。直近 30 日に 3 記事以上・2 日以上で現れ、直前 60 日より出現率が 2 倍以上で、どのキーワードリストにもない語を候補にする。目的はその語を含む記事が選ばれた目的の多数決、重みはその目的の既存キーワードの中央値。一般語（"day" など）は停止語で、1 日だけの話題（"stabbing" など）は日数の条件で除く

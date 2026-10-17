@@ -396,6 +396,33 @@ export function getSourceFailureStreak(sourceName: string): number {
 }
 
 /**
+/**
+ * Titles of the URLs processed between `fromDaysAgo` and `toDaysAgo` days ago (UTC), oldest
+ * first, with their purpose and processing day. Used for keyword expansion.
+ */
+export function getProcessedTitles(
+  fromDaysAgo: number,
+  toDaysAgo: number = 0,
+): Array<{
+  title: string;
+  purpose: string | null;
+  date: string;
+}> {
+  const database = getDb();
+  return database
+    .prepare(
+      `
+    SELECT title, purpose, date(processed_at) AS date
+    FROM processed_urls
+    WHERE processed_at >= datetime('now', '-' || ? || ' days')
+      AND processed_at < datetime('now', '-' || ? || ' days')
+    ORDER BY processed_at ASC
+  `,
+    )
+    .all(fromDaysAgo, toDaysAgo) as Array<{ title: string; purpose: string | null; date: string }>;
+}
+
+/**
  * Closes the database connection gracefully.
  */
 export function closeDb(): void {

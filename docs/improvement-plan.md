@@ -290,7 +290,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 | 種別 | 対象 |
 | :-- | :-- |
 | 未使用の依存 | `p-retry`、`uuid`（コードからの import なし。jest の `transformIgnorePatterns` にのみ登場） |
-| 未配線の機能 | プラグインレジストリ（登録 0 件・ハンドラ 0 件）、`recordGeneration`（Langfuse スパン）、`createZennDraft` / `publishToNote`（`NOTE_API_TOKEN` も未使用）、`generateWeeklyDigest`（テストのみ） |
+| 未配線の機能 | プラグインレジストリ（登録 0 件・ハンドラ 0 件）、`recordGeneration`（Langfuse スパン）、`createZennDraft` / `publishToNote`（`NOTE_API_TOKEN` も未使用）、`generateWeeklyDigest`（テストのみ）。**#57 ですべて配線した** |
 | 未使用の関数・定数 | `clearState` / `getProcessedCount` / `getRecentRuns`、`generateRelatedLinks` / `generateObsidianFooter`、`promptHash`、`MAP_SYSTEM_PROMPT` / `REDUCE_SYSTEM_PROMPT`、`clearFactCache` |
 | 未使用の import | `main.ts` の `formatSuggestionReport` / `formatTrendAnalysis`、`trend_analyzer.ts` の `llmCall` |
 
@@ -426,8 +426,20 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 - [ ] 4-2 `main.ts` をステージ関数（取得 → 抽出 → 選定 → Map → Reduce → 評価 → 配信 → 永続化）に分割し、依存を注入する。ソースと配信先はレジストリで解決する（プラグインレジストリを実際に使うか、削除する）
 - [x] 4-3 実行ステータス（success / degraded / failed / skipped）を、`pipeline_runs`・metrics・Job Summary に必ず記録する（#54。`pipeline_runs` に `run_status`・`status_reasons` 列〔schema version 3、既存の行は `metrics_json` から補完〕。致命的なエラーでも 3 つとも残し、ワークフローはコミットする。success 以外のメトリクス JSON は `<日付>_metrics.<status>.json`）
 - [ ] 4-4 `pages_generator.ts` を分割（CSS・JS を静的アセットへ）し、HTML を無効化した Markdown レンダラーと CSP を使う
-- [ ] 4-5 未配線の機能について、配線するか削除するかを決める（週次はワークフロー追加、年次は月次からの集約か削除、note.com / Zenn、キーワード拡張・トレンド分析、Langfuse スパン、Podcast）
+- [x] 4-5 未配線の機能について、配線するか削除するかを決める（週次はワークフロー追加、年次は月次からの集約か削除、note.com / Zenn、キーワード拡張・トレンド分析、Langfuse スパン、Podcast）
 - [ ] 4-6 ドキュメントの不整合（§4.11）を直し、ADR（Architecture Decision Record）を導入し、`Item X.Y` コメントを整理する
+
+> **進捗（2026-10-17）**: 4-5 を実施した（#57）。ユーザーの判断で、表の機能はすべて削除せずに本番で使えるように配線した（CI-9 の年次、CI-10、SCO-10、PUB-9、QL-5 の「未配線の機能」）。
+>
+> - **週次（CI-10）**: `weekly_digest.yml`（毎週月曜 02:17 UTC、前週の ISO 週）と CLI `src/cli/report.ts`（`node dist/cli/report.js weekly [2026-W42]`）を追加した。LLM の失敗は例外にしてジョブを失敗させ、frontmatter に `type: weekly_report`・`period` を書くようにした
+> - **年次（CI-9 の年次）**: `src/aggregation/yearly_report.ts` を追加した。その年の月次ダイジェスト（12 月分は翌年のフォルダにある）と、日次サマリーのトップニュースの一覧を入力に、`prompts/yearly_reduce_v1.md` で Reduce する。`yearly_report.yml` は 12 月分の月次の翌日（1/2 20:43 UTC）に動き、concurrency グループ `pipeline-state` と `vars.ARTIFACTS_REPO` を使うようにした
+> - **note.com / Zenn**: `note_api.ts` を書き直した。Zenn は記事ファイルを `publish/zenn/` に書き、`vars.ZENN_REPO` があれば composite action `.github/actions/sync-zenn` が Zenn 連携リポジトリの `articles/` に新しい記事を push する（既存の記事は上書きしない）。note.com は下書きを `publish/note/` に書き、`NOTE_API_TOKEN`（`_note_session_v5` Cookie）があればエディターの非公式 API で下書きを作る。既定では週次・月次・年次を配信し、`published: false`（下書き）にした（`settings.publishing`）
+> - **キーワード拡張・トレンド分析（SCO-10）**: キーワード候補は状態 DB の処理済みタイトルを使い、直近 30 日と直前 60 日を比較する（単語と 2 語の句、3 記事以上・2 日以上・出現率 2 倍以上、停止語を拡充、目的は選定された目的の多数決、重みはその目的の中央値）。トレンド分析は日次サマリーの frontmatter（`tags`・`mentioned_*`）を集計する。日次の実行で `collection/insights/` に保存して Job Summary に載せ、週次・月次・年次のレポートの末尾にも付ける（`settings.insights`）
+> - **Langfuse スパン**: `llmCall` が成功のたびに、実行のトレースへ generation（モデル・トークン・コスト・レイテンシ・プロンプトのハッシュ）を記録する。パイプラインのイベントもトレースに記録し、週次・月次・年次も 1 実行 1 トレースにした
+> - **Podcast（PUB-9）**: 台本を見出しの文言ではなく Markdown の構造から作り、日本語・英語のテンプレートを用意した（ほかの言語は英語）。話者ごとに別の声で合成して 1 つの MP3 にまとめる。日次のワークフローで `pipx install edge-tts==7.3.1` を実行する（`settings.publishing.podcast`）
+> - **プラグインレジストリ**: 組み込みのソース 9 種と配信先 6 種を `src/core/builtin_plugins.ts` で登録し、`main.ts` と report CLI はレジストリ経由で取得・配信する。Raindrop のアーカイブは `onPublished` フックに移した。配信先は `Promise.allSettled` で隔離し、結果（published / skipped / failed）をログに出す
+>
+> ユーザー側の作業: Zenn を使う場合は Zenn の GitHub 連携と `vars.ZENN_REPO`（`PAT_GITHUB` にそのリポジトリへの書き込み権限）、note.com を使う場合は `secrets.NOTE_API_TOKEN` を設定する。どちらも未設定なら、ファイルが artifacts リポジトリに残るだけになる
 
 ---
 

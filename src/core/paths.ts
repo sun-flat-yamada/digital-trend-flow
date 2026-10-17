@@ -11,8 +11,14 @@
  *         │   │   └── YYYY/MM/YYYY-MM-DD_digital-trend_daily_summary.md
  *         │   ├── monthly/
  *         │   │   └── YYYY/YYYY-MM-DD_digital-trend_monthly_report.md
+ *         │   ├── weekly/
+ *         │   │   └── YYYY/YYYY-MM-DD_digital-trend_weekly_report.md
  *         │   ├── yearly/
- *         │   │   └── YYYY-MM-DD_digital-trend_yearly_report.md
+ *         │   │   └── YYYY/YYYY_digital-trend_yearly_report.md
+ *         │   ├── insights/
+ *         │   │   └── YYYY/YYYY-MM-DD_digital-trend_insights.md
+ *         │   ├── audio/
+ *         │   │   └── YYYY/MM/YYYY-MM-DD_podcast{.mp3,_script.md,_script.json}
  *         │   └── metrics/
  *         └── publish/
  *             ├── note/
@@ -51,6 +57,10 @@ export const PATHS = {
   ARTIFACTS_METRICS: {
     relative: "artifacts/contents/digital-trend/collection/metrics",
     absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/metrics"),
+  },
+  ARTIFACTS_INSIGHTS: {
+    relative: "artifacts/contents/digital-trend/collection/insights",
+    absolute: path.resolve(PROJECT_ROOT, "artifacts/contents/digital-trend/collection/insights"),
   },
   ARTIFACTS_AUDIO: {
     relative: "artifacts/contents/digital-trend/collection/audio",

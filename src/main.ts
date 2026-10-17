@@ -10,13 +10,8 @@ import { config, env } from "./core/config";
 import { metrics, SOURCE_ALERT_STREAK, type RunStatus } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
-import { archiveProcessedRaindrops, archivableRaindropIds } from "./ingestion/raindrop";
+import { registerBuiltinPlugins } from "./core/builtin_plugins";
 import { sourceDisabledReason } from "./ingestion/source_availability";
-import {
-  fetchSource as fetchConfiguredSource,
-  type RaindropResultSet,
-  type SourceWithPurpose,
-} from "./ingestion/fetch_source";
 import { extractMarkdown } from "./ingestion/jina_reader";
 import {
   calculatePurposeScore,
@@ -30,21 +25,16 @@ import {
 import { triageArticles, triagePurposes, triageScore, type TriageDecision } from "./filtering/llm_triage";
 import { llmCall } from "./summarization/llm_gateway";
 import { semanticDedup } from "./filtering/semantic_dedup";
-import { discoverCandidateKeywords } from "./filtering/keyword_expansion";
 import { mapExtractFacts, MapInput, MapOutput } from "./summarization/gemini_map";
 import { reduceSummarize } from "./summarization/gemini_reduce";
 import { saveMarkdownFile, extractTopStoryTitle, SummaryFrontmatter } from "./storage/markdown_builder";
 import { saveDailyCanvas } from "./storage/canvas_builder";
 import { extractMentionedCompanies, extractMentionedTechnologies } from "./storage/obsidian_linker";
-import { notifyDiscord } from "./publishing/discord_notifier";
-import { notifySlack } from "./publishing/slack_notifier";
-import { notifyTeams } from "./publishing/teams_notifier";
-import { notifyEmail } from "./publishing/email_notifier";
 import { generatePagesSite } from "./publishing/pages_generator";
 import { generatePodcast } from "./publishing/podcast_generator";
 import { evaluateQuality } from "./evaluation/quality_checker";
 import { evaluateRunGate, RunGateResult } from "./evaluation/run_gate";
-import { analyzeTopicTrends } from "./aggregation/trend_analyzer";
+import { buildInsightsReport, saveInsightsReport } from "./aggregation/insights";
 import {
   markAsProcessed,
   markAsEvaluated,
@@ -85,7 +75,10 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   console.log(`\n🚀 Digital Trend Flow - Daily Pipeline Starting (${today})...`);
   console.log(`   ⚙️ API Concurrency: ${env.API_CONCURRENCY}, Interval: ${env.API_INTERVAL_MS}ms\n`);
 
-  // Initialize Langfuse tracing (Item 4.3)
+  // Built-in sources, publishers and event handlers (Item 8.5)
+  registerBuiltinPlugins();
+
+  // Initialize Langfuse tracing (Item 4.3); LLM generations are recorded under this trace
   initLangfuse();
   const trace = createTrace(metrics.getSnapshot().run_id, today);
 
@@ -124,12 +117,8 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     });
   }
 
-  const raindropResultSets: RaindropResultSet[] = [];
-  const fetchSource = (s: SourceWithPurpose): Promise<ArticleItem[]> =>
-    fetchConfiguredSource(s, (result) => raindropResultSets.push(result));
-
   // Fetchers throw on failure, so a broken feed is reported as an error rather than as "empty".
-  const fetchResults = await Promise.allSettled(activeSources.map(fetchSource));
+  const fetchResults = await Promise.allSettled(activeSources.map((s) => registry.fetchSource(s, s.purpose)));
 
   const allNewItems: ArticleItem[] = [];
   fetchResults.forEach((result, i) => {
@@ -188,7 +177,6 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   console.log("\n🔍 Phase 2: Extraction, Scoring & Purpose-Based Selection...");
 
   const allScoredArticles: ScoredArticle[] = [];
-  const allTitles: string[] = []; // For keyword expansion (Item 3.2)
 
   // Metadata pre-filter (blocked domains, NG title keywords) before triage, so blocked items cost nothing.
   const candidates = uniqueItems.filter((item) => {
@@ -279,7 +267,6 @@ export async function runDailyPipeline(): Promise<RunStatus> {
         }
       }
 
-      allTitles.push(item.title);
       console.log(`  ✅ [${scoreResult.purposeLabel}] "${item.title}" (score: ${finalScore.toFixed(1)})`);
       return {
         article: articleData,
@@ -546,11 +533,20 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     console.warn(`⚠️ Obsidian Canvas generation failed: ${errorMessage(canvasErr)}`);
   }
 
-  // Publishing (Items 6.4, 6.5)
-  await notifyDiscord(title, summaryMarkdown, summarizedArticles.length);
-  await notifySlack(title, summaryMarkdown, summarizedArticles.length);
-  await notifyTeams(title, summaryMarkdown, summarizedArticles.length);
-  await notifyEmail(title, summaryMarkdown, summarizedArticles.length);
+  // Publishing (Items 6.2, 6.4): every registered publisher that handles daily reports
+  const publishResults = await registry.publishAll({
+    kind: "daily",
+    title,
+    markdown: summaryMarkdown,
+    articleCount: summarizedArticles.length,
+    date: today,
+    period: today,
+    language: targetLanguage,
+    tags: frontmatterMeta.tags ?? [],
+  });
+  for (const r of publishResults) {
+    console.log(`  📣 ${r.name}: ${r.status}${r.error ? ` (${r.error})` : ""}`);
+  }
 
   // GitHub Pages static site generation (also writes the Atom feed, Item 6.5)
   try {
@@ -560,14 +556,23 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   }
 
   // Item C: Generate AI conversational podcast & audio briefing
-  try {
-    await generatePodcast(summaryMarkdown, today);
-  } catch (podcastErr) {
-    console.warn(`⚠️ Podcast generation failed: ${errorMessage(podcastErr)}`);
+  const podcastConfig = config.settings.publishing.podcast;
+  if (podcastConfig.enabled) {
+    try {
+      await generatePodcast(summaryMarkdown, today, { language: targetLanguage, voices: podcastConfig.voices });
+    } catch (podcastErr) {
+      console.warn(`⚠️ Podcast generation failed: ${errorMessage(podcastErr)}`);
+    }
   }
 
   await registry.events.emit("publish:complete", {
-    channels: ["obsidian", "discord", "slack", "teams", "rss", "pages", "podcast"],
+    channels: [
+      "obsidian",
+      "rss",
+      "pages",
+      ...(podcastConfig.enabled ? ["podcast"] : []),
+      ...publishResults.filter((r) => r.status === "published").map((r) => r.name),
+    ],
   });
 
   // Mark processed URLs
@@ -581,14 +586,8 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     if (!selectedUrls.has(sa.article.url)) markAsEvaluated(sa.article.url, "not_selected", sa.score, sa.purpose);
   }
 
-  // Archive Raindrop items
-  const summarizedUrls = summarizedArticles.map((sa) => sa.article.url);
-  for (const rs of raindropResultSets) {
-    const archiveIds = archivableRaindropIds(rs, summarizedUrls);
-    if (archiveIds.length > 0) {
-      await archiveProcessedRaindrops(rs.collectionId, archiveIds, rs.archiveId);
-    }
-  }
+  // Post-publish steps of the sources (e.g. Raindrop archives the summarized bookmarks)
+  await registry.notifyPublished(summarizedArticles.map((sa) => sa.article.url));
 
   // Item 5.3: Save pipeline run metrics
   savePipelineRun(finalMetrics);
@@ -596,29 +595,28 @@ export async function runDailyPipeline(): Promise<RunStatus> {
   // Item 4.2: Persist metrics JSON
   metrics.persist();
 
-  // Item 3.2: Keyword expansion suggestions
-  if (allTitles.length >= 10) {
-    const suggestions = discoverCandidateKeywords(allTitles);
-    if (suggestions.length > 0) {
-      console.log("\n🔑 Keyword Expansion Suggestions:");
-      for (const s of suggestions.slice(0, 5)) {
-        console.log(`    "${s.word}" (${s.frequency}x) → ${s.suggestedPurpose} weight:${s.suggestedWeight}`);
+  // Items 3.2, 8.1: topic trends and keyword suggestions (insights report + job summary)
+  let insightsMarkdown: string | undefined;
+  if (config.settings.insights.enabled) {
+    try {
+      const insights = buildInsightsReport(today, targetLanguage);
+      saveInsightsReport(insights, targetLanguage);
+      insightsMarkdown = insights.markdown;
+      for (const t of insights.trends.filter((t) => t.trend === "rising" || t.trend === "new").slice(0, 5)) {
+        console.log(`    ${t.trend === "new" ? "🆕" : "📈"} ${t.topic} (${t.totalMentions} days)`);
       }
-    }
-  }
-
-  // Item 8.1: Temporal trend analysis
-  const trends = analyzeTopicTrends(30);
-  const risingTrends = trends.filter((t) => t.trend === "rising" || t.trend === "new");
-  if (risingTrends.length > 0) {
-    console.log("\n📈 Rising Trends:");
-    for (const t of risingTrends.slice(0, 5)) {
-      console.log(`    ${t.trend === "new" ? "🆕" : "📈"} ${t.topic} (${t.totalMentions} mentions)`);
+      for (const k of insights.suggestions.slice(0, 5)) {
+        console.log(
+          `    🔑 "${k.word}" (${k.frequency} titles, lift ${k.lift ?? "—"}) → ${k.suggestedPurpose} weight:${k.suggestedWeight}`,
+        );
+      }
+    } catch (insightsErr) {
+      console.warn(`⚠️ Insights report failed: ${errorMessage(insightsErr)}`);
     }
   }
 
   // Item 4.4: GitHub Actions job summary
-  writeStepSummary();
+  writeStepSummary(insightsMarkdown);
 
   // Cost summary
   console.log(`\n💰 Total LLM Cost: $${finalMetrics.total_cost_usd.toFixed(4)}`);
@@ -750,11 +748,11 @@ export function finishFailed(error: unknown): void {
 
 // ── GitHub Actions Integration ──
 
-/** Appends the metrics summary to the GitHub Actions job summary, when running in Actions. */
-function writeStepSummary(): void {
+/** Appends the metrics summary (and extra sections) to the GitHub Actions job summary, when running in Actions. */
+function writeStepSummary(extra?: string): void {
   const summaryPath = process.env["GITHUB_STEP_SUMMARY"];
   if (!summaryPath) return;
-  fs.appendFileSync(summaryPath, metrics.toGitHubSummary(), "utf8");
+  fs.appendFileSync(summaryPath, metrics.toGitHubSummary() + (extra ? `\n\n${extra}\n` : ""), "utf8");
   console.log("📊 GitHub Actions summary written.");
 }
 

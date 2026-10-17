@@ -4,7 +4,8 @@
     "triage": "triage_v1.md",
     "reduce": "dynamic",
     "monthly_reduce": "monthly_reduce_v1.md",
-    "weekly_reduce": "weekly_reduce_v1.md"
+    "weekly_reduce": "weekly_reduce_v1.md",
+    "yearly_reduce": "yearly_reduce_v1.md"
   },
   "history": [
     {
@@ -16,6 +17,11 @@
       "version": "v2",
       "activated_at": "2026-10-17",
       "description": "Add batch triage prompt (triage_v1); remove the LLM Judge prompt"
+    },
+    {
+      "version": "v1-yearly",
+      "activated_at": "2026-10-17",
+      "description": "Yearly report prompt (aggregates the monthly digests)"
     }
   ]
 }
