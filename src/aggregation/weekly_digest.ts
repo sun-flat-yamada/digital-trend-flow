@@ -13,6 +13,8 @@ import { llmCall } from "../summarization/llm_gateway";
 import { getWeeklyReducePrompt } from "../summarization/prompts";
 import { saveMarkdownFile } from "../storage/markdown_builder";
 import { config } from "../core/config";
+import { outputLanguage } from "../core/language";
+import { metrics } from "../core/metrics";
 import {
   appendTrendSection,
   rankByFrequency,
@@ -147,10 +149,11 @@ ${JSON.stringify(factsPayload, null, 2)}
 
 Generate a comprehensive weekly trend analysis report.`;
 
+  const language = outputLanguage();
   let reportText: string;
   try {
     const response = await llmCall({
-      systemPrompt: getWeeklyReducePrompt(),
+      systemPrompt: getWeeklyReducePrompt(language),
       userPrompt,
       phase: "reduce",
       maxOutputTokens: 16384,
@@ -163,7 +166,7 @@ Generate a comprehensive weekly trend analysis report.`;
   }
 
   // This week against the previous one
-  const markdown = appendTrendSection(reportText, endDate, 14);
+  const markdown = appendTrendSection(reportText, endDate, 14, language);
   const filename = `${endDate}_digital-trend_weekly_report.md`;
   const title = `Weekly Trend Report ${isoWeek} (${startDate} ~ ${endDate})`;
 
@@ -174,8 +177,20 @@ Generate a comprehensive weekly trend analysis report.`;
     sources: [`${matchedSummaries.length} daily summaries (${startDate} ~ ${endDate})`],
     type: "weekly_report",
     period: isoWeek,
+    language,
+    prompts: metrics.getSnapshot().prompts,
   });
 
   console.log(`✅ Weekly digest generated: ${outputPath}`);
-  return { kind: "weekly", period: isoWeek, endDate, title, markdown, articleCount: totalArticles, tags, outputPath };
+  return {
+    kind: "weekly",
+    period: isoWeek,
+    endDate,
+    title,
+    markdown,
+    articleCount: totalArticles,
+    tags,
+    language,
+    outputPath,
+  };
 }

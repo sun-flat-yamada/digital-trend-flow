@@ -21,7 +21,7 @@ jest.mock("../src/core/paths", () => {
       ARTIFACTS_ZENN: abs("zenn"),
       ARTIFACTS_NOTE: abs("note"),
       DB: p.join(mockRoot, "state.db"),
-      PROMPTS: p.join(mockRoot, "prompts"),
+      PROMPTS: p.resolve(__dirname, "..", "prompts"),
       TMP_AI: mockRoot,
     },
   };
@@ -81,7 +81,14 @@ describe("weekly digest", () => {
     expect(() => resolveWeek("last week")).toThrow("Invalid week");
   });
 
+  const savedLanguage = process.env["OUTPUT_LANGUAGE"];
+  afterEach(() => {
+    if (savedLanguage === undefined) delete process.env["OUTPUT_LANGUAGE"];
+    else process.env["OUTPUT_LANGUAGE"] = savedLanguage;
+  });
+
   test("aggregates the week's daily summaries and saves a weekly_report", async () => {
+    process.env["OUTPUT_LANGUAGE"] = "ja";
     mockLlm.mockResolvedValueOnce({ text: "## 📈 今週のトレンド概要\n\nweekly analysis" });
 
     const report = await generateWeeklyDigest("2026-W42");
@@ -101,7 +108,27 @@ describe("weekly digest", () => {
     const saved = fs.readFileSync(report!.outputPath, "utf8");
     expect(saved).toContain("type: weekly_report");
     expect(saved).toContain("period: 2026-W42");
+    // The Japanese prompt file, recorded with its hash
+    expect(mockLlm.mock.calls[0]![0].systemPrompt).toContain("週次のトレンド分析レポート");
+    expect(report!.language).toBe("ja");
+    expect(saved).toContain("language: ja");
+    expect(saved).toMatch(/prompts:\n {2}weekly_reduce: weekly_reduce_ja_v1\.md@[0-9a-f]{8}/);
     expect(report!.outputPath).toContain(path.join("weekly", "2026", "2026-10-18_digital-trend_weekly_report.md"));
+  });
+
+  test("writes the report in OUTPUT_LANGUAGE with the English prompt for a language other than Japanese", async () => {
+    process.env["OUTPUT_LANGUAGE"] = "French";
+    mockLlm.mockResolvedValueOnce({ text: "## 📈 Tendances\n\nweekly analysis" });
+
+    const report = await generateWeeklyDigest("2026-W42");
+
+    const systemPrompt = mockLlm.mock.calls.at(-1)![0].systemPrompt as string;
+    expect(systemPrompt).toContain("## 📈 This Week's Trends");
+    expect(systemPrompt).toContain("Write the entire report in fluent, professional French.");
+    expect(systemPrompt).not.toContain("{{");
+    expect(report!.language).toBe("French");
+    expect(report!.markdown).toContain("## 📐 Topic Trends");
+    expect(fs.readFileSync(report!.outputPath, "utf8")).toMatch(/weekly_reduce: weekly_reduce_en_v1\.md@[0-9a-f]{8}/);
   });
 
   test("throws when the LLM call fails", async () => {

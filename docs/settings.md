@@ -49,6 +49,7 @@ When a language is specified, the following components automatically adapt:
    - **`en` (Default)**: Produces an English briefing with `## 🔥 Today's Top Story`, `**Source**: [Title](URL)`, structured sections (`Technical Breakthrough`, `Trade-offs & Adoption Considerations`, `Recommended Actions for Engineers`), active category breakdowns, and `## 📰 Other Relevant News`.
    - **`ja`**: Produces a Japanese briefing with `## 🔥 本日の最重要ニュース`, `**出典**:`, `技術的ブレークスルー`, `採用・導入のトレードオフ`, `エンジニアへの推奨アクション`, and `## 📰 その他の関連ニュース`.
    - **Any other language (`es`, `fr`, `de`, `zh`, etc.)**: Dynamically instructs the LLM to write the entire briefing fluently in the requested language while strictly adhering to the "TOP 1+3" section structure.
+   - The prompts themselves live only in `prompts/` (`manifest.json` names the file per language: `reduce_ja_v1.md` for Japanese, `reduce_en_v1.md` for every other language). The weekly, monthly and yearly reports choose `*_reduce_ja_v1.md` or `*_reduce_en_v1.md` the same way, so they follow `OUTPUT_LANGUAGE` too. The file and hash of every prompt a run used are recorded in the metrics JSON (`prompts`) and in the note's frontmatter (`prompts`).
 
 2. **Quality Evaluation (`src/evaluation/quality_checker.ts`)**:
    - Validates that the generated summary matches the target language (e.g. Latin/English character ratio for `en`, Japanese character ratio for `ja`).

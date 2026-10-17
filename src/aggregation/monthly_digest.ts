@@ -16,6 +16,8 @@ import { llmCall } from "../summarization/llm_gateway";
 import { getMonthlyReducePrompt } from "../summarization/prompts";
 import { saveMarkdownFile } from "../storage/markdown_builder";
 import { config } from "../core/config";
+import { outputLanguage } from "../core/language";
+import { metrics } from "../core/metrics";
 import { appendTrendSection, rankByFrequency, readDailySummary, type PeriodicReport } from "./periodic_common";
 import { errorMessage } from "../core/errors";
 
@@ -84,10 +86,11 @@ ${JSON.stringify(factsPayload, null, 2)}
 
 Generate a comprehensive monthly trend analysis.`;
 
+  const language = outputLanguage();
   let reportText: string;
   try {
     const response = await llmCall({
-      systemPrompt: getMonthlyReducePrompt(),
+      systemPrompt: getMonthlyReducePrompt(language),
       userPrompt,
       phase: "reduce",
       maxOutputTokens: 16384,
@@ -103,7 +106,7 @@ Generate a comprehensive monthly trend analysis.`;
 
   // This month against the previous one
   const endDate = `${yearMonth}-${String(daysInMonth(yearMonth)).padStart(2, "0")}`;
-  const markdown = appendTrendSection(reportText, endDate, daysInMonth(yearMonth) * 2);
+  const markdown = appendTrendSection(reportText, endDate, daysInMonth(yearMonth) * 2, language);
 
   // Save monthly digest
   const today = new Date().toISOString().split("T")[0] ?? yearMonth + "-01";
@@ -117,6 +120,8 @@ Generate a comprehensive monthly trend analysis.`;
     sources: [`${dailyFiles.length} daily summaries`],
     type: "monthly_report",
     period: yearMonth,
+    language,
+    prompts: metrics.getSnapshot().prompts,
   });
 
   console.log(`✅ Monthly digest generated: ${outputPath}`);
@@ -128,6 +133,7 @@ Generate a comprehensive monthly trend analysis.`;
     markdown,
     articleCount: totalArticles,
     tags,
+    language,
     outputPath,
   };
 }

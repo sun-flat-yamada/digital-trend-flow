@@ -139,3 +139,11 @@ describe("estimateCost", () => {
     expect(cost).toBeGreaterThan(0);
   });
 });
+
+describe("prompt tracking", () => {
+  test("lists the recorded prompts in the step summary", () => {
+    metrics.recordPrompt("map", "map_v1.md@0123abcd");
+    expect(metrics.getSnapshot().prompts).toMatchObject({ map: "map_v1.md@0123abcd" });
+    expect(metrics.toGitHubSummary()).toContain("| Prompts | map: `map_v1.md@0123abcd`");
+  });
+});

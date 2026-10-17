@@ -29,6 +29,8 @@ export interface SummaryFrontmatter {
   type?: string | undefined;
   /** Period of a periodic report, e.g. "2026-W42", "2026-09", "2026". */
   period?: string | undefined;
+  /** Prompts used to generate the note: prompt key → "<file>@<hash>". */
+  prompts?: Record<string, string> | undefined;
 }
 
 /** Obsidian note name (file name without ".md") of the daily summary for a date. */
@@ -122,6 +124,9 @@ export function saveMarkdownFile(
   }
   if (metadata?.language) {
     frontmatterObj["language"] = metadata.language;
+  }
+  if (metadata?.prompts && Object.keys(metadata.prompts).length > 0) {
+    frontmatterObj["prompts"] = metadata.prompts;
   }
 
   const frontmatter = `---\n${yaml.stringify(frontmatterObj)}---\n\n`;
