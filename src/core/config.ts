@@ -3,7 +3,9 @@ import * as path from "path";
 import { PATHS } from "./paths";
 import * as yaml from "yaml";
 import * as dotenv from "dotenv";
+import { z } from "zod";
 import { AppConfig, ConfigSchema, EnvConfig, EnvSchema } from "./types";
+import { errorMessage } from "./errors";
 
 /**
  * Ensures environment variables are loaded from .env file (if present)
@@ -13,13 +15,13 @@ import { AppConfig, ConfigSchema, EnvConfig, EnvSchema } from "./types";
 function loadAndValidateEnv(): EnvConfig {
   // Load .env file silently. In GitHub Actions, secrets are passed directly
   // via the environment, so failure to find .env is fine.
-  dotenv.config();
+  dotenv.config({ quiet: true });
 
   try {
     return EnvSchema.parse(process.env);
-  } catch (error: any) {
+  } catch (error) {
     console.error("❌ Critical Error: Environment variables validation failed.");
-    console.error(error.errors || error.message);
+    console.error(error instanceof z.ZodError ? z.prettifyError(error) : errorMessage(error));
     process.exit(1);
   }
 }
@@ -34,15 +36,10 @@ function loadAndValidateConfig(configPath: string): AppConfig {
     const parsedYaml = yaml.parse(fileContents);
 
     return ConfigSchema.parse(parsedYaml);
-  } catch (error: any) {
+  } catch (error) {
     console.error(`❌ Critical Error: Failed to load or validate config at ${configPath}`);
-    if (error.errors) {
-      // Zod validation error
-      console.error(JSON.stringify(error.errors, null, 2));
-    } else {
-      // File read or YAML parse error
-      console.error(error.message);
-    }
+    // A Zod validation error lists every invalid field; anything else is a file read or YAML parse error.
+    console.error(error instanceof z.ZodError ? z.prettifyError(error) : errorMessage(error));
     process.exit(1);
   }
 }

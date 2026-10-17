@@ -7,6 +7,7 @@ import * as fs from "fs";
 import { runDailyPipeline, shutdownPipeline } from "../main";
 import { metrics } from "../core/metrics";
 import { registry } from "../core/plugin_registry";
+import { errorMessage } from "../core/errors";
 
 // A degraded run exits non-zero so the job fails visibly; the workflow reads the `run_status`
 // step output to still commit the run record (see .github/workflows/daily_summary.yml).
@@ -27,10 +28,10 @@ export async function runDaily(): Promise<number> {
     await shutdownPipeline();
     writeGitHubOutput("run_status", status);
     return status === "degraded" ? EXIT_CODE_DEGRADED : 0;
-  } catch (err: any) {
+  } catch (err) {
     await shutdownPipeline();
     console.error("💀 Fatal pipeline error:", err);
-    metrics.recordError(`Fatal: ${err?.message ?? err}`);
+    metrics.recordError(`Fatal: ${errorMessage(err)}`);
     await registry.events.emit("pipeline:error", { error: String(err) }).catch(() => {});
     writeGitHubOutput("run_status", "failed");
     return EXIT_CODE_FAILED;
@@ -38,5 +39,5 @@ export async function runDaily(): Promise<number> {
 }
 
 if (require.main === module) {
-  runDaily().then((code) => process.exit(code));
+  void runDaily().then((code) => process.exit(code));
 }

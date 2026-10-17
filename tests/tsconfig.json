@@ -1,0 +1,11 @@
+{
+  // Type information for ESLint on tests (Jest compiles tests with its own settings in package.json).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["../src/**/*", "./**/*"],
+  "exclude": []
+}

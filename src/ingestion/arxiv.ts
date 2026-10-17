@@ -9,6 +9,7 @@
 import axios from "axios";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
+import { errorMessage } from "../core/errors";
 
 const ARXIV_API_BASE = "https://export.arxiv.org/api/query";
 
@@ -72,8 +73,8 @@ export async function fetchArxiv(
 
     console.log(`  📄 arXiv [${sourceName}]: ${newItems.length} new papers`);
     return newItems;
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`arXiv fetch failed: ${error.message}`, { cause: error });
+    throw new Error(`arXiv fetch failed: ${errorMessage(error)}`, { cause: error });
   }
 }

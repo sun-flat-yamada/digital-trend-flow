@@ -9,7 +9,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import { PATHS } from "../core/paths";
-import { llmCall } from "../summarization/llm_gateway";
 
 interface TopicOccurrence {
   topic: string;
@@ -25,7 +24,6 @@ export function analyzeTopicTrends(daysBack: number = 30): TopicOccurrence[] {
   const dailyDir = PATHS.ARTIFACTS_DAILY.absolute;
   if (!fs.existsSync(dailyDir)) return [];
 
-  const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
   const filesToProcess: string[] = [];
 
   for (let i = 0; i < daysBack; i++) {

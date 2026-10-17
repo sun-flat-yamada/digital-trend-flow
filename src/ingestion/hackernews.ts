@@ -9,6 +9,7 @@
 import axios from "axios";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
+import { errorMessage } from "../core/errors";
 
 const HN_API_BASE = "https://hacker-news.firebaseio.com/v0";
 
@@ -69,8 +70,8 @@ export async function fetchHackerNews(
 
     console.log(`  📰 HN [${sourceName}]: ${newItems.length} stories (score ≥ ${minScore})`);
     return newItems;
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`Hacker News fetch failed: ${error.message}`, { cause: error });
+    throw new Error(`Hacker News fetch failed: ${errorMessage(error)}`, { cause: error });
   }
 }

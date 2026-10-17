@@ -13,6 +13,7 @@ import { env, config } from "../core/config";
 import { metrics, estimateCost } from "../core/metrics";
 import type { LLMCallMetrics } from "../core/metrics";
 import { resolveModel } from "./model_resolver";
+import { asErrorLike, errorMessage, toError } from "../core/errors";
 
 // ── Types ──
 
@@ -37,10 +38,11 @@ export interface LLMResponse {
 
 // ── Error Classification & Utilities ──
 
-export function isRateLimitError(error: any): boolean {
-  const status = error?.status ?? error?.response?.status ?? error?.statusCode;
+export function isRateLimitError(error: unknown): boolean {
+  const e = asErrorLike(error);
+  const status = e.status ?? e.response?.status ?? e.statusCode;
   if (status === 429) return true;
-  const msg = String(error?.message || "");
+  const msg = String(e.message || "");
   return (
     msg.includes("429") ||
     msg.includes("Too Many Requests") ||
@@ -52,11 +54,12 @@ export function isRateLimitError(error: any): boolean {
   );
 }
 
-export function isTransientError(error: any): boolean {
+export function isTransientError(error: unknown): boolean {
   if (isRateLimitError(error)) return true;
-  const status = error?.status ?? error?.response?.status ?? error?.statusCode;
+  const e = asErrorLike(error);
+  const status = e.status ?? e.response?.status ?? e.statusCode;
   if (status === 500 || status === 502 || status === 503 || status === 504) return true;
-  const msg = String(error?.message || "");
+  const msg = String(e.message || "");
   return (
     msg.includes("503") ||
     msg.includes("502") ||
@@ -72,8 +75,9 @@ export function isTransientError(error: any): boolean {
   );
 }
 
-export function extractRetryDelayMs(error: any): number | null {
-  const msg = String(error?.message || "");
+export function extractRetryDelayMs(error: unknown): number | null {
+  const e = asErrorLike(error);
+  const msg = String(e.message || "");
   // Check "Please retry in 32.197s" or "Please retry in 32s"
   const retryMatch = msg.match(/Please retry in ([\d.]+)s/i);
   if (retryMatch && retryMatch[1]) {
@@ -91,7 +95,7 @@ export function extractRetryDelayMs(error: any): number | null {
     }
   }
   // Check header retry-after in axios response
-  const retryAfter = error?.response?.headers?.["retry-after"];
+  const retryAfter = e.response?.headers?.["retry-after"];
   if (retryAfter) {
     const sec = parseInt(retryAfter, 10);
     if (!isNaN(sec) && sec > 0) {
@@ -121,7 +125,7 @@ export function getCircuit(provider: string): CircuitState {
   return circuits[provider]!;
 }
 
-export function recordFailure(provider: string, error?: any): void {
+export function recordFailure(provider: string, error?: unknown): void {
   // Distinguish rate limit errors from complete infrastructure outages
   if (error && isRateLimitError(error)) {
     console.warn(`  ℹ️ Rate limit on ${provider}. Not recording as infrastructure outage in circuit breaker.`);
@@ -336,23 +340,23 @@ export async function callProviderWithRetry(provider: ProviderConfig, request: L
     async () => {
       try {
         return await callProvider(provider, request);
-      } catch (error: any) {
-        const status = error?.status ?? error?.response?.status;
+      } catch (error) {
+        const status = asErrorLike(error).status ?? asErrorLike(error).response?.status;
         // Client errors (400 Bad Request, 401 Unauthorized, 403 Forbidden) should NOT retry
         if (status === 400 || status === 401 || status === 403) {
-          throw new AbortError(error);
+          throw new AbortError(toError(error));
         }
         // If quota limit is 0 (e.g. Pro model on Free Tier), retrying will never succeed.
         // Abort immediately so fallback provider/model can take over without wasting minutes.
-        const msg = String(error?.message || "");
+        const msg = String(asErrorLike(error).message || "");
         if (isRateLimitError(error) && (msg.includes("limit: 0") || msg.includes('"limit":0'))) {
           console.warn(
             `  ⚠️ Quota limit is 0 for ${provider.platform}/${provider.model}. Aborting retries immediately to allow fallback.`,
           );
-          throw new AbortError(error);
+          throw new AbortError(toError(error));
         }
         if (!isTransientError(error)) {
-          throw new AbortError(error);
+          throw new AbortError(toError(error));
         }
         throw error;
       }
@@ -367,7 +371,7 @@ export async function callProviderWithRetry(provider: ProviderConfig, request: L
         const errorType = isRateLimit ? "RateLimit (429)" : "TransientError (503/Timeout)";
         const delayHint = extractRetryDelayMs(error);
         console.warn(
-          `  ⚠️ [${errorType}] ${provider.platform}/${provider.model} attempt ${attemptNumber} failed: ${error.message}. (${retriesLeft} retries left)`,
+          `  ⚠️ [${errorType}] ${provider.platform}/${provider.model} attempt ${attemptNumber} failed: ${errorMessage(error)}. (${retriesLeft} retries left)`,
         );
         if (delayHint && delayHint > 0 && retriesLeft > 0) {
           console.log(`  ⏳ Respecting upstream retry delay: waiting ${Math.ceil(delayHint / 1000)}s...`);
@@ -412,7 +416,7 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
       });
 
       return response;
-    } catch (error: any) {
+    } catch (error) {
       const originalError = error instanceof AbortError ? error.originalError : error;
       // Only infrastructure failures (5xx, timeouts, network) count toward the circuit breaker.
       // Client errors such as a 400 from a model that cannot serve this request are specific to
@@ -422,7 +426,7 @@ export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
       }
       // Every failure is recorded and the next candidate is tried: a client error from one model
       // (e.g. "Developer instruction is not enabled for this model") says nothing about the others.
-      lastError = `${provider.platform}/${provider.model}: ${(originalError as any)?.message ?? originalError}`;
+      lastError = `${provider.platform}/${provider.model}: ${errorMessage(originalError)}`;
       metrics.recordError(`[${request.phase}] ${lastError}`);
       console.warn(`  ⚠️ ${lastError}. Trying next provider...`);
     }

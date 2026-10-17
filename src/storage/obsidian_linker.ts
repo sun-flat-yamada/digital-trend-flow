@@ -6,7 +6,6 @@
  * Items: 6.3 Obsidian DataView 強化, 8.3 Obsidian Vault 双方向連携
  */
 
-import { config } from "../core/config";
 import { dailySummaryNoteName } from "./markdown_builder";
 
 export interface EnrichedFrontmatter {
@@ -108,56 +107,6 @@ export function extractMentionedCompanies(text: string): string[] {
  */
 export function extractMentionedTechnologies(text: string): string[] {
   return KNOWN_TECHNOLOGIES.filter((tech) => text.toLowerCase().includes(tech.toLowerCase()));
-}
-
-/**
- * Generates Obsidian internal links for related daily summaries.
- * Item 8.3: Bidirectional linking based on shared topics.
- */
-export function generateRelatedLinks(
-  currentDate: string,
-  currentTopics: string[],
-  _recentDates: string[] = [],
-): string[] {
-  // Generate navigation links
-  const links: string[] = [];
-  const prevDate = getPreviousDate(currentDate);
-  links.push(`[[${dailySummaryNoteName(prevDate)}|← 前日]]`);
-
-  // Topic-based MOC links
-  for (const topic of currentTopics.slice(0, 3)) {
-    links.push(`[[MOC-${topic}|${topic}]]`);
-  }
-
-  return links;
-}
-
-/**
- * Generates the footer section with Obsidian navigation links.
- */
-export function generateObsidianFooter(currentDate: string, topics: string[]): string {
-  const prevDate = getPreviousDate(currentDate);
-  const parts: string[] = ["\n\n---\n", `← [[${dailySummaryNoteName(prevDate)}|前日のサマリー]]`];
-
-  if (topics.length > 0) {
-    parts.push("");
-    parts.push("**関連ノート:**");
-    for (const topic of topics.slice(0, 5)) {
-      parts.push(`- [[MOC-${topic}]]`);
-    }
-  }
-
-  return parts.join("\n");
-}
-
-function getPreviousDate(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    date.setDate(date.getDate() - 1);
-    return date.toISOString().split("T")[0] ?? "";
-  } catch {
-    return "";
-  }
 }
 
 /**

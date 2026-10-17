@@ -12,6 +12,7 @@ import { llmCall } from "../summarization/llm_gateway";
 import { getWeeklyReducePrompt } from "../summarization/prompts";
 import { saveMarkdownFile, SummaryFrontmatter } from "../storage/markdown_builder";
 import { config } from "../core/config";
+import { errorMessage } from "../core/errors";
 
 interface DailySummaryMeta {
   date: string;
@@ -187,17 +188,13 @@ Generate a comprehensive weekly trend analysis report.`;
       response.text,
       totalArticles,
       config.settings.author,
-      {
-        ...frontmatter,
-        type: "weekly_report",
-        period: isoWeek,
-      } as any,
+      frontmatter,
     );
 
     console.log(`✅ Weekly digest generated: ${outputPath}`);
     return outputPath;
-  } catch (error: any) {
-    console.error(`❌ Weekly digest generation failed: ${error.message}`);
+  } catch (error) {
+    console.error(`❌ Weekly digest generation failed: ${errorMessage(error)}`);
     return null;
   }
 }

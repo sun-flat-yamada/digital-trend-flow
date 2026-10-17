@@ -7,6 +7,7 @@
 
 import axios from "axios";
 import { env } from "../core/config";
+import { errorMessage } from "../core/errors";
 
 /**
  * Sends a summary to Slack via Webhook.
@@ -53,7 +54,7 @@ export async function notifySlack(title: string, summaryMarkdown: string, articl
     ); // a hung webhook must not stall the run
 
     console.log("✅ Slack notification sent successfully.");
-  } catch (error: any) {
-    console.error(`⚠️ Slack notification failed: ${error.message}`);
+  } catch (error) {
+    console.error(`⚠️ Slack notification failed: ${errorMessage(error)}`);
   }
 }

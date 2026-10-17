@@ -7,6 +7,7 @@
 
 import axios from "axios";
 import { env } from "../core/config";
+import { errorMessage } from "../core/errors";
 
 /**
  * Sends a summary to Microsoft Teams via Webhook.
@@ -63,7 +64,7 @@ export async function notifyTeams(title: string, summaryMarkdown: string, articl
     ); // a hung webhook must not stall the run
 
     console.log("✅ Teams notification sent successfully.");
-  } catch (error: any) {
-    console.error(`⚠️ Teams notification failed: ${error.message}`);
+  } catch (error) {
+    console.error(`⚠️ Teams notification failed: ${errorMessage(error)}`);
   }
 }

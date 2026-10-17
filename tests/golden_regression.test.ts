@@ -5,7 +5,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { calculatePurposeScore, assignBestPurpose, excludeByMetadata } from "../src/filtering/scorer";
+import { assignBestPurpose, excludeByMetadata } from "../src/filtering/scorer";
 
 jest.mock("../src/core/config", () => ({
   config: {

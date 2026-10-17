@@ -1,5 +1,6 @@
 import { extractMarkdownViaJina } from "../ingestion/jina_reader";
 import { calculateScore, normalizeUrl, ArticleData } from "../filtering/scorer";
+import { errorMessage } from "../core/errors";
 
 async function main() {
   const urlArg = process.argv[2];
@@ -50,9 +51,9 @@ async function main() {
       console.log(`Matched Keywords: ${result.matchedKeywords.join(", ")}`);
     }
     console.log("================================================");
-  } catch (err: any) {
-    console.error("❌ Error during dry-run:", err.message);
+  } catch (err) {
+    console.error("❌ Error during dry-run:", errorMessage(err));
   }
 }
 
-main();
+void main();

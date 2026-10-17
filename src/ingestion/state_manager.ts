@@ -16,6 +16,7 @@ import { config } from "../core/config";
 import type { PipelineRunMetrics } from "../core/metrics";
 import { PATHS } from "../core/paths";
 import { normalizeUrl } from "../core/url";
+import { errorMessage } from "../core/errors";
 
 const DB_PATH = PATHS.DB;
 const LEGACY_JSON_PATH = PATHS.LEGACY_JSON;
@@ -127,8 +128,8 @@ function migrateLegacyJson(): void {
     const backupPath = LEGACY_JSON_PATH.replace(".json", ".json.bak");
     fs.renameSync(LEGACY_JSON_PATH, backupPath);
     console.log(`  → Legacy file backed up to ${backupPath}`);
-  } catch (err: any) {
-    console.warn(`⚠️ Legacy migration failed: ${err.message}`);
+  } catch (err) {
+    console.warn(`⚠️ Legacy migration failed: ${errorMessage(err)}`);
   }
 }
 
@@ -282,57 +283,6 @@ export function getSourceFailureStreak(sourceName: string): number {
     )
     .all(sourceName) as Array<{ status: string; article_count: number }>;
   return computeFailureStreak(rows);
-}
-
-/**
- * Gets the total number of processed URLs (for monitoring).
- */
-export function getProcessedCount(): number {
-  const database = getDb();
-  const row = database
-    .prepare(`SELECT COUNT(*) as count FROM processed_urls WHERE expires_at > datetime('now')`)
-    .get() as { count: number } | undefined;
-  return row?.count ?? 0;
-}
-
-/**
- * Gets recent pipeline run history for trend analysis.
- */
-export function getRecentRuns(days: number = 30): Array<{
-  date: string;
-  articles_selected: number;
-  total_cost_usd: number;
-  duration_ms: number;
-}> {
-  const database = getDb();
-  return database
-    .prepare(
-      `
-    SELECT date, articles_selected, total_cost_usd, duration_ms
-    FROM pipeline_runs
-    WHERE date >= date('now', '-' || ? || ' days')
-    ORDER BY date DESC
-  `,
-    )
-    .all(days) as Array<{
-    date: string;
-    articles_selected: number;
-    total_cost_usd: number;
-    duration_ms: number;
-  }>;
-}
-
-/**
- * Debug utility to clear the state.
- */
-export function clearState(): void {
-  if (db) {
-    db.close();
-    db = null;
-  }
-  if (fs.existsSync(DB_PATH)) {
-    fs.unlinkSync(DB_PATH);
-  }
 }
 
 /**

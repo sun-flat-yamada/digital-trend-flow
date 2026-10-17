@@ -3,7 +3,6 @@ import * as path from "path";
 import {
   markdownToHtml,
   parseDailySummary,
-  scanDailySummaries,
   scanAllSummaries,
   generatePagesSite,
   CONTENT_SECURITY_POLICY,
@@ -352,7 +351,7 @@ categories:
       const reportsJsonStr = fs.readFileSync(path.join(testOutputDir, "data", "reports.json"), "utf8");
       const reportsData = JSON.parse(reportsJsonStr);
       expect(Array.isArray(reportsData)).toBe(true);
-      expect(reportsData.some((r: any) => r.reportType === "weekly")).toBe(true);
+      expect(reportsData.some((r: { reportType?: string }) => r.reportType === "weekly")).toBe(true);
 
       // Verify CSS and JS exist
       expect(stylesCss.length).toBeGreaterThan(100);

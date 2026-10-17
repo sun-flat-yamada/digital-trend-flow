@@ -17,7 +17,7 @@ describe("Config Schema Validation", () => {
 
     if (!result.success) {
       // Format errors for debug output
-      const errors = result.error.errors.map((e) => ({
+      const errors = result.error.issues.map((e) => ({
         path: e.path.join("."),
         message: e.message,
       }));
@@ -37,7 +37,7 @@ describe("Config Schema Validation", () => {
     const raw = yaml.parse(fs.readFileSync(path.join(process.cwd(), "config.yml"), "utf8"));
     const config = ConfigSchema.parse(raw);
 
-    for (const [key, purpose] of Object.entries(config.purposes)) {
+    for (const purpose of Object.values(config.purposes)) {
       if (purpose.scoring === null) {
         // Curated — scoring is null, which is valid
         expect(purpose.scoring).toBeNull();
@@ -64,7 +64,7 @@ describe("Config Schema Validation", () => {
       "reddit",
       "bluesky",
     ];
-    for (const [purposeKey, purpose] of Object.entries(config.purposes)) {
+    for (const purpose of Object.values(config.purposes)) {
       for (const source of purpose.sources) {
         expect(validTypes).toContain(source.type);
       }

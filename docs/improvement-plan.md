@@ -400,7 +400,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 ### Phase 3: エンジニアリング基盤（Phase 1・2 と並行、〜3 週）
 
 - [x] 3-1 `ci.yml`（pull_request / push）を追加する。`npm ci` → type-check → lint → test → build の順に実行し、actionlint と `npm audit --audit-level=high` も行う
-- [ ] 3-2 typescript-eslint（`no-floating-promises`、`no-unused-vars` など）を導入する。tsconfig の `noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch` を有効にし、フォーマッタも導入する
+- [x] 3-2 typescript-eslint（`no-floating-promises`、`no-unused-vars` など）を導入する。tsconfig の `noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch` を有効にし、フォーマッタも導入する（#36。Prettier を採用）
 - [x] 3-3 エントリーポイントを分離する（`src/cli/daily.ts`）。`mapWithConcurrency` を `core/` へ移し、`--forceExit` をやめる（#35）
 - [ ] 3-4 テストを拡充する
   - `state_manager`（`:memory:` の DB を使う）

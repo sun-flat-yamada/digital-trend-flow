@@ -6,10 +6,12 @@
  * Item: 4.3 Langfuse 統合
  */
 
+import { Langfuse, type LangfuseTraceClient } from "langfuse";
 import { env } from "../core/config";
+import { errorMessage } from "./errors";
 
 // Lazy-initialized Langfuse client
-let langfuseClient: any = null;
+let langfuseClient: Langfuse | null = null;
 let isAvailable = false;
 
 /**
@@ -22,8 +24,6 @@ export function initLangfuse(): void {
   }
 
   try {
-    // Dynamic import to avoid hard dependency
-    const { Langfuse } = require("langfuse");
     langfuseClient = new Langfuse({
       publicKey: env.LANGFUSE_PUBLIC_KEY,
       secretKey: env.LANGFUSE_SECRET_KEY,
@@ -31,15 +31,15 @@ export function initLangfuse(): void {
     });
     isAvailable = true;
     console.log("🔭 Langfuse tracing enabled.");
-  } catch (error: any) {
-    console.warn(`⚠️ Langfuse initialization failed: ${error.message}`);
+  } catch (error) {
+    console.warn(`⚠️ Langfuse initialization failed: ${errorMessage(error)}`);
   }
 }
 
 /**
  * Creates a new trace for a pipeline run.
  */
-export function createTrace(runId: string, date: string): any {
+export function createTrace(runId: string, date: string): LangfuseTraceClient | null {
   if (!isAvailable || !langfuseClient) return null;
   try {
     return langfuseClient.trace({
@@ -56,7 +56,7 @@ export function createTrace(runId: string, date: string): any {
  * Records an LLM generation span within a trace.
  */
 export function recordGeneration(
-  trace: any,
+  trace: LangfuseTraceClient | null,
   params: {
     name: string;
     model: string;
@@ -93,7 +93,7 @@ export function recordGeneration(
 /**
  * Records a quality score for a trace.
  */
-export function recordQualityScore(trace: any, score: number): void {
+export function recordQualityScore(trace: LangfuseTraceClient | null, score: number): void {
   if (!trace) return;
   try {
     trace.score({

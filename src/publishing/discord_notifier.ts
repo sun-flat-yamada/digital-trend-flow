@@ -1,6 +1,7 @@
 import axios from "axios";
 import { env } from "../core/config";
 import { PATHS } from "../core/paths";
+import { errorMessage } from "../core/errors";
 
 /**
  * Truncates Markdown content at section boundaries to preserve document structure.
@@ -67,8 +68,8 @@ export async function notifyDiscord(title: string, summaryMarkdown: string, arti
     ); // a hung webhook must not stall the run
 
     console.log("✅ Discord notification sent successfully.");
-  } catch (error: any) {
+  } catch (error) {
     // Don't crash the pipeline for a notification failure
-    console.error(`⚠️ Discord notification failed: ${error.message}`);
+    console.error(`⚠️ Discord notification failed: ${errorMessage(error)}`);
   }
 }

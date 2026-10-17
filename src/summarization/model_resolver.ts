@@ -1,4 +1,5 @@
 import { env } from "../core/config";
+import { errorMessage } from "../core/errors";
 
 // Cache the resolved models to avoid repeated API calls
 const resolvedCache: Record<string, string> = {};
@@ -12,6 +13,12 @@ const NON_TEXT_VARIANT_TOKENS = new Set(["tts", "image", "audio", "live", "embed
  * Returns true if a model from the `models.list` response can serve plain-text
  * `generateContent` requests (the only kind this pipeline makes).
  */
+/** A model entry of the Gemini `GET /v1beta/models` response (only the fields used here). */
+interface GeminiModelInfo {
+  name: string;
+  supportedGenerationMethods?: unknown;
+}
+
 export function isTextGenerationModel(model: { name?: string; supportedGenerationMethods?: unknown }): boolean {
   const methods = model.supportedGenerationMethods;
   if (Array.isArray(methods) && !methods.includes("generateContent")) {
@@ -72,10 +79,10 @@ export async function resolveModel(configuredModel: string, platform: string = "
     }
 
     // Filter models based on target category: flash-lite / flash / pro
-    const geminiModels = data.models
-      .filter((m: any) => m.name && m.name.startsWith("models/gemini-"))
-      .filter((m: any) => isTextGenerationModel(m))
-      .filter((m: any) => {
+    const geminiModels = (data.models as GeminiModelInfo[])
+      .filter((m) => m.name && m.name.startsWith("models/gemini-"))
+      .filter((m) => isTextGenerationModel(m))
+      .filter((m) => {
         const name = m.name.toLowerCase();
         if (isFlashLite) {
           return name.includes("lite");
@@ -87,7 +94,7 @@ export async function resolveModel(configuredModel: string, platform: string = "
         }
       })
       // Favor stable models: exclude -exp (experimental)
-      .filter((m: any) => !m.name.toLowerCase().includes("exp"));
+      .filter((m) => !m.name.toLowerCase().includes("exp"));
 
     let highestScore = -1;
     let latestModelId = "";
@@ -121,8 +128,8 @@ export async function resolveModel(configuredModel: string, platform: string = "
     console.warn(`⚠️ Could not auto-resolve ${configuredModel}, falling back to ${fallbackModel}`);
     resolvedCache[cacheKey] = fallbackModel;
     return fallbackModel;
-  } catch (error: any) {
-    console.error(`⚠️ Error fetching latest models for ${configuredModel}: ${error.message}`);
+  } catch (error) {
+    console.error(`⚠️ Error fetching latest models for ${configuredModel}: ${errorMessage(error)}`);
     resolvedCache[cacheKey] = fallbackModel;
     return fallbackModel;
   }

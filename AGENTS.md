@@ -56,7 +56,7 @@ The pipeline ingests data from seven types of sources. Each module is designed t
 *   **Resilience (Fault Tolerance)**:
     *   Never allow a single article's processing failure to crash the entire pipeline.
     *   Use `Promise.allSettled` (not `Promise.all`) for batch operations.
-    *   Implement retry mechanisms for external APIs (e.g., `p-retry` for Jina Reader).
+    *   Implement retry mechanisms for external APIs (e.g., `pRetry` in `src/core/retry.ts` for Jina Reader and the LLM gateway).
     *   LLM gateway uses circuit breaker pattern with automatic fallback across providers.
 *   **Idempotency**: Always check and update `pipeline_state.db` (SQLite) via `src/ingestion/state_manager.ts`. Never process the same URL twice across runs. Expired entries are automatically purged via TTL (default: 90 days).
 *   **Citations**: Source URLs MUST be preserved throughout the Map-Reduce pipeline and included in all final outputs.
@@ -101,7 +101,7 @@ When an AI agent finishes a task or refactor, verify via:
 2.  **Golden Regression**: `npm run test:golden` — validates output quality against reference datasets in `tests/golden/`.
 3.  **Dry-run Testing**: `npm run debug:filter <URL>` — validates ingestion + scoring logic without LLM/API costs.
 4.  **Build Check**: `npm run build` — ensures `tsc` compilation to `dist/` succeeds.
-5.  **Lint**: `npm run lint` — ESLint check across TypeScript, JSON, and YAML files.
+5.  **Lint & Format**: `npm run lint` — ESLint (typescript-eslint with type-aware promise rules, JSON, YAML). `npm run format:check` — Prettier on TypeScript/JavaScript (`npm run format` to fix). `npm run type-check` also type-checks `tests/` (`tests/tsconfig.json`).
 
 ## 8. Key Design Decisions (for context)
 

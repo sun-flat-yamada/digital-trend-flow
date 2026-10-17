@@ -1,5 +1,5 @@
 import { buildReducePrompt } from "../src/summarization/prompts";
-import { getI18n, I18N_EN, I18N_JA } from "../src/publishing/pages_generator";
+import { getI18n } from "../src/publishing/pages_generator";
 
 describe("multilingual prompts & i18n", () => {
   const purposes = [

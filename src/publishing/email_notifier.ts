@@ -7,6 +7,7 @@ import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
 import { env } from "../core/config";
 import { markdownToHtml } from "./pages_generator";
+import { errorMessage } from "../core/errors";
 
 /**
  * Helper to build responsive, clean HTML email body.
@@ -166,8 +167,8 @@ export async function notifyEmail(
     });
 
     console.log(`✅ Email notification sent successfully to ${mailTo}.`);
-  } catch (error: any) {
+  } catch (error) {
     // Don't crash the pipeline for a notification failure
-    console.error(`⚠️ Email notification failed: ${error.message}`);
+    console.error(`⚠️ Email notification failed: ${errorMessage(error)}`);
   }
 }

@@ -2,6 +2,7 @@ import axios from "axios";
 import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
 import { ArticleItem } from "./rss";
+import { errorMessage } from "../core/errors";
 
 const XAI_API_BASE = "https://api.x.ai/v1";
 
@@ -149,8 +150,10 @@ export async function fetchXViGrok(
 
     console.log(`  🐦 X/Grok [${sourceName}]: ${newItems.length} new posts (${parsed.results.length} total found).`);
     return newItems;
-  } catch (error: any) {
+  } catch (error) {
     // Propagate, so the run records the source as failing rather than empty.
-    throw new Error(`X/Grok search failed for "${sourceName}": ${error.message}`, { cause: error });
+    throw new Error(`X/Grok search failed for "${sourceName}": ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
 }

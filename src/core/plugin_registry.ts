@@ -7,6 +7,7 @@
  */
 
 import { ArticleItem } from "../ingestion/rss";
+import { errorMessage } from "./errors";
 
 // ── Plugin Interfaces ──
 
@@ -52,8 +53,8 @@ class EventBus {
     for (const handler of handlers) {
       try {
         await handler(data);
-      } catch (error: any) {
-        console.warn(`⚠️ Event handler error for ${event}: ${error.message}`);
+      } catch (error) {
+        console.warn(`⚠️ Event handler error for ${event}: ${errorMessage(error)}`);
       }
     }
   }
