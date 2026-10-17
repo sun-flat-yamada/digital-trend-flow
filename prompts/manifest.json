@@ -2,10 +2,22 @@
   "active": {
     "map": "map_v1.md",
     "triage": "triage_v1.md",
-    "reduce": "dynamic",
-    "monthly_reduce": "monthly_reduce_v1.md",
-    "weekly_reduce": "weekly_reduce_v1.md",
-    "yearly_reduce": "yearly_reduce_v1.md"
+    "reduce": {
+      "ja": "reduce_ja_v1.md",
+      "en": "reduce_en_v1.md"
+    },
+    "weekly_reduce": {
+      "ja": "weekly_reduce_ja_v1.md",
+      "en": "weekly_reduce_en_v1.md"
+    },
+    "monthly_reduce": {
+      "ja": "monthly_reduce_ja_v1.md",
+      "en": "monthly_reduce_en_v1.md"
+    },
+    "yearly_reduce": {
+      "ja": "yearly_reduce_ja_v1.md",
+      "en": "yearly_reduce_en_v1.md"
+    }
   },
   "history": [
     {
@@ -22,6 +34,11 @@
       "version": "v1-yearly",
       "activated_at": "2026-10-17",
       "description": "Yearly report prompt (aggregates the monthly digests)"
+    },
+    {
+      "version": "v3",
+      "activated_at": "2026-10-17",
+      "description": "prompts/ is the only prompt definition: the daily Reduce prompt moves to reduce_{ja,en}_v1.md; weekly, monthly and yearly prompts get an English version (selected by OUTPUT_LANGUAGE)"
     }
   ]
 }

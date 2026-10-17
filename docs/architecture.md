@@ -205,6 +205,10 @@ interface SummaryFrontmatter {
   executionTimeSec?: number;
   qualityScore?: number;
   relatedNotes?: string[];
+  language?: string;
+  type?: string; // "daily_summary" | "weekly_report" | "monthly_report" | "yearly_report"
+  period?: string;
+  prompts?: Record<string, string>; // 使ったプロンプト: キー → "<ファイル名>@<ハッシュ>"
 }
 ```
 
@@ -665,6 +669,7 @@ artifacts/contents/
 
 - どれも `node dist/cli/report.js <weekly|monthly|yearly> [period]` で実行する（期間を省略すると直前の完了した期間）。ローカルでは `npm run report:weekly` など
 - 入力は日次サマリー（または月次ダイジェスト）の抜粋で上限があり、Reduce モデルが 1 回だけ呼ばれる。年次は月次ダイジェストを入力にするので、Map-Reduce の段数が 1 つ増えた形になる
+- プロンプトは `prompts/*_reduce_{ja,en}_v1.md`。`OUTPUT_LANGUAGE` が日本語なら ja、それ以外は en のファイルを使う（en には書く言語の指示を差し込む）
 - 生成後、レポートの末尾に「トピックの推移」（`trend_analyzer.ts` による決定的な集計。週次は前週比、月次は前月比、年次は前半と後半の比較）を付ける
 - LLM が失敗したら例外にしてジョブを失敗させる。対象期間のデータがなければ何もせずに成功で終わる
 - 生成したレポートは `registry.publishAll()` で配信する（既定では通知・Zenn・note.com）

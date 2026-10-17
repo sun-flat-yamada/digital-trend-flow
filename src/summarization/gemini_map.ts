@@ -1,29 +1,14 @@
 /**
  * [Role] Map phase of the Map-Reduce summarization pipeline.
  * [Mechanism] Uses the LLM Gateway with structured output to extract
- * concise facts from individual articles, with semantic caching.
+ * concise facts from individual articles.
  *
- * Items: 1.1 Structured Output, 1.2 Multi-LLM Fallback, 1.5 Semantic Cache
+ * Items: 1.1 Structured Output, 1.2 Multi-LLM Fallback
  */
 
-import * as crypto from "crypto";
 import { llmCall } from "./llm_gateway";
 import { getMapPrompt, MAP_RESPONSE_SCHEMA } from "./prompts";
 import { cleanseMarkdownContext } from "../filtering/scorer";
-
-// ── Semantic Cache (Item 1.5) ──
-// In-memory cache keyed by content hash to avoid duplicate LLM calls
-// within the same pipeline run or retries.
-
-const factCache = new Map<string, MapOutput>();
-
-function contentHash(url: string, content: string): string {
-  return crypto
-    .createHash("sha256")
-    .update(`${url}::${content.slice(0, 5000)}`)
-    .digest("hex")
-    .slice(0, 16);
-}
 
 // ── Types ──
 
@@ -56,14 +41,6 @@ export interface MapOutput {
  * "summarized" from its title alone.
  */
 export async function mapExtractFacts(article: MapInput): Promise<MapOutput> {
-  // Check cache first (Item 1.5)
-  const hash = contentHash(article.url, article.content);
-  const cached = factCache.get(hash);
-  if (cached) {
-    console.log(`  💾 Cache hit for: "${article.title}"`);
-    return cached;
-  }
-
   // Slice first to avoid cleansing the entire document, then cleanse
   const truncatedContent = cleanseMarkdownContext(article.content.slice(0, 15000)).slice(0, 10000);
 
@@ -91,9 +68,6 @@ ${truncatedContent}
     source_url: article.url,
     facts: parseFacts(response.text),
   };
-
-  // Cache the result (Item 1.5)
-  factCache.set(hash, output);
 
   return output;
 }
@@ -123,11 +97,4 @@ function parseFacts(responseText: string): ExtractedFact[] {
     throw new Error("Map response contained no usable facts");
   }
   return facts;
-}
-
-/**
- * Clears the fact cache (useful for testing).
- */
-export function clearFactCache(): void {
-  factCache.clear();
 }

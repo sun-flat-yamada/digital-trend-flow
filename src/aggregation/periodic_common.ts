@@ -8,9 +8,7 @@ import * as fs from "fs";
 import * as yaml from "yaml";
 import { analyzeTopicTrends, formatTrendAnalysis } from "./trend_analyzer";
 import type { ReportKind } from "../core/plugin_registry";
-
-/** The periodic report prompts are written in Japanese, so the appended sections are too. */
-export const PERIODIC_REPORT_LANGUAGE = "ja";
+import { isJapanese } from "../core/language";
 
 export interface DailySummaryMeta {
   date: string;
@@ -33,6 +31,8 @@ export interface PeriodicReport {
   markdown: string;
   articleCount: number;
   tags: string[];
+  /** Language the report was written in (OUTPUT_LANGUAGE). */
+  language: string;
   outputPath: string;
 }
 
@@ -72,11 +72,14 @@ export function readDailySummary(filePath: string, date: string, maxChars: numbe
  * Appends the topic trend section over the `windowDays` days ending at `endDate`; the report is
  * returned unchanged when no trend stands out.
  */
-export function appendTrendSection(markdown: string, endDate: string, windowDays: number): string {
+export function appendTrendSection(markdown: string, endDate: string, windowDays: number, language: string): string {
   const trends = analyzeTopicTrends(windowDays, new Date(`${endDate}T00:00:00Z`));
-  const section = formatTrendAnalysis(trends, PERIODIC_REPORT_LANGUAGE);
+  const section = formatTrendAnalysis(trends, language);
   if (!section) return markdown;
-  return `${markdown.trim()}\n\n## 📐 トピックの推移（日次サマリーの集計・直近 ${windowDays} 日）\n\n${section}\n`;
+  const heading = isJapanese(language)
+    ? `## 📐 トピックの推移（日次サマリーの集計・直近 ${windowDays} 日）`
+    : `## 📐 Topic Trends (from the daily summaries, last ${windowDays} days)`;
+  return `${markdown.trim()}\n\n${heading}\n\n${section}\n`;
 }
 
 /** Most frequent values first (ties keep first-seen order). */

@@ -208,8 +208,8 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | LLM-4 | P1 | サーキットブレーカーがプラットフォーム単位のため、過負荷の 1 モデル（503 が頻発する flash など）が原因で、同じプラットフォームの健全なモデル（flash-lite）まで遮断される | `llm_gateway.ts:398, 427` | `platform/model` 単位にする（✅ #50） |
 | LLM-5 | P1 | Anthropic の `anthropic-version: "2024-10-22"` は無効な値（有効値は `2023-06-01`）。フォールバック先に設定すると 400 で即失敗する。`responseSchema` も Anthropic では無視される | `llm_gateway.ts:255-291` | ヘッダーを修正し、tool use 等で構造化出力に対応する（✅ ヘッダーは #26、構造化出力は #50。Anthropic は強制した tool 呼び出しの `input_schema`、OpenAI は JSON Schema〔小文字の型・`additionalProperties: false`〕で送る） |
 | LLM-6 | P2 | コスト表を部分一致・先頭一致で引くため、`gpt-4.1-mini` が `gpt-4.1` の単価で計算される。価格表もコードにハードコードされている | `metrics.ts:55-94` | 最長一致にし、価格表を config 化する（✅ 最長一致は #26、価格表は #51 で `settings.pricing`。2026-10-17 の公式価格に更新） |
-| LLM-7 | P2 | 「Semantic Cache」は実行内メモリの完全一致キャッシュである。1 回の実行で同じ URL は 1 回しか処理しないため、実質ヒットしない | `gemini_map.ts:14-26, 53-59` | 削除するか、永続キャッシュとして設計し直す |
-| LLM-8 | P2 | プロンプトがファイルとコードに二重定義され、ファイルがないと無言でインライン版に切り替わる。`promptHash` は未使用で、出力と使用プロンプトの対応を追えない。月次・週次のプロンプトは日本語固定 | `prompts.ts`、`prompts/manifest.json` | ファイルを唯一の正とし、版とハッシュを metrics・frontmatter に記録し、多言語化する |
+| LLM-7 | P2 | 「Semantic Cache」は実行内メモリの完全一致キャッシュである。1 回の実行で同じ URL は 1 回しか処理しないため、実質ヒットしない | `gemini_map.ts:14-26, 53-59` | 削除するか、永続キャッシュとして設計し直す（✅ #44。削除した） |
+| LLM-8 | P2 | プロンプトがファイルとコードに二重定義され、ファイルがないと無言でインライン版に切り替わる。`promptHash` は未使用で、出力と使用プロンプトの対応を追えない。月次・週次のプロンプトは日本語固定 | `prompts.ts`、`prompts/manifest.json` | ファイルを唯一の正とし、版とハッシュを metrics・frontmatter に記録し、多言語化する（✅ #44） |
 
 ### 4.5 品質評価
 
@@ -383,7 +383,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 - [ ] 2-2 キーワードスコアの照合範囲（タイトル＋説明文＋本文冒頭）、語形変化・正規表現への対応、`prescreen` の明示的な設定
 - [ ] 2-3 IDF 補正を決定的にするか削除し、目的間でスコアを正規化する
 - [ ] 2-4 品質評価を拡張する（引用の precision、Map 成功率、fallback 検出、閾値の config 化。任意で LLM による根拠性のサンプリング評価）
-- [ ] 2-5 プロンプトを単一ソースにし、版とハッシュを記録し、月次・週次を多言語化する
+- [x] 2-5 プロンプトを単一ソースにし、版とハッシュを記録し、月次・週次を多言語化する（#44）
 - [ ] 2-6 本番ログ由来の回帰データセット（§1.3 の取りこぼし例・誤検出例）を、実際の `config.yml` で検証するテストを作る
 
 > **進捗（2026-10-17）**: 2-1 を実装した（#40）。評価は回帰データセット（2-6、#38）ができてから行うため、チェックは付けていない。実装時に決めた点は次のとおり。
@@ -394,6 +394,14 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 > - トリアージを通った記事は、キーワードの閾値で落とさない。スコアは重要度ベース（目的間で同じ尺度。SCO-5 の一部）で、キーワードの一致はタグと説明用に残す
 > - 重複は、トリアージが返す「重複先」で同じ話題の記事をまとめ、重要度が最も高い 1 件だけ残す（同じバッチ内のみ。`batch_size` 150 なので 1 日約 120 件なら 1 回で全件を見る）
 > - コストの見込みは 1 回あたり約 $0.008（入力約 1 万トークン、出力約 4 千トークン、Flash-Lite の単価）
+
+> **進捗（2026-10-17、2-5）**: 2-5 を実装した（#44）。実装時に決めた点は次のとおり。
+>
+> - `prompts/` を唯一の定義にした。`manifest.json` にない、またはファイルがないプロンプトはエラーにし、`prompts.ts` のインライン版は削除した
+> - 日次の Reduce は `reduce_ja_v1.md` / `reduce_en_v1.md` にし、カテゴリ別の節（`{{purpose_sections}}`）と書く言語の指示（`{{language_instruction}}`）を差し込む。週次・月次・年次は `*_reduce_ja_v1.md`（従来の日本語版）と `*_reduce_en_v1.md`（新規）にした
+> - 言語は日次と同じく `OUTPUT_LANGUAGE`（→ `SUMMARY_LANGUAGE` → `settings.language`）で選ぶ。日本語は ja のファイル、それ以外は en のファイルに言語の指示を差し込む。週次・月次・年次のワークフローにも `OUTPUT_LANGUAGE` を渡すようにしたため、**変数が未設定なら週次・月次・年次も英語になる**（従来は日本語固定）
+> - 使ったプロンプトは `<ファイル名>@<テンプレートの sha256 先頭 8 桁>` として、metrics JSON の `prompts`、Job Summary の Prompts 行、日次・週次・月次・年次の frontmatter の `prompts` に記録する
+> - LLM-7: Map の `factCache` は削除した（1 回の実行で同じ URL は 1 回しか処理しないため）
 
 **完了条件**: 回帰データセットで、関連記事の再現率が 90% 以上、対象外記事の通過率が 10% 以下、引用の precision が 100% であること。
 
@@ -432,7 +440,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 > **進捗（2026-10-17）**: 4-5 を実施した（#57）。ユーザーの判断で、表の機能はすべて削除せずに本番で使えるように配線した（CI-9 の年次、CI-10、SCO-10、PUB-9、QL-5 の「未配線の機能」）。
 >
 > - **週次（CI-10）**: `weekly_digest.yml`（毎週月曜 02:17 UTC、前週の ISO 週）と CLI `src/cli/report.ts`（`node dist/cli/report.js weekly [2026-W42]`）を追加した。LLM の失敗は例外にしてジョブを失敗させ、frontmatter に `type: weekly_report`・`period` を書くようにした
-> - **年次（CI-9 の年次）**: `src/aggregation/yearly_report.ts` を追加した。その年の月次ダイジェスト（12 月分は翌年のフォルダにある）と、日次サマリーのトップニュースの一覧を入力に、`prompts/yearly_reduce_v1.md` で Reduce する。`yearly_report.yml` は 12 月分の月次の翌日（1/2 20:43 UTC）に動き、concurrency グループ `pipeline-state` と `vars.ARTIFACTS_REPO` を使うようにした
+> - **年次（CI-9 の年次）**: `src/aggregation/yearly_report.ts` を追加した。その年の月次ダイジェスト（12 月分は翌年のフォルダにある）と、日次サマリーのトップニュースの一覧を入力に、`prompts/yearly_reduce_v1.md`（#44 で `yearly_reduce_{ja,en}_v1.md`）で Reduce する。`yearly_report.yml` は 12 月分の月次の翌日（1/2 20:43 UTC）に動き、concurrency グループ `pipeline-state` と `vars.ARTIFACTS_REPO` を使うようにした
 > - **note.com / Zenn**: `note_api.ts` を書き直した。Zenn は記事ファイルを `publish/zenn/` に書き、`vars.ZENN_REPO` があれば composite action `.github/actions/sync-zenn` が Zenn 連携リポジトリの `articles/` に新しい記事を push する（既存の記事は上書きしない）。note.com は下書きを `publish/note/` に書き、`NOTE_API_TOKEN`（`_note_session_v5` Cookie）があればエディターの非公式 API で下書きを作る。既定では週次・月次・年次を配信し、`published: false`（下書き）にした（`settings.publishing`）
 > - **キーワード拡張・トレンド分析（SCO-10）**: キーワード候補は状態 DB の処理済みタイトルを使い、直近 30 日と直前 60 日を比較する（単語と 2 語の句、3 記事以上・2 日以上・出現率 2 倍以上、停止語を拡充、目的は選定された目的の多数決、重みはその目的の中央値）。トレンド分析は日次サマリーの frontmatter（`tags`・`mentioned_*`）を集計する。日次の実行で `collection/insights/` に保存して Job Summary に載せ、週次・月次・年次のレポートの末尾にも付ける（`settings.insights`）
 > - **Langfuse スパン**: `llmCall` が成功のたびに、実行のトレースへ generation（モデル・トークン・コスト・レイテンシ・プロンプトのハッシュ）を記録する。パイプラインのイベントもトレースに記録し、週次・月次・年次も 1 実行 1 トレースにした

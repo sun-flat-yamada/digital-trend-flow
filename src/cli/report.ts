@@ -14,7 +14,7 @@ import { randomUUID } from "crypto";
 import { generateWeeklyDigest, getIsoWeekString } from "../aggregation/weekly_digest";
 import { generateMonthlyDigest } from "../aggregation/monthly_digest";
 import { generateYearlyReport } from "../aggregation/yearly_report";
-import { PERIODIC_REPORT_LANGUAGE, type PeriodicReport } from "../aggregation/periodic_common";
+import { type PeriodicReport } from "../aggregation/periodic_common";
 import { registerBuiltinPlugins } from "../core/builtin_plugins";
 import { initLangfuse, createTrace, flushLangfuse } from "../core/langfuse";
 import { metrics } from "../core/metrics";
@@ -66,7 +66,7 @@ export async function runReport(kind: PeriodicKind, period: string): Promise<Per
     articleCount: report.articleCount,
     date: report.endDate,
     period: report.period,
-    language: PERIODIC_REPORT_LANGUAGE,
+    language: report.language,
     tags: report.tags,
   });
   for (const r of results) {

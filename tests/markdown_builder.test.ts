@@ -91,6 +91,17 @@ describe("saveMarkdownFile", () => {
     expect(content).toContain("[[2026-09-07_digital-trend_daily_summary|Previous Summary]]");
   });
 
+  test("records the prompts used in frontmatter", () => {
+    const filePath = saveMarkdownFile(testDir, "test_prompts.md", "T", "Body", 1, "Author", {
+      prompts: { map: "map_v1.md@0123abcd", reduce: "reduce_ja_v1.md@89ef4567" },
+    });
+    const content = fs.readFileSync(filePath, "utf8");
+    expect(content).toContain("prompts:\n  map: map_v1.md@0123abcd\n  reduce: reduce_ja_v1.md@89ef4567\n");
+    expect(
+      fs.readFileSync(saveMarkdownFile(testDir, "no_prompts.md", "T", "B", 1, "A", { prompts: {} }), "utf8"),
+    ).not.toContain("prompts:");
+  });
+
   test("creates parent directories automatically", () => {
     const nestedDir = path.join(testDir, "nested", "deep");
     const filePath = saveMarkdownFile(nestedDir, "nested_test.md", "Nested", "Body", 1, "Author");

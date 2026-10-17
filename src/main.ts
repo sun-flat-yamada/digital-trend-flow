@@ -7,6 +7,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { config, env } from "./core/config";
+import { outputLanguage } from "./core/language";
 import { metrics, SOURCE_ALERT_STREAK, type RunStatus } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
@@ -393,8 +394,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     }
   }
 
-  const targetLanguage =
-    process.env.OUTPUT_LANGUAGE || process.env.SUMMARY_LANGUAGE || config.settings.language || "en";
+  const targetLanguage = outputLanguage();
   console.log(`  🌐 Output language: ${targetLanguage}`);
 
   const reduceResult = await reduceSummarize(allFacts, today, activePurposes, targetLanguage);
@@ -493,6 +493,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     totalTokens: finalMetrics.total_tokens,
     qualityScore: qualityResult.overallScore,
     language: targetLanguage,
+    prompts: finalMetrics.prompts,
   };
 
   const outputDir = path.join(PATHS.ARTIFACTS_DAILY.absolute, yyyy, mm);

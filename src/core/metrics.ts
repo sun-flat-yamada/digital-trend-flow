@@ -79,6 +79,8 @@ export interface PipelineRunMetrics {
   status_reasons?: string[];
   map_attempted?: number; // selected articles sent to the Map phase
   map_succeeded?: number; // articles whose facts were extracted
+  /** Prompts loaded by the run: prompt key → "<file>@<hash>" (see summarization/prompts.ts). */
+  prompts?: Record<string, string>;
 }
 
 // ── Cost Estimation ──
@@ -137,6 +139,7 @@ class MetricsCollector {
       errors: [],
       sources_status: [],
       extraction: { attempted: 0, failed: 0, fallback: 0 },
+      prompts: {},
     };
   }
 
@@ -146,6 +149,11 @@ class MetricsCollector {
     this.metrics.total_tokens.input += call.input_tokens;
     this.metrics.total_tokens.output += call.output_tokens;
     this.metrics.total_cost_usd += call.estimated_cost_usd;
+  }
+
+  /** Records the prompt file and hash a run used for `key`. */
+  recordPrompt(key: string, ref: string): void {
+    (this.metrics.prompts ??= {})[key] = ref;
   }
 
   /** Records the status of a source fetch. */
@@ -275,6 +283,9 @@ class MetricsCollector {
 
     const statusIcons: Record<RunStatus, string> = { success: "✅", degraded: "⚠️", skipped: "⏭️", failed: "❌" };
     const runStatus = m.run_status ? `${statusIcons[m.run_status]} ${m.run_status}` : "N/A";
+    const promptList = Object.entries(m.prompts ?? {})
+      .map(([key, ref]) => `${key}: \`${ref}\``)
+      .join(", ");
     const mapSuccess = m.map_attempted !== undefined ? `${m.map_succeeded ?? 0}/${m.map_attempted}` : "N/A";
     const reasonsSection =
       m.status_reasons && m.status_reasons.length > 0
@@ -299,6 +310,7 @@ ${triageRow}| Content Extraction (Failed / Description Fallback) | ${m.extractio
 | Estimated Cost | $${m.total_cost_usd.toFixed(4)} |
 | Quality Score | ${m.quality_score?.toFixed(1) ?? "N/A"} |
 | Errors | ${m.errors.length} |
+| Prompts | ${promptList || "N/A"} |
 ${reasonsSection}${sourceAlertsSection}
 ### Sources
 | Source | Type | Status | Articles | Failure Streak |
@@ -314,7 +326,7 @@ ${purposeRows || "| (none) | — |"}
 
   /** Returns current metrics snapshot (non-finalized). */
   getSnapshot(): PipelineRunMetrics {
-    return { ...this.metrics };
+    return { ...this.metrics, prompts: { ...(this.metrics.prompts ?? {}) } };
   }
 }
 

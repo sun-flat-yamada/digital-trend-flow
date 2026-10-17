@@ -11,6 +11,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { PATHS } from "../core/paths";
 import { config } from "../core/config";
+import { outputLanguage } from "../core/language";
+import { metrics } from "../core/metrics";
 import { llmCall } from "../summarization/llm_gateway";
 import { getYearlyReducePrompt } from "../summarization/prompts";
 import { saveMarkdownFile } from "../storage/markdown_builder";
@@ -135,10 +137,11 @@ ${topStories.map((s) => `- ${s.date}: ${s.topStory}`).join("\n")}
 
 Generate the yearly trend report.`;
 
+  const language = outputLanguage();
   let reportText: string;
   try {
     const response = await llmCall({
-      systemPrompt: getYearlyReducePrompt(),
+      systemPrompt: getYearlyReducePrompt(language),
       userPrompt,
       phase: "reduce",
       maxOutputTokens: 16384,
@@ -150,7 +153,7 @@ Generate the yearly trend report.`;
 
   const endDate = `${year}-12-31`;
   // Second half of the year against the first
-  const markdown = appendTrendSection(reportText, endDate, 365);
+  const markdown = appendTrendSection(reportText, endDate, 365, language);
   const tags = rankByFrequency([...monthly.flatMap((m) => m.tags), ...topStories.flatMap((s) => s.tags)], 10);
   const title = `Yearly Trend Report ${year}`;
   // Articles summarized over the year, like the article count of the weekly and monthly reports
@@ -168,9 +171,21 @@ Generate the yearly trend report.`;
       sources: [`${monthly.length} monthly digests`, `${topStories.length} daily summaries`],
       type: "yearly_report",
       period: year,
+      language,
+      prompts: metrics.getSnapshot().prompts,
     },
   );
 
   console.log(`✅ Yearly report generated: ${outputPath}`);
-  return { kind: "yearly", period: year, endDate, title, markdown, articleCount: totalArticles, tags, outputPath };
+  return {
+    kind: "yearly",
+    period: year,
+    endDate,
+    title,
+    markdown,
+    articleCount: totalArticles,
+    tags,
+    language,
+    outputPath,
+  };
 }
