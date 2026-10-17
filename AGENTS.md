@@ -19,18 +19,19 @@ Strictly follow these boundaries when creating or modifying files:
 
 | Directory             | Purpose                                             | Key modules                                                                                                                                   |
 | --------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/core`            | Configuration, types, paths, metrics, observability | `config.ts`, `types.ts` (Zod schemas), `paths.ts`, `metrics.ts`, `langfuse.ts`, `plugin_registry.ts`                                          |
+| `src/core`            | Configuration, types, paths, metrics, observability | `config.ts`, `types.ts` (Zod schemas), `paths.ts`, `metrics.ts`, `langfuse.ts`, `plugin_registry.ts`, `builtin_plugins.ts` (registers the built-in sources/publishers) |
 | `src/ingestion`       | Fetching raw data + state management                | `rss.ts`, `raindrop.ts`, `xai_grok.ts`, `hackernews.ts`, `arxiv.ts`, `youtube.ts`, `github_trending.ts`, `jina_reader.ts`, `state_manager.ts` |
 | `src/filtering`       | Rule-based exclusion + scoring                      | `llm_triage.ts` (batch LLM triage), `scorer.ts` (NO LLM calls here), `keyword_expansion.ts`, `semantic_dedup.ts`                              |
 | `src/summarization`   | LLM API integrations (multi-provider)               | `gemini_map.ts`, `gemini_reduce.ts`, `prompts.ts`, `llm_gateway.ts`, `model_resolver.ts`                                                      |
 | `src/evaluation`      | Automated quality assessment of outputs             | `quality_checker.ts`                                                                                                                          |
+| `src/aggregation`     | Periodic reports + insights                         | `weekly_digest.ts`, `monthly_digest.ts`, `yearly_report.ts`, `periodic_common.ts`, `trend_analyzer.ts`, `insights.ts`                         |
 | `src/storage`         | Markdown file writing + Obsidian integration        | `markdown_builder.ts`, `obsidian_linker.ts`                                                                                                   |
-| `src/publishing`      | External platform integrations                      | `discord_notifier.ts`, `slack_notifier.ts`, `teams_notifier.ts`, `email_notifier.ts`, `note_api.ts`, `feed_generator.ts` |
-| `src/cli`             | Developer tooling                                   | `dry_run.ts`, `test_config.ts`                                                                                                                |
-| `prompts/`            | Versioned prompt templates (Markdown)               | `map_v1.md`, `triage_v1.md`, `monthly_reduce_v1.md`, `manifest.json`                                                                          |
+| `src/publishing`      | External platform integrations                      | `discord_notifier.ts`, `slack_notifier.ts`, `teams_notifier.ts`, `email_notifier.ts`, `note_api.ts` (Zenn + note.com), `podcast_generator.ts`, `pages_generator.ts`, `feed_generator.ts` |
+| `src/cli`             | Developer tooling + periodic report entry point     | `dry_run.ts`, `test_config.ts`, `build_pages.ts`, `report.ts` (weekly / monthly / yearly)                                                     |
+| `prompts/`            | Versioned prompt templates (Markdown)               | `map_v1.md`, `triage_v1.md`, `weekly_reduce_v1.md`, `monthly_reduce_v1.md`, `yearly_reduce_v1.md`, `manifest.json`                                                                         |
 | `tests/`              | Unit tests, golden regression tests                 | `*.test.ts`, `golden/golden_dataset.json`                                                                                                     |
-| `artifacts/contents/` | Generated output (git-ignored; local working copy of external `sun-flat-yamada/artifacts` repo) | `digital-trend/collection/{daily,monthly,yearly,metrics}/`, `publish/{note,zenn}/`                                                            |
-| `.github/workflows/`  | CI/CD automation                                    | `daily_summary.yml`, `monthly_digest.yml`, `yearly_report.yml`, `pages.yml`                                                                   |
+| `artifacts/contents/` | Generated output (git-ignored; local working copy of external `sun-flat-yamada/artifacts` repo) | `digital-trend/collection/{daily,weekly,monthly,yearly,insights,audio,metrics}/`, `publish/{note,zenn}/`                                                         |
+| `.github/workflows/`  | CI/CD automation                                    | `ci.yml`, `daily_summary.yml`, `weekly_digest.yml`, `monthly_digest.yml`, `yearly_report.yml`, `pages.yml`; composite action `.github/actions/sync-zenn` |
 
 ## 3. Information Sources
 
@@ -60,7 +61,8 @@ The pipeline ingests data from seven types of sources. Each module is designed t
     *   LLM gateway uses circuit breaker pattern with automatic fallback across providers.
 *   **Idempotency**: Always check and update `pipeline_state.db` (SQLite) via `src/ingestion/state_manager.ts`. Never process the same URL twice across runs. Expired entries are automatically purged via TTL (default: 90 days).
 *   **Citations**: Source URLs MUST be preserved throughout the Map-Reduce pipeline and included in all final outputs.
-*   **Observability**: Pipeline execution metrics (tokens, cost, latency) are tracked via `src/core/metrics.ts` and optionally exported to Langfuse (`src/core/langfuse.ts`).
+*   **Observability**: Pipeline execution metrics (tokens, cost, latency) are tracked via `src/core/metrics.ts` and optionally exported to Langfuse (`src/core/langfuse.ts`): one trace per run, one generation per LLM call (recorded by `llmCall`), and the pipeline events.
+*   **Plugins**: Sources and publishers are resolved through `src/core/plugin_registry.ts`. A new source type or publisher is registered in `src/core/builtin_plugins.ts`; do not call fetchers or notifiers directly from `main.ts` or `src/cli/report.ts`.
 
 ## 5. Environment Context
 
@@ -74,7 +76,7 @@ The pipeline ingests data from seven types of sources. Each module is designed t
     *   `GEMINI_API_KEY` — Required. Primary LLM provider.
 *   **Optional Secrets**:
     *   `RAINDROP_TEST_TOKEN`, `XAI_API_KEY`, `YOUTUBE_API_KEY` — Ingestion sources.
-    *   `NOTE_API_TOKEN` — Publishing to note.com.
+    *   `NOTE_API_TOKEN` — note.com drafts (the `_note_session_v5` session cookie; unofficial API). Without it, drafts are only written to `publish/note/`.
     *   `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`, `TEAMS_WEBHOOK_URL` — Notifications.
     *   `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `MAIL_TO` — Email delivery.
     *   `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` — Multi-LLM fallback providers.
@@ -82,16 +84,18 @@ The pipeline ingests data from seven types of sources. Each module is designed t
     *   `FIRECRAWL_API_KEY` — Alternative content extraction.
     *   `JINA_API_KEY` — Higher Jina Reader rate limit.
     *   `PAGES_BASE_URL` (variable) — Public Pages URL used in the Atom feed (default: derived from `GITHUB_REPOSITORY`).
+    *   `ZENN_REPO`, `ZENN_BRANCH` (variables) — Repository connected to Zenn's GitHub integration; new Zenn articles are pushed to its `articles/`.
 
 ## 6. Automation Schedule
 
 | Workflow             | Cron (UTC)    | JST           | Trigger                                     |
 | -------------------- | ------------- | ------------- | ------------------------------------------- |
 | `daily_summary.yml`  | `47 18 * * *` | 03:47         | Full pipeline + git push to artifacts repo; also `repository_dispatch` (`trigger-digest`) |
+| `weekly_digest.yml`  | `17 2 * * 1`  | 毎週月曜 11:17 | Weekly report of the previous ISO week      |
 | `monthly_digest.yml` | `30 19 1 * *` | 毎月2日 04:30 | Monthly aggregation of the previous month   |
-| `yearly_report.yml`  | `0 20 1 1 *`  | 1/1 05:00     | Yearly aggregation (placeholder)            |
+| `yearly_report.yml`  | `43 20 2 1 *` | 1/3 05:43     | Yearly report of the previous year (from the monthly digests) |
 
-All scheduled workflows also support manual trigger via `workflow_dispatch`. A manual daily run can be a dry run (`DRY_RUN=true`: stops after article selection, publishes and commits nothing). The daily and monthly workflows share the `pipeline-state` concurrency group, so runs that write `pipeline_state.db` or the artifacts repo never overlap.
+All scheduled workflows also support manual trigger via `workflow_dispatch`. A manual daily run can be a dry run (`DRY_RUN=true`: stops after article selection, publishes and commits nothing). The weekly, monthly and yearly workflows run `node dist/cli/report.js <kind> [period]` (locally `npm run report:weekly` etc.) and publish through the plugin registry. The daily, weekly, monthly and yearly workflows share the `pipeline-state` concurrency group, so runs that write `pipeline_state.db` or the artifacts repo never overlap.
 
 ## 7. Verification & Testing Instructions
 

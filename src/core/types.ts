@@ -158,6 +158,59 @@ export const FallbackModelSchema = z
   })
   .optional();
 
+// --- Publishing ---
+export const ReportKindSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
+const ALL_REPORT_KINDS: ("daily" | "weekly" | "monthly" | "yearly")[] = ["daily", "weekly", "monthly", "yearly"];
+const PERIODIC_REPORT_KINDS: ("daily" | "weekly" | "monthly" | "yearly")[] = ["weekly", "monthly", "yearly"];
+
+export const PublishingSchema = z.object({
+  // Report kinds sent to Discord / Slack / Teams / email
+  notify_kinds: z.array(ReportKindSchema).default(ALL_REPORT_KINDS),
+  // Zenn article files (publish/zenn/), synced to the repository in the ZENN_REPO variable
+  zenn: z
+    .object({
+      enabled: z.boolean().default(true),
+      published: z.boolean().default(false), // false = the article stays a draft on Zenn
+      topics: z.array(z.string()).default(["ai", "tech"]),
+      kinds: z.array(ReportKindSchema).default(PERIODIC_REPORT_KINDS),
+    })
+    .prefault({}),
+  // note.com drafts (publish/note/; created on note.com too when NOTE_API_TOKEN is set)
+  note: z
+    .object({
+      enabled: z.boolean().default(true),
+      kinds: z.array(ReportKindSchema).default(PERIODIC_REPORT_KINDS),
+    })
+    .prefault({}),
+  // Daily audio briefing (script always; MP3 when edge-tts is installed)
+  podcast: z
+    .object({
+      enabled: z.boolean().default(true),
+      // edge-tts voices per output language; an unlisted language uses "en"
+      voices: z.record(z.string(), z.object({ host_a: z.string(), host_b: z.string() })).default({
+        ja: { host_a: "ja-JP-KeitaNeural", host_b: "ja-JP-NanamiNeural" },
+        en: { host_a: "en-US-GuyNeural", host_b: "en-US-JennyNeural" },
+      }),
+    })
+    .prefault({}),
+});
+
+export type PublishingConfig = z.infer<typeof PublishingSchema>;
+
+// --- Insights (keyword expansion and trend analysis) ---
+export const InsightsSchema = z.object({
+  enabled: z.boolean().default(true),
+  // Keyword suggestions: titles of the last `keyword_window_days` compared with the
+  // `background_days` before them (state DB `processed_urls`)
+  keyword_window_days: z.number().int().positive().default(30),
+  background_days: z.number().int().positive().default(60),
+  min_document_frequency: z.number().int().positive().default(3),
+  // Topic trends over the daily summaries of the last `trend_window_days`
+  trend_window_days: z.number().int().positive().default(30),
+});
+
+export type InsightsConfig = z.infer<typeof InsightsSchema>;
+
 // --- Main Config Schema ---
 export const ConfigSchema = z.object({
   version: z.string(),
@@ -211,6 +264,8 @@ export const ConfigSchema = z.object({
         min_quality_score: z.number().min(0).max(100).default(60), // evaluateQuality() overall score
       })
       .default({ min_map_success_rate: 0.5, min_quality_score: 60 }),
+    publishing: PublishingSchema.prefault({}),
+    insights: InsightsSchema.prefault({}),
   }),
   purposes: z.record(z.string(), PurposeSchema),
   exclude: ExcludeSchema,

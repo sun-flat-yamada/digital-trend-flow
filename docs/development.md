@@ -103,11 +103,17 @@ Category Breakdown:
 | `scorer.test.ts` | スコアリングエンジン、除外ルール、鮮度計算 |
 | `config_schema.test.ts` | Zod スキーマバリデーション |
 | `semantic_dedup.test.ts` | セマンティック重複排除 |
-| `keyword_expansion.test.ts` | キーワード拡張候補 |
+| `keyword_expansion.test.ts` | キーワード拡張候補（直近と直前の期間の比較、日数・停止語の条件） |
+| `trend_analyzer.test.ts` | トピックの推移（日次サマリーの frontmatter の集計と分類） |
+| `insights.test.ts` | インサイトレポート（状態 DB の期間の取り方、保存） |
+| `periodic_reports.test.ts` | 週次・年次レポートと report CLI の既定の期間 |
 | `quality_checker.test.ts` | 品質チェッカー |
 | `markdown_builder.test.ts` | Markdown 生成 + Frontmatter |
 | `obsidian_linker.test.ts` | Obsidian Wiki リンク |
-| `plugin_registry.test.ts` | プラグインレジストリ + Event Bus |
+| `plugin_registry.test.ts` | プラグインレジストリ（ソースの解決、配信の種類・未設定・失敗の扱い）+ Event Bus |
+| `builtin_plugins.test.ts` | 組み込みのソース（設定スキーマの全種別）と配信先の登録 |
+| `note_api.test.ts` | Zenn の記事ファイル、note.com の下書き（ファイルと非公式 API） |
+| `langfuse.test.ts` | Langfuse のトレース・generation・イベント |
 | `metrics.test.ts` | メトリクス収集 + コスト計算 |
 | `feed_generator.test.ts` | Atom フィード生成（Pages の `feed.xml`） |
 | `url.test.ts` | URL 正規化と重複排除 |

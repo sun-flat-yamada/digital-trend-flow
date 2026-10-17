@@ -59,8 +59,50 @@ describe("podcast_generator", () => {
     expect(combinedText).toContain("試験導入");
   });
 
+  test("builds an English script from an English summary", () => {
+    const enSummary = `## 🔥 Today's Top Story
+
+### Anthropic ships a new agent SDK
+**Source**: [Anthropic](https://anthropic.com/news) | **Category**: 🛠️ Dev Tools
+
+The SDK lets teams build long-running agents. It ships with a sandbox.
+
+- **🚀 Technical Breakthrough / Quantitative Advance**: Tool calls run 40% faster than the previous release.
+- **⚠️ Trade-offs & Adoption Considerations**: Requires Node.js 24.
+- **💡 Recommended Actions for Engineers**: Start a PoC with an internal tool.
+
+---
+
+## 🔬 AI Research
+
+1. **Sparse attention at scale**: A new paper halves memory use.
+   **Source**: [arXiv](https://arxiv.org/abs/1)
+
+## 📰 Other Relevant News
+
+- [Some link](https://example.com) — Business
+`;
+    const script = buildDialogueScript(enSummary, "2026-10-17", "en");
+    const text = script.turns.map((t) => t.text).join(" ");
+
+    expect(script.language).toBe("en");
+    expect(text).toContain("Anthropic ships a new agent SDK");
+    expect(text).toContain("40% faster");
+    expect(text).toContain("Start a PoC");
+    expect(text).toContain("Sparse attention at scale");
+    expect(text).not.toContain("https://");
+    expect(text).not.toMatch(/[ぁ-んァ-ン]/); // no Japanese phrases in an English script
+    expect(script.markdown).toContain("Daily AI Podcast");
+  });
+
+  test("falls back to the English template for other languages", () => {
+    const script = buildDialogueScript("## Résumé\n\n### Titre\n\nTexte.", "2026-10-17", "fr");
+    expect(script.language).toBe("en");
+    expect(script.turns.map((t) => t.text).join(" ")).toContain("Titre");
+  });
+
   test("generates podcast files in script_only mode when TTS is absent", async () => {
-    const result = await generatePodcast(sampleSummary, "2026-09-07", tmpDir);
+    const result = await generatePodcast(sampleSummary, "2026-09-07", { outputDir: tmpDir, language: "ja" });
 
     expect(fs.existsSync(result.scriptPath)).toBe(true);
     expect(fs.existsSync(result.markdownPath)).toBe(true);

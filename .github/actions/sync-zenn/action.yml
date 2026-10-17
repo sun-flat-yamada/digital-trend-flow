@@ -1,0 +1,61 @@
+name: Sync Zenn articles
+description: >-
+  Copies new article files from artifacts/contents/publish/zenn/ into the articles/ directory of
+  the repository connected to Zenn's GitHub integration, then pushes. Existing articles are never
+  overwritten, so edits made on the Zenn side are kept. Does nothing when zenn-repo is empty.
+
+inputs:
+  zenn-repo:
+    description: "owner/repo connected to Zenn (the ZENN_REPO variable); empty skips the sync"
+    required: false
+    default: ""
+  zenn-branch:
+    description: "Branch that Zenn deploys from"
+    required: false
+    default: "main"
+  token:
+    description: "Token with push access to zenn-repo"
+    required: true
+  source-dir:
+    description: "Directory holding the generated Zenn articles"
+    required: false
+    default: "artifacts/contents/publish/zenn"
+
+runs:
+  using: composite
+  steps:
+    - name: Push new articles to the Zenn repository
+      shell: bash
+      env:
+        ZENN_REPO: ${{ inputs.zenn-repo }}
+        ZENN_BRANCH: ${{ inputs.zenn-branch }}
+        ZENN_TOKEN: ${{ inputs.token }}
+        SOURCE_DIR: ${{ inputs.source-dir }}
+      run: |
+        if [ -z "${ZENN_REPO}" ]; then
+          echo "ZENN_REPO is not set; Zenn sync skipped (articles stay in ${SOURCE_DIR})."
+          exit 0
+        fi
+        if [ -z "${ZENN_TOKEN}" ]; then
+          echo "::warning::No token for ${ZENN_REPO}; Zenn sync skipped."
+          exit 0
+        fi
+        if ! compgen -G "${SOURCE_DIR}/*.md" > /dev/null; then
+          echo "No Zenn article files in ${SOURCE_DIR}."
+          exit 0
+        fi
+        workdir="$(mktemp -d)"
+        git clone --depth 1 --branch "${ZENN_BRANCH}" \
+          "https://x-access-token:${ZENN_TOKEN}@github.com/${ZENN_REPO}.git" "${workdir}"
+        mkdir -p "${workdir}/articles"
+        cp -n "${SOURCE_DIR}"/*.md "${workdir}/articles/"
+        cd "${workdir}"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
+        git add articles/
+        if git diff --staged --quiet; then
+          echo "No new Zenn articles."
+          exit 0
+        fi
+        git commit -m "Add articles from digital-trend-flow ($(date -u '+%Y-%m-%d'))"
+        git push origin "HEAD:${ZENN_BRANCH}"

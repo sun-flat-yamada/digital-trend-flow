@@ -28,7 +28,8 @@
                         ↓ Quality Gate
               Automated Quality Checker (100pt)
                         ↓ Publish
-   Obsidian ─ note.com ─ Discord ─ Slack ─ Teams ─ Atom Feed ─ GitHub Pages
+   Obsidian ─ Discord ─ Slack ─ Teams ─ Email ─ Atom Feed ─ GitHub Pages ─ Podcast
+   (weekly / monthly / yearly reports → Zenn ─ note.com drafts)
 ```
 
 **Why Map-Reduce?** → Pre-compression with Flash → Integration with Pro. Reduces cost to less than 1/10 and stabilizes quality.
@@ -70,8 +71,9 @@ npm run build && npm start                        # Full pipeline execution
 | Workflow             | Schedule (JST)     | Description                                                         |
 | :------------------- | :----------------- | :------------------------------------------------------------------ |
 | `daily_summary.yml`  | Daily 03:47        | Daily summary + push to artifacts repo (also `repository_dispatch`) |
+| `weekly_digest.yml`  | Mondays 11:17      | Weekly report of the previous ISO week + Trend analysis             |
 | `monthly_digest.yml` | 2nd of month 04:30 | Monthly digest of the previous month + Trend analysis               |
-| `yearly_report.yml`  | Jan 1st 05:00      | Yearly report                                                       |
+| `yearly_report.yml`  | Jan 3rd 05:43      | Yearly report from the monthly digests + Trend analysis             |
 | `ci.yml`             | PRs / push to main | Audit, type check, lint, config check, Jest, build + actionlint     |
 
 ## Project Structure
@@ -82,11 +84,11 @@ src/
 ├── ingestion/      # 7 Source Adapters + Jina Reader + SQLite State Manager
 ├── filtering/      # LLM Triage, Scorer, Semantic Dedup, Keyword Expansion
 ├── summarization/  # Map/Reduce, LLM Gateway (multi-provider), Model Resolver
-├── aggregation/    # Monthly Digest, Trend Analyzer
+├── aggregation/    # Weekly / Monthly / Yearly Reports, Trend Analyzer, Insights
 ├── evaluation/     # Quality Checker (automated)
 ├── storage/        # Markdown Builder (Frontmatter), Obsidian Linker
-├── publishing/     # Discord, Slack, Teams, note.com, Atom Feed
-└── cli/            # debug:filter, test_config
+├── publishing/     # Discord, Slack, Teams, Email, Zenn, note.com, Podcast, Pages, Atom Feed
+└── cli/            # debug:filter, test_config, build:pages, report (weekly / monthly / yearly)
 ```
 
 ## Documentation

@@ -2,7 +2,9 @@
  * [Role] Monthly digest generation from daily summaries.
  * [Mechanism] Reads daily summary Markdown files for a given month,
  * extracts facts and metadata, then uses Reduce phase to generate
- * a monthly trend analysis.
+ * a monthly trend analysis, followed by the deterministic topic trend section
+ * (this month against the previous one).
+ * Run by `.github/workflows/monthly_digest.yml` through `src/cli/report.ts`.
  *
  * Item: 6.1 月次ダイジェスト実装
  */
@@ -12,16 +14,15 @@ import * as path from "path";
 import { PATHS } from "../core/paths";
 import { llmCall } from "../summarization/llm_gateway";
 import { getMonthlyReducePrompt } from "../summarization/prompts";
-import { saveMarkdownFile, SummaryFrontmatter } from "../storage/markdown_builder";
+import { saveMarkdownFile } from "../storage/markdown_builder";
 import { config } from "../core/config";
+import { appendTrendSection, rankByFrequency, readDailySummary, type PeriodicReport } from "./periodic_common";
 import { errorMessage } from "../core/errors";
 
-interface DailySummaryMeta {
-  date: string;
-  title: string;
-  content: string;
-  articleCount: number;
-  categories: string[];
+/** Number of days of a month ("2026-02" → 28). */
+export function daysInMonth(yearMonth: string): number {
+  const [year, month] = yearMonth.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 /**
@@ -29,7 +30,10 @@ interface DailySummaryMeta {
  * Resolves with null when the month has no daily summaries; throws when generation fails.
  * @param yearMonth Format: "2026-04"
  */
-export async function generateMonthlyDigest(yearMonth: string): Promise<string | null> {
+export async function generateMonthlyDigest(yearMonth: string): Promise<PeriodicReport | null> {
+  if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+    throw new Error(`Invalid month "${yearMonth}": use "YYYY-MM"`);
+  }
   const [year, month] = yearMonth.split("-") as [string, string];
   const dailyDir = path.join(PATHS.ARTIFACTS_DAILY.absolute, year, month);
   if (!fs.existsSync(dailyDir)) {
@@ -50,31 +54,18 @@ export async function generateMonthlyDigest(yearMonth: string): Promise<string |
 
   console.log(`📅 Generating monthly digest for ${yearMonth} (${dailyFiles.length} daily summaries)`);
 
-  // Extract content from each daily summary
-  const dailySummaries: DailySummaryMeta[] = [];
-  for (const file of dailyFiles) {
-    const content = fs.readFileSync(path.join(dailyDir, file), "utf8");
-    const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})/);
-    const titleMatch = content.match(/^title:\s*(.+)$/m);
-    const countMatch = content.match(/^articles_processed:\s*(\d+)$/m);
-    const catMatch = content.match(/^categories:\s*\n((?:\s+-\s+.+\n)*)/m);
-
-    // Extract body (after frontmatter)
-    const bodyStart = content.indexOf("---\n\n");
-    const body = bodyStart >= 0 ? content.slice(bodyStart + 5) : content;
-
-    dailySummaries.push({
-      date: dateMatch?.[1] ?? "",
-      title: titleMatch?.[1]?.replace(/["']/g, "") ?? "",
-      content: body.slice(0, 3000), // Truncate per-day to fit context
-      articleCount: parseInt(countMatch?.[1] ?? "0", 10),
-      categories: catMatch?.[1]?.match(/- (.+)/g)?.map((l) => l.replace("- ", "")) ?? [],
-    });
-  }
+  // Extract content from each daily summary (truncated per day to fit context)
+  const dailySummaries = dailyFiles.map((file) =>
+    readDailySummary(path.join(dailyDir, file), file.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? ""),
+  );
 
   // Build the reduce input
   const totalArticles = dailySummaries.reduce((sum, d) => sum + d.articleCount, 0);
   const allCategories = [...new Set(dailySummaries.flatMap((d) => d.categories))];
+  const tags = rankByFrequency(
+    dailySummaries.flatMap((d) => d.tags),
+    10,
+  );
 
   const factsPayload = dailySummaries.map((d) => ({
     date: d.date,
@@ -93,6 +84,7 @@ ${JSON.stringify(factsPayload, null, 2)}
 
 Generate a comprehensive monthly trend analysis.`;
 
+  let reportText: string;
   try {
     const response = await llmCall({
       systemPrompt: getMonthlyReducePrompt(),
@@ -100,31 +92,7 @@ Generate a comprehensive monthly trend analysis.`;
       phase: "reduce",
       maxOutputTokens: 16384,
     });
-
-    // Save monthly digest
-    const today = new Date().toISOString().split("T")[0] ?? yearMonth + "-01";
-    const filename = `${today}_digital-trend_monthly_report.md`;
-    const title = `Monthly Digest ${yearMonth}`;
-
-    const frontmatter: SummaryFrontmatter = {
-      tags: allCategories.slice(0, 10),
-      categories: allCategories,
-      sources: [`${dailyFiles.length} daily summaries`],
-    };
-
-    const outputDir = path.join(PATHS.ARTIFACTS_MONTHLY.absolute, year);
-    const outputPath = saveMarkdownFile(
-      outputDir,
-      filename,
-      title,
-      response.text,
-      totalArticles,
-      config.settings.author,
-      frontmatter,
-    );
-
-    console.log(`✅ Monthly digest generated: ${outputPath}`);
-    return outputPath;
+    reportText = response.text;
   } catch (error) {
     // Throw rather than return null: null means "no daily summaries", which the workflow treats
     // as success, so an LLM failure would otherwise go unnoticed.
@@ -132,4 +100,34 @@ Generate a comprehensive monthly trend analysis.`;
       cause: error,
     });
   }
+
+  // This month against the previous one
+  const endDate = `${yearMonth}-${String(daysInMonth(yearMonth)).padStart(2, "0")}`;
+  const markdown = appendTrendSection(reportText, endDate, daysInMonth(yearMonth) * 2);
+
+  // Save monthly digest
+  const today = new Date().toISOString().split("T")[0] ?? yearMonth + "-01";
+  const filename = `${today}_digital-trend_monthly_report.md`;
+  const title = `Monthly Digest ${yearMonth}`;
+
+  const outputDir = path.join(PATHS.ARTIFACTS_MONTHLY.absolute, year);
+  const outputPath = saveMarkdownFile(outputDir, filename, title, markdown, totalArticles, config.settings.author, {
+    tags,
+    categories: allCategories,
+    sources: [`${dailyFiles.length} daily summaries`],
+    type: "monthly_report",
+    period: yearMonth,
+  });
+
+  console.log(`✅ Monthly digest generated: ${outputPath}`);
+  return {
+    kind: "monthly",
+    period: yearMonth,
+    endDate,
+    title,
+    markdown,
+    articleCount: totalArticles,
+    tags,
+    outputPath,
+  };
 }

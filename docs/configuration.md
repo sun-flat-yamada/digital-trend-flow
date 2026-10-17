@@ -35,9 +35,30 @@ settings:
   quality_gate:                     # 公開ゲート (下回ると degraded: 配信・処理済み登録をせずジョブ失敗)
     min_map_success_rate: 0.5       # Map で事実を抽出できた記事の割合の下限 (0〜1)
     min_quality_score: 60           # 品質スコアの下限 (0〜100)
+  publishing:
+    notify_kinds: [daily, weekly, monthly, yearly]  # Discord / Slack / Teams / Email に送るレポート
+    zenn:
+      enabled: true
+      published: false              # false = Zenn 上では下書き
+      topics: [ai, tech]
+      kinds: [weekly, monthly, yearly]
+    note:
+      enabled: true                 # publish/note/ に下書き。NOTE_API_TOKEN があれば note.com にも
+      kinds: [weekly, monthly, yearly]
+    podcast:
+      enabled: true                 # 日次の音声ブリーフィング (edge-tts があれば MP3)
+      voices:
+        ja: {host_a: ja-JP-KeitaNeural, host_b: ja-JP-NanamiNeural}
+        en: {host_a: en-US-GuyNeural, host_b: en-US-JennyNeural}
+  insights:                         # トピックの推移とキーワード追加の候補 (LLM なし)
+    enabled: true
+    keyword_window_days: 30
+    background_days: 60
+    min_document_frequency: 3
+    trend_window_days: 30
 ```
 
-> degraded の扱いは [Architecture の Quality Gate](architecture.md#quality-gate) を参照。
+> degraded の扱いは [Architecture の Quality Gate](architecture.md#quality-gate) を参照。配信先・Podcast・インサイトの仕組みは [Architecture](architecture.md#periodic-reports) を参照。
 
 ### Fallback Models (Optional)
 
@@ -115,7 +136,7 @@ X/Grok（`xai_grok`）は、検索ツール（`x_search`）を使う実装に直
 
 | Variable | Description |
 |:---|:---|
-| `NOTE_API_TOKEN` | note.com 配信 |
+| `NOTE_API_TOKEN` | note.com の下書き作成。ログイン済みブラウザの `_note_session_v5` Cookie の値（`name=value; ...` の Cookie 文字列でもよい）。非公式 API のため期限切れ・仕様変更で失敗しうる。未設定でも `publish/note/` に下書きファイルは書かれる |
 | `DISCORD_WEBHOOK_URL` | Discord 通知 |
 | `SLACK_WEBHOOK_URL` | Slack 通知 |
 | `TEAMS_WEBHOOK_URL` | Teams 通知 |
@@ -160,3 +181,5 @@ X/Grok（`xai_grok`）は、検索ツール（`x_search`）を使う実装に直
 |:---|:---|:---|
 | `API_CONCURRENCY` | `1` | 並列リクエスト数 (Free Tier: 1, Paid: 5) |
 | `API_INTERVAL_MS` | `13000` | リクエスト間遅延ミリ秒 (Free Tier: 13000 = ~4.6 RPM) |
+| `ZENN_REPO` | — | Zenn と GitHub 連携したリポジトリ（`owner/repo`）。設定すると新しい Zenn 記事をその `articles/` に push する。`PAT_GITHUB` にそのリポジトリへの書き込み権限が必要 |
+| `ZENN_BRANCH` | `main` | Zenn がデプロイするブランチ |
