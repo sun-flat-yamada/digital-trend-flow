@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Tech News</title>
+    <link>https://news.example.com/</link>
+    <description>Example feed for tests</description>
+    <item>
+      <title>New open-weight model tops the coding benchmarks</title>
+      <link>https://news.example.com/articles/open-weight-model</link>
+      <pubDate>{{HOURS_AGO:2}}</pubDate>
+      <description><![CDATA[<p>The model scores 71% on SWE-bench Verified.</p>]]></description>
+    </item>
+    <item>
+      <title>Already summarized story</title>
+      <link>https://news.example.com/articles/already-summarized</link>
+      <pubDate>{{HOURS_AGO:5}}</pubDate>
+    </item>
+    <item>
+      <title>Story from last week</title>
+      <link>https://news.example.com/articles/last-week</link>
+      <pubDate>{{HOURS_AGO:200}}</pubDate>
+    </item>
+    <item>
+      <title>Item without a link</title>
+      <pubDate>{{HOURS_AGO:1}}</pubDate>
+    </item>
+    <item>
+      <title>Story without a date</title>
+      <link>https://news.example.com/articles/undated</link>
+    </item>
+  </channel>
+</rss>

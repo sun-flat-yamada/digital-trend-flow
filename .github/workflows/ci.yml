@@ -53,8 +53,9 @@ jobs:
       - name: Validate config
         run: npm run test:config
 
-      - name: Unit tests
-        run: npx jest
+      # 重要モジュールの行カバレッジ 70% 以上を強制する (package.json の jest.coverageThreshold)
+      - name: Unit tests (with coverage thresholds)
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build

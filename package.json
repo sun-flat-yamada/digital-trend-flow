@@ -10,6 +10,7 @@
   "scripts": {
     "test:config": "ts-node src/cli/test_config.ts",
     "test:unit": "jest",
+    "test:coverage": "jest --coverage",
     "test:golden": "jest tests/golden_regression",
     "test": "npm run type-check && npm run test:config && npm run test:unit",
     "type-check": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.json",
@@ -55,7 +56,36 @@
     ],
     "testMatch": [
       "**/tests/**/*.test.ts"
-    ]
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts"
+    ],
+    "coverageReporters": [
+      "text-summary"
+    ],
+    "coverageThreshold": {
+      "./src/main.ts": {
+        "lines": 70
+      },
+      "./src/cli/daily.ts": {
+        "lines": 70
+      },
+      "./src/ingestion/state_manager.ts": {
+        "lines": 70
+      },
+      "./src/summarization/llm_gateway.ts": {
+        "lines": 70
+      },
+      "./src/summarization/gemini_map.ts": {
+        "lines": 70
+      },
+      "./src/summarization/gemini_reduce.ts": {
+        "lines": 70
+      },
+      "./src/ingestion/{arxiv,bluesky,fetch_source,github_trending,hackernews,jina_reader,raindrop,reddit,rss,youtube}.ts": {
+        "lines": 70
+      }
+    }
   },
   "keywords": [],
   "author": "Youhei Yamada",

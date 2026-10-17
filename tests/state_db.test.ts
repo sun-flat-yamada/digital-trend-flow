@@ -155,6 +155,58 @@ describe("state DB", () => {
     expect(state.isEvaluated("https://example.com/a")).toBe(false);
   });
 
+  test("a processed URL is found in canonical or raw form until its TTL expires, then purged", () => {
+    const file = path.join(tmpDir, "processed.db");
+    state = loadStateManager(file);
+    state.markAsProcessed("https://example.com/story?utm_source=feed", "Story", 8.5, "tech");
+
+    expect(state.isProcessed("https://example.com/story")).toBe(true);
+    expect(state.isProcessed("https://example.com/story?utm_source=feed")).toBe(true);
+    state.closeDb();
+
+    const raw = new Database(file);
+    const row = raw
+      .prepare(
+        "SELECT title, score, purpose, julianday(expires_at) - julianday(processed_at) AS days FROM processed_urls",
+      )
+      .get() as { title: string; score: number; purpose: string; days: number };
+    expect(row).toMatchObject({ title: "Story", score: 8.5, purpose: "tech" });
+    expect(row.days).toBeCloseTo(90);
+    raw.prepare("UPDATE processed_urls SET expires_at = datetime('now', '-1 day')").run();
+    raw.close();
+
+    state = loadStateManager(file);
+    expect(state.isProcessed("https://example.com/story")).toBe(false);
+    state.flushState();
+    state.closeDb();
+    const after = new Database(file);
+    expect((after.prepare("SELECT count(*) AS n FROM processed_urls").get() as { n: number }).n).toBe(0);
+    after.close();
+  });
+
+  test("source health checks give each source its failure streak", () => {
+    state = loadStateManager(":memory:");
+    state.recordSourceHealth("Dead Feed", "rss", "error", 0, "Status code 404");
+    state.recordSourceHealth("Live Feed", "rss", "ok", 12);
+
+    expect(state.getSourceFailureStreak("Dead Feed")).toBe(1);
+    expect(state.getSourceFailureStreak("Live Feed")).toBe(0);
+    expect(state.getSourceFailureStreak("Unknown Feed")).toBe(0);
+    // A second check on the same day replaces the first.
+    state.recordSourceHealth("Dead Feed", "rss", "ok", 3);
+    expect(state.getSourceFailureStreak("Dead Feed")).toBe(0);
+  });
+
+  test("lookups can be disabled for read-only tools, without opening the DB", () => {
+    const file = path.join(tmpDir, "never-created.db");
+    state = loadStateManager(file);
+    state.disableStateLookups();
+
+    expect(state.isProcessed("https://example.com/a")).toBe(false);
+    expect(state.isEvaluated("https://example.com/a")).toBe(false);
+    expect(fs.existsSync(file)).toBe(false);
+  });
+
   test("a DB from a newer schema version is refused", () => {
     const file = path.join(tmpDir, "future.db");
     const future = new Database(file);
