@@ -100,7 +100,8 @@ export function validateBranchName(branch: string): BranchValidation {
     return {
       status: "cloud-default",
       reasons: [
-        `"${branch}" is the name the Claude Code cloud platform assigned to the session and does not describe the change`,
+        `"${branch}" is the name the Claude Code cloud platform assigned to the session and does not describe the change; ` +
+          'rename it with `npm run change-dev:branch -- rename <type> <issue> "<title>"` before the first push',
       ],
     };
   }

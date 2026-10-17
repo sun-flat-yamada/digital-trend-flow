@@ -1,7 +1,7 @@
 name: Change-dev Check
 
 # change-dev のブランチ名 (<type>/<issue>-<slug>) と plan-first を PR で検査する (.agents/rules/development-workflow.md)。
-# クラウドセッションの割り当て名 (claude/<adjective>-<name>-<id>) は、改名の許可が出るまで警告にとどめる (--warn-cloud)。
+# クラウドセッションの割り当て名 (claude/<adjective>-<name>-<id>) も失敗にする。最初の push 前に change-dev:branch rename で改名する。
 on:
   pull_request:
     types: [opened, reopened, synchronize]
@@ -37,7 +37,7 @@ jobs:
       - name: Validate head branch name
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: npm run -s change-dev:branch -- check "$HEAD_REF" --warn-cloud
+        run: npm run -s change-dev:branch -- check "$HEAD_REF"
 
       - name: Plan committed before the implementation
         env:
