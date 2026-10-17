@@ -92,4 +92,3 @@ export const PATHS = {
   // Tmp files (used usually by AI or tests, but kept for reference)
   TMP_AI: path.resolve(PROJECT_ROOT, "_tmp_ai"),
 };
-export const ciTypeErrorProbe: number = "not a number";
