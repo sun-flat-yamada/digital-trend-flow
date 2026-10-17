@@ -167,7 +167,7 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | ING-4 | P1 | X/Grok のコメントは「`/v1/responses` + `x_search`」だが、実装は検索ツールなしで `/v1/chat/completions` に `grok-3-fast` を投げる。実在しない投稿 URL を生成し得る（URL 形式しか検査しない） | `xai_grok.ts:14-20` と `:88-108` | 検索ツール付きで実装し直すまで無効化する。モデル名は config へ移す |
 | ING-5 | P1 | Reddit / Bluesky は GitHub Actions からの未認証アクセスで 403 | 09-30 ログ | Reddit は OAuth（script app）、Bluesky は App Password で認証した API を使う。または対象から外す |
 | ING-6 | P1 | RSS 4 本が死んでいる（Reuters / Ledge.ai / HF Daily Papers / VentureBeat） | §1.2 | 代替フィードに差し替え、`npm run check:sources` で定期的に検査する |
-| ING-7 | P2 | `ArticleItem` が `rss.ts` に定義され、全モジュールが依存している。タイトルに `(HN: 744pts)`・`⭐ … (★3481/day)`・`🎬 …` などの装飾を埋め込むため、重複排除・キーワード判定・要約の見出しに混入する | `hackernews.ts:66`、`github_trending.ts:74`、`youtube.ts:72` | 型を `core/types.ts` へ移す。エンゲージメント等は `engagement`・`description` などの別フィールドにする |
+| ING-7 | P2 | `ArticleItem` が `rss.ts` に定義され、全モジュールが依存している。タイトルに `(HN: 744pts)`・`⭐ … (★3481/day)`・`🎬 …` などの装飾を埋め込むため、重複排除・キーワード判定・要約の見出しに混入する | `hackernews.ts:66`、`github_trending.ts:74`、`youtube.ts:72` | 型を `core/types.ts` へ移す。エンゲージメント等は `engagement`・`description` などの別フィールドにする（✅ #37） |
 | ING-8 | P2 | 取得期間（72 時間）がソースごとにハードコードされ、`freshness.max_age_hours` と二重管理になっている | `rss.ts:34`、`youtube.ts:50` | config から注入する |
 | ING-9 | P2 | GitHub Trending は正規表現による HTML スクレイピング。説明文の抽出で次のリポジトリの `<p>` を拾い得る | `github_trending.ts:42-68` | HTML パーサーを使うか、GitHub Search API 等へ切り替える |
 | ING-10 | P2 | Bluesky の `searchPosts` に `since` 指定がなく、`sort: "top"` で古い投稿が混入し得る | `bluesky.ts:57-68` | `since` を付ける |

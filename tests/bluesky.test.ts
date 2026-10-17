@@ -50,8 +50,8 @@ describe("fetchBluesky", () => {
     const articles = await fetchBluesky("LLM", 20, 10, "ai_research");
 
     expect(articles.length).toBe(1);
-    expect(articles[0]?.title).toContain("Energy-Based Reasoning in LLMs");
-    expect(articles[0]?.title).toContain("♥50");
+    expect(articles[0]?.title).toBe("Energy-Based Reasoning in LLMs");
+    expect(articles[0]?.engagement).toEqual({ likes: 50 });
     expect(articles[0]?.sourceType).toBe("bluesky");
     expect(articles[0]?.url).toBe("https://arxiv.org/abs/2609.12345");
   });

@@ -10,7 +10,7 @@ import { config, env } from "./core/config";
 import { metrics, SOURCE_ALERT_STREAK, type RunStatus } from "./core/metrics";
 import { initLangfuse, createTrace, recordQualityScore, flushLangfuse } from "./core/langfuse";
 import { registry } from "./core/plugin_registry";
-import { fetchRss, ArticleItem } from "./ingestion/rss";
+import { fetchRss } from "./ingestion/rss";
 import {
   fetchRaindropBookmarks,
   archiveProcessedRaindrops,
@@ -61,17 +61,19 @@ import {
   getSourceFailureStreak,
   closeDb,
 } from "./ingestion/state_manager";
-import { Purpose, Source } from "./core/types";
+import { ArticleItem, Purpose, Source } from "./core/types";
 import { PATHS } from "./core/paths";
 import { dedupeByUrl } from "./core/url";
 import { mapWithConcurrency } from "./core/concurrency";
 import { errorMessage } from "./core/errors";
+import { describeEngagement } from "./core/article";
 
 // ── Types for pipeline internal state ──
 
 interface ScoredArticle {
   article: ArticleData;
   sourceName: string;
+  sourceSignals: string | undefined;
   score: number;
   purpose: string;
   purposeLabel: string;
@@ -302,6 +304,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
       return {
         article: articleData,
         sourceName: item.sourceName,
+        sourceSignals: describeEngagement(item),
         score: finalScore,
         purpose: scoreResult.assignedPurpose,
         purposeLabel: scoreResult.purposeLabel,
@@ -369,6 +372,7 @@ export async function runDailyPipeline(): Promise<RunStatus> {
     url: sa.article.url,
     content: sa.article.content,
     ...(sa.article.language !== undefined ? { language: sa.article.language } : {}),
+    ...(sa.sourceSignals ? { sourceSignals: sa.sourceSignals } : {}),
   }));
 
   const mapResults = await mapWithConcurrency(mapInputs, mapExtractFacts, env.API_CONCURRENCY, env.API_INTERVAL_MS);

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const XAI_API_BASE = "https://api.x.ai/v1";

@@ -51,6 +51,16 @@ describe("mapExtractFacts", () => {
     expect(result.facts).toEqual([{ text: "Fact A", importance: 7 }]);
   });
 
+  test("gives the model the source's engagement signals on their own line", async () => {
+    mockLlmCall.mockResolvedValue(llmResponse(JSON.stringify({ facts: [{ text: "Fact A", importance: 7 }] })));
+
+    await mapExtractFacts({ ...article("hn"), sourceSignals: "Hacker News: 1637 points" });
+
+    const request = mockLlmCall.mock.calls[0]?.[0] as { userPrompt: string };
+    expect(request.userPrompt).toContain("Article Title: Article hn\n");
+    expect(request.userPrompt).toContain("Source Signals: Hacker News: 1637 points");
+  });
+
   test("propagates LLM failures instead of returning a placeholder fact", async () => {
     mockLlmCall.mockRejectedValue(new Error("All LLM providers failed for phase: map"));
 

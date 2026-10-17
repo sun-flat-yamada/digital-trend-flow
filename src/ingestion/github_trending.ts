@@ -8,7 +8,7 @@
 
 import axios from "axios";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const GITHUB_TRENDING_URL = "https://github.com/trending";
@@ -66,16 +66,17 @@ export async function fetchGitHubTrending(
         "m",
       );
       const starsMatch = html.match(starsRegex);
-      const stars = starsMatch?.[1]?.replace(/,/g, "") ?? "0";
+      const starsToday = Number(starsMatch?.[1]?.replace(/,/g, "") ?? "0");
 
       newItems.push({
         sourceName,
         sourceType: "github_trending",
         purpose,
-        title: `⭐ ${repoPath} — ${description || "Trending repo"} (★${stars}/day)`,
+        title: repoPath,
         url: repoUrl,
         publishedAt: new Date().toISOString(),
         ...(description ? { description } : {}),
+        engagement: { starsToday },
       });
 
       if (newItems.length >= 25) break;

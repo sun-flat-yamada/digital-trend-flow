@@ -8,7 +8,7 @@
 
 import axios from "axios";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const HN_API_BASE = "https://hacker-news.firebaseio.com/v0";
@@ -59,9 +59,10 @@ export async function fetchHackerNews(
           sourceName,
           sourceType: "hackernews",
           purpose,
-          title: `${item.title} (HN: ${item.score}pts)`,
+          title: item.title,
           url: item.url,
           publishedAt: new Date(item.time * 1000).toISOString(),
+          engagement: { score: item.score },
         });
 
         if (newItems.length >= maxItems) break;

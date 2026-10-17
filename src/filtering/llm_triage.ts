@@ -10,8 +10,8 @@
  */
 
 import { z } from "zod";
-import type { ArticleItem } from "../ingestion/rss";
-import type { Purpose } from "../core/types";
+import type { ArticleItem, Purpose } from "../core/types";
+import { describeEngagement } from "../core/article";
 import type { LLMRequest, LLMResponse } from "../summarization/llm_gateway";
 import { getTriagePrompt, TRIAGE_RESPONSE_SCHEMA } from "../summarization/prompts";
 import { mapWithConcurrency } from "../core/concurrency";
@@ -87,14 +87,16 @@ export function triagePurposes(purposes: Record<string, Purpose>): TriagePurpose
 export function buildTriageUserPrompt(purposes: TriagePurpose[], batch: { id: number; item: ArticleItem }[]): string {
   const purposeLines = purposes.map((p) => `- ${p.key}: ${p.label} (e.g. ${p.hints.join(", ")})`).join("\n");
   const candidateLines = batch
-    .map(({ id, item }) =>
-      JSON.stringify({
+    .map(({ id, item }) => {
+      const signals = describeEngagement(item);
+      return JSON.stringify({
         id,
         title: item.title,
         source: `${item.sourceName} (${item.sourceType})`,
         ...(item.description ? { description: item.description.replace(/\s+/g, " ").slice(0, DESCRIPTION_CHARS) } : {}),
-      }),
-    )
+        ...(signals ? { signals } : {}),
+      });
+    })
     .join("\n");
   return `Purposes:\n${purposeLines}\n\nCandidates (one JSON object per line):\n${candidateLines}`;
 }
