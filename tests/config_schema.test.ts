@@ -91,9 +91,10 @@ describe("Config Schema Validation", () => {
     expect(config.settings.freshness.enabled).toBeDefined();
     expect(typeof config.settings.freshness.decay_lambda).toBe("number");
 
-    // LLM Judge
-    expect(config.settings.llm_judge).toBeDefined();
-    expect(typeof config.settings.llm_judge.enabled).toBe("boolean");
+    // Batch LLM triage (Plan 2-1)
+    expect(typeof config.settings.triage.enabled).toBe("boolean");
+    expect(config.settings.triage.max_candidates).toBeGreaterThan(0);
+    expect(config.settings.triage.batch_size).toBeGreaterThan(0);
 
     // Semantic dedup
     expect(config.settings.semantic_dedup).toBeDefined();

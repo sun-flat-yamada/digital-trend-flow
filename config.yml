@@ -40,10 +40,15 @@ settings:
   # Item 5.2: 処理済みURL の TTL (日数)
   state_ttl_days: 90
 
-  # Item 3.1: LLM-as-a-Judge (Flash モデルで記事の関連性を自動評価)
-  llm_judge:
-    enabled: false       # true にするとLLM呼び出しが増加しコストが上昇
-    weight: 0.5          # キーワードスコアとの混合比率 (0=キーワードのみ, 1=LLMのみ)
+  # 計画 2-1: バッチ LLM トリアージ (本文取得の前に、タイトル・説明文・情報源を Flash-Lite でまとめて判定)
+  # 関連あり・重複なしの上位 max_candidates 件だけ Jina で本文を取得する。
+  # トリアージが失敗した実行は、キーワードによるタイトル事前選別 (従来の経路) に戻り、metrics に記録される。
+  triage:
+    enabled: true
+    # model: latest-flash-lite  # 省略時は models.map
+    max_candidates: 30   # 本文を取得する候補の上限 (計画書 §7.5 の 20〜30 件)
+    batch_size: 150      # 1 回の LLM 呼び出しに入れる候補数 (1 日約 120 件なら 1 回)
+    min_relevance: 50    # 関連度 (0〜100) がこれ未満の候補は落とす
 
   # Item 2.4: セマンティック重複排除
   semantic_dedup:

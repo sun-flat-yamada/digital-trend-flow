@@ -1,16 +1,15 @@
 /**
  * [Role] Filters and scores articles based on domain, length, keywords, and relevance.
  * [Mechanism] Implements rule-based exclusion, multi-purpose weighted scoring,
- * LLM-as-a-Judge evaluation, freshness scoring, and TF-IDF dynamic weighting.
+ * freshness scoring, and TF-IDF dynamic weighting. No LLM calls here: relevance judging by LLM
+ * lives in llm_triage.ts.
  *
- * Items: 3.1 LLM-as-Judge, 3.3 TF-IDF, 3.4 Negative keyword refinement, 2.5 Freshness
+ * Items: 3.3 TF-IDF, 3.4 Negative keyword refinement, 2.5 Freshness
  */
 
 import { config } from "../core/config";
 import { canonicalizeUrl } from "../core/url";
 import { ExcludeRules, PurposeScoring, ExcludeKeyword } from "../core/types";
-import { llmCall } from "../summarization/llm_gateway";
-import { getJudgePrompt, JUDGE_RESPONSE_SCHEMA } from "../summarization/prompts";
 
 export interface ArticleData {
   url: string;
@@ -27,9 +26,7 @@ export interface PurposeScoreOutput {
   purposeLabel: string;      // Human-readable label
   totalScore: number;
   matchedKeywords: string[];
-  llmJudgeScore?: number;    // Item 3.1
   freshnessFactor?: number;  // Item 2.5
-  detectedTopics?: string[]; // Item 3.1
 }
 
 // ── TF-IDF State (Item 3.3) ──
@@ -261,60 +258,11 @@ function scoreAgainstPurpose(
   return { score, matchedKeywords };
 }
 
-// ── LLM-as-a-Judge (Item 3.1) ──
-
-interface JudgeResult {
-  relevance_score: number;
-  category_suggestion: string;
-  reasoning: string;
-  is_breaking_news: boolean;
-  topics: string[];
-}
-
-/**
- * Uses an LLM to evaluate article relevance (Item 3.1).
- * Returns null if judging is disabled or fails.
- */
-export async function llmJudgeScore(
-  article: ArticleData,
-  availableCategories: string[]
-): Promise<JudgeResult | null> {
-  if (!config.settings.llm_judge.enabled) return null;
-
-  try {
-    const excerpt = article.content.slice(0, 500);
-    const userPrompt = `Available Categories: ${availableCategories.join(", ")}
-
-Article Title: ${article.title}
-Article Excerpt: ${excerpt}
-
-Evaluate this article's relevance and importance.`;
-
-    const response = await llmCall({
-      systemPrompt: getJudgePrompt(),
-      userPrompt,
-      phase: "judge",
-      responseSchema: JUDGE_RESPONSE_SCHEMA,
-      temperature: 0.1,
-    });
-
-    const cleanedJson = response.text
-      .replace(/```json\n?/g, "")
-      .replace(/```\n?/g, "")
-      .trim();
-
-    return JSON.parse(cleanedJson) as JudgeResult;
-  } catch (error: any) {
-    console.warn(`  ⚠️ LLM Judge failed for "${article.title}": ${error.message}`);
-    return null;
-  }
-}
-
 // ── Public Scoring Functions ──
 
 /**
  * Calculates the score of an article using its designated purpose's keyword list,
- * with optional LLM-as-Judge and freshness adjustments.
+ * with a freshness adjustment.
  */
 export function calculatePurposeScore(
   article: ArticleData,
@@ -414,22 +362,8 @@ export function assignBestPurpose(article: ArticleData): PurposeScoreOutput {
 }
 
 /**
- * Combines keyword score with LLM-as-Judge score (Item 3.1).
- */
-export function combineWithJudgeScore(
-  keywordScore: number,
-  judgeResult: JudgeResult | null
-): number {
-  if (!judgeResult || !config.settings.llm_judge.enabled) return keywordScore;
-
-  const weight = config.settings.llm_judge.weight;
-  // Normalize judge score (0-100) to same scale as keyword score
-  const normalizedJudge = judgeResult.relevance_score / 5; // → 0-20 scale
-  return keywordScore * (1 - weight) + normalizedJudge * weight;
-}
-
-/**
  * Title-only pre-screening to skip expensive content extraction.
+ * Used only when LLM triage is disabled or fails (see filtering/llm_triage.ts).
  */
 export function titlePassesPreScreen(title: string, purposeKey: string): boolean {
   if (purposeKey === "curated") return true;

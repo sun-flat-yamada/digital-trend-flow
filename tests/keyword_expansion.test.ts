@@ -23,7 +23,7 @@ jest.mock("../src/core/config", () => ({
     settings: {
       daily_threshold_score: 0,
       freshness: { enabled: false },
-      llm_judge: { enabled: false },
+      triage: { enabled: false },
       semantic_dedup: { enabled: false },
     },
   },

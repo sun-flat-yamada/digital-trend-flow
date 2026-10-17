@@ -20,6 +20,7 @@ export interface LLMRequest {
   systemPrompt: string;
   userPrompt: string;
   phase: LLMCallMetrics["phase"];
+  model?: string; // overrides the primary provider's model for this call (e.g. settings.triage.model)
   responseSchema?: Record<string, unknown>; // Item 1.1: Structured Output
   temperature?: number;
   maxOutputTokens?: number;
@@ -392,10 +393,11 @@ export async function callProviderWithRetry(
  * Tries the primary provider first, falls back to secondary on failure.
  */
 export async function llmCall(request: LLMRequest): Promise<LLMResponse> {
-  const phase = request.phase === "judge" || request.phase === "keyword_expansion"
-    || request.phase === "trend_detection"
-    ? "map" : request.phase;
-  const providers = getProviderConfigs(phase as "map" | "reduce");
+  const phase = request.phase === "reduce" ? "reduce" : "map";
+  const providers = getProviderConfigs(phase);
+  if (request.model && providers[0]) {
+    providers[0] = { ...providers[0], model: request.model };
+  }
   let lastError: string | undefined;
 
   for (const provider of providers) {

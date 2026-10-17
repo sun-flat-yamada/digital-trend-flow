@@ -42,7 +42,8 @@ daily_summary.yml
 パイプライン実行後、GitHub Actions の **Summary** タブにメトリクスが自動出力されます:
 
 - 取得/スコアリング/選定された記事数
-- LLM コール数 (Map/Reduce/Judge)
+- トリアージの結果 (残した件数・落とした件数・トークン数・コスト。失敗時は fallback)
+- LLM コール数 (Triage/Map/Reduce)
 - トークン消費量・推定コスト
 - ソース別ステータス
 - カテゴリ別記事分布

@@ -14,7 +14,7 @@ import { PATHS } from "./paths";
 // ── LLM Call Metrics ──
 
 export interface LLMCallMetrics {
-  phase: "map" | "reduce" | "judge" | "keyword_expansion" | "trend_detection";
+  phase: "map" | "reduce" | "triage" | "keyword_expansion" | "trend_detection";
   model: string;
   input_tokens: number;
   output_tokens: number;
@@ -40,6 +40,18 @@ export interface SourceStatus {
 /** Streak length at which a source is listed under "Source Alerts" in the job summary. */
 export const SOURCE_ALERT_STREAK = 3;
 
+/** Batch LLM triage outcome (filtering/llm_triage.ts). "fallback" means the keyword pre-screen ran. */
+export interface TriageMetrics {
+  status: "ok" | "fallback" | "disabled";
+  candidates: number;
+  kept: number;
+  dropped_irrelevant: number;
+  dropped_duplicate: number;
+  dropped_over_limit: number;
+  batches: number;
+  error?: string;
+}
+
 export interface PipelineRunMetrics {
   run_id: string;
   date: string;
@@ -57,6 +69,7 @@ export interface PipelineRunMetrics {
   sources_status: SourceStatus[];
   /** Article body extraction: "fallback" means the source's description was used instead. */
   extraction: { attempted: number; failed: number; fallback: number };
+  triage?: TriageMetrics;
   quality_score?: number;
   run_status?: RunStatus;
   status_reasons?: string[];
@@ -172,6 +185,11 @@ class MetricsCollector {
     this.metrics.articles_by_purpose = distribution;
   }
 
+  /** Records the batch triage outcome. */
+  setTriage(triage: TriageMetrics): void {
+    this.metrics.triage = triage;
+  }
+
   /** Sets the quality score from the quality checker. */
   setQualityScore(score: number): void {
     this.metrics.quality_score = score;
@@ -215,7 +233,18 @@ class MetricsCollector {
     const m = this.metrics;
     const mapCalls = m.llm_calls.filter((c) => c.phase === "map").length;
     const reduceCalls = m.llm_calls.filter((c) => c.phase === "reduce").length;
-    const judgeCalls = m.llm_calls.filter((c) => c.phase === "judge").length;
+    const triageCalls = m.llm_calls.filter((c) => c.phase === "triage");
+    const triageTokens = triageCalls.reduce(
+      (sum, c) => ({ input: sum.input + c.input_tokens, output: sum.output + c.output_tokens }),
+      { input: 0, output: 0 }
+    );
+    const triageCost = triageCalls.reduce((sum, c) => sum + c.estimated_cost_usd, 0);
+    const t = m.triage;
+    const triageRow = t
+      ? `| Triage (${t.status}) | ${t.kept} kept / ${t.dropped_irrelevant} irrelevant / ${t.dropped_duplicate} duplicate / ${t.dropped_over_limit} over limit, of ${t.candidates}` +
+        ` — tokens ${triageTokens.input.toLocaleString()} / ${triageTokens.output.toLocaleString()}, $${triageCost.toFixed(4)}` +
+        (t.error ? ` — ${t.error.replace(/\s+/g, " ").slice(0, 200)}` : "") + " |\n"
+      : "";
 
     const sourceRows = m.sources_status
       .map((s) => `| ${s.name} | ${s.type} | ${s.status} | ${s.article_count} | ${s.failure_streak ?? "—"} |`)
@@ -252,9 +281,9 @@ class MetricsCollector {
 | Articles Ingested | ${m.articles_ingested} |
 | Articles Scored | ${m.articles_scored} |
 | Articles Selected | ${m.articles_selected} |
-| Content Extraction (Failed / Description Fallback) | ${m.extraction.failed} / ${m.extraction.fallback} of ${m.extraction.attempted} |
+${triageRow}| Content Extraction (Failed / Description Fallback) | ${m.extraction.failed} / ${m.extraction.fallback} of ${m.extraction.attempted} |
 | Map Success (Articles) | ${mapSuccess} |
-| LLM Calls (Map/Reduce/Judge) | ${mapCalls}/${reduceCalls}/${judgeCalls} |
+| LLM Calls (Triage/Map/Reduce) | ${triageCalls.length}/${mapCalls}/${reduceCalls} |
 | Total Tokens (In/Out) | ${m.total_tokens.input.toLocaleString()} / ${m.total_tokens.output.toLocaleString()} |
 | Estimated Cost | $${m.total_cost_usd.toFixed(4)} |
 | Quality Score | ${m.quality_score?.toFixed(1) ?? "N/A"} |

@@ -175,11 +175,15 @@ export const ConfigSchema = z.object({
     }).default({ enabled: true, decay_lambda: 0.02, max_age_hours: 72 }),
     // Item 5.2: State TTL
     state_ttl_days: z.number().default(90),
-    // Item 3.1: LLM-as-a-Judge
-    llm_judge: z.object({
-      enabled: z.boolean().default(false),
-      weight: z.number().default(0.5), // weight vs keyword score
-    }).default({ enabled: false, weight: 0.5 }),
+    // Plan 2-1: batch LLM triage of titles/descriptions before any body is fetched
+    // (see filtering/llm_triage.ts). When it fails, the run falls back to the keyword pre-screen.
+    triage: z.object({
+      enabled: z.boolean().default(true),
+      model: z.string().optional(), // defaults to models.map
+      max_candidates: z.number().int().positive().default(30), // candidates whose body is fetched
+      batch_size: z.number().int().positive().default(150), // candidates per LLM call
+      min_relevance: z.number().min(0).max(100).default(50), // below this a candidate is dropped
+    }).default({ enabled: true, max_candidates: 30, batch_size: 150, min_relevance: 50 }),
     // Item 2.4: Semantic deduplication
     semantic_dedup: z.object({
       enabled: z.boolean().default(false),
