@@ -95,6 +95,18 @@ const MIGRATIONS: ReadonlyArray<(database: Database.Database) => void> = [
     CREATE INDEX IF NOT EXISTS idx_evaluated_urls_expires
       ON evaluated_urls(expires_at);
   `),
+  // 3: the run outcome as columns (it was only inside metrics_json), backfilled from metrics_json
+  (database) =>
+    database.exec(`
+    ALTER TABLE pipeline_runs ADD COLUMN run_status TEXT; -- 'success' | 'degraded' | 'skipped' | 'failed'
+    ALTER TABLE pipeline_runs ADD COLUMN status_reasons TEXT; -- JSON array
+    UPDATE pipeline_runs
+      SET run_status = json_extract(metrics_json, '$.run_status'),
+          status_reasons = json_extract(metrics_json, '$.status_reasons')
+      WHERE json_valid(metrics_json);
+    CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status
+      ON pipeline_runs(run_status);
+  `),
 ];
 
 /** The schema version this code writes. */
@@ -300,8 +312,8 @@ export function savePipelineRun(metrics: PipelineRunMetrics): void {
     (run_id, date, started_at, finished_at, duration_ms,
      articles_ingested, articles_scored, articles_selected,
      articles_by_purpose, total_input_tokens, total_output_tokens,
-     total_cost_usd, error_count, quality_score, metrics_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     total_cost_usd, error_count, quality_score, metrics_json, run_status, status_reasons)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
     )
     .run(
@@ -320,6 +332,8 @@ export function savePipelineRun(metrics: PipelineRunMetrics): void {
       metrics.errors.length,
       metrics.quality_score ?? null,
       JSON.stringify(metrics),
+      metrics.run_status ?? null,
+      metrics.status_reasons ? JSON.stringify(metrics.status_reasons) : null,
     );
 }
 

@@ -239,7 +239,7 @@ F-01 が発見されなかった理由である。各層が失敗を握りつぶ
 | :-- | :-- | :-- | :-- | :-- |
 | ST-1 | P1 | `config.yml` の `state_ttl_days` が使われず、90 日にハードコードされている | `state_manager.ts:20, 41, 112, 171` | config から注入する |
 | ST-2 | P1 | 選ばれなかった記事は処理済みにならないため、RSS に残っている同じ記事を毎日 Jina で取り直している（抽出時間が長い主因の一つ） | `main.ts:563-566` | 「評価済み（不採用）」を短い TTL で記録する（✅ #42。閾値未満・除外・選外を `evaluated_urls` に `settings.evaluated_ttl_days`〔既定 7 日〕記録し、取得直後に除く） |
-| ST-3 | P2 | 失敗した実行や 0 件の実行では `pipeline_runs`・メトリクスが保存されない（早期 return、致命的エラー時は `cleanup` のみ） | `main.ts:268-271, 365-368, 706-717` | 実行ステータス付きで常に保存する |
+| ST-3 | P2 | 失敗した実行や 0 件の実行では `pipeline_runs`・メトリクスが保存されない（早期 return、致命的エラー時は `cleanup` のみ） | `main.ts:268-271, 365-368, 706-717` | 実行ステータス付きで常に保存する（✅ #54） |
 | ST-4 | P2 | スキーマのマイグレーション機構がない（`CREATE TABLE IF NOT EXISTS` のみ） | `state_manager.ts:34-80` | `PRAGMA user_version` で段階的に移行する（✅ #42。現行を version 1、`evaluated_urls` を version 2 とした） |
 | ST-5 | P2 | 版日付が UTC の実行日になっている。定期実行は 2〜4.5 時間遅れており、0 時 UTC を跨ぐと日付がずれ、前日分の上書きや欠番が起き得る | `main.ts:95`、§1.1 | 版日付を JST で明示的に決め、既存ファイルの上書きを防ぐ |
 
@@ -424,7 +424,7 @@ QL-5 の内訳（`src/` 内から参照されていないもの）:
 
 - [ ] 4-1 状態 DB を artifacts リポジトリへ移し、成果物と状態を 1 コミットで保存する。本体 `main` への日次 bot コミットをなくし、ブランチ保護を有効にする
 - [ ] 4-2 `main.ts` をステージ関数（取得 → 抽出 → 選定 → Map → Reduce → 評価 → 配信 → 永続化）に分割し、依存を注入する。ソースと配信先はレジストリで解決する（プラグインレジストリを実際に使うか、削除する）
-- [ ] 4-3 実行ステータス（success / degraded / failed / skipped）を、`pipeline_runs`・metrics・Job Summary に必ず記録する
+- [x] 4-3 実行ステータス（success / degraded / failed / skipped）を、`pipeline_runs`・metrics・Job Summary に必ず記録する（#54。`pipeline_runs` に `run_status`・`status_reasons` 列〔schema version 3、既存の行は `metrics_json` から補完〕。致命的なエラーでも 3 つとも残し、ワークフローはコミットする。success 以外のメトリクス JSON は `<日付>_metrics.<status>.json`）
 - [ ] 4-4 `pages_generator.ts` を分割（CSS・JS を静的アセットへ）し、HTML を無効化した Markdown レンダラーと CSP を使う
 - [ ] 4-5 未配線の機能について、配線するか削除するかを決める（週次はワークフロー追加、年次は月次からの集約か削除、note.com / Zenn、キーワード拡張・トレンド分析、Langfuse スパン、Podcast）
 - [ ] 4-6 ドキュメントの不整合（§4.11）を直し、ADR（Architecture Decision Record）を導入し、`Item X.Y` コメントを整理する

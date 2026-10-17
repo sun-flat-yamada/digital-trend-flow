@@ -719,8 +719,33 @@ function finishSkipped(reason: string): RunStatus {
   console.log(`ℹ️ ${reason} Pipeline complete.`);
   metrics.setRunStatus("skipped", [reason]);
   savePipelineRun(metrics.finalize());
+  metrics.persist();
   writeStepSummary();
   return "skipped";
+}
+
+/**
+ * Records a run that ended with a fatal error: the run record, the metrics JSON and the job
+ * summary, each with the error. Each step is attempted even if an earlier one fails (the error may
+ * come from the state DB or the disk). Never throws. Call it before shutdownPipeline().
+ */
+export function finishFailed(error: unknown): void {
+  const message = `Fatal: ${errorMessage(error)}`;
+  metrics.recordError(message);
+  metrics.setRunStatus("failed", [message]);
+  const finalMetrics = metrics.finalize();
+  const steps: [string, () => void][] = [
+    ["save the run record", () => savePipelineRun(finalMetrics)],
+    ["persist the metrics", () => void metrics.persist()],
+    ["write the job summary", writeStepSummary],
+  ];
+  for (const [what, step] of steps) {
+    try {
+      step();
+    } catch (e) {
+      console.error(`⚠️ Failed to ${what} of the failed run:`, errorMessage(e));
+    }
+  }
 }
 
 // ── GitHub Actions Integration ──

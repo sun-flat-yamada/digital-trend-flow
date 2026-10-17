@@ -32,12 +32,23 @@ function createLegacyDb(file: string): void {
       processed_at TEXT NOT NULL DEFAULT (datetime('now')),
       expires_at TEXT NOT NULL DEFAULT (datetime('now', '+90 days'))
     );
-    CREATE TABLE pipeline_runs (run_id TEXT PRIMARY KEY, date TEXT NOT NULL, started_at TEXT NOT NULL);
+    CREATE TABLE pipeline_runs (
+      run_id TEXT PRIMARY KEY, date TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, duration_ms INTEGER,
+      articles_ingested INTEGER NOT NULL DEFAULT 0, articles_scored INTEGER NOT NULL DEFAULT 0,
+      articles_selected INTEGER NOT NULL DEFAULT 0, articles_by_purpose TEXT,
+      total_input_tokens INTEGER NOT NULL DEFAULT 0, total_output_tokens INTEGER NOT NULL DEFAULT 0,
+      total_cost_usd REAL NOT NULL DEFAULT 0, error_count INTEGER NOT NULL DEFAULT 0, quality_score REAL,
+      metrics_json TEXT
+    );
     CREATE TABLE source_health (
       source_name TEXT NOT NULL, source_type TEXT NOT NULL, check_date TEXT NOT NULL, status TEXT NOT NULL,
       article_count INTEGER NOT NULL DEFAULT 0, error_message TEXT, PRIMARY KEY (source_name, check_date)
     );
     INSERT INTO processed_urls (url, title, score) VALUES ('https://example.com/old', 'Old', 42);
+    INSERT INTO pipeline_runs (run_id, date, started_at, metrics_json) VALUES
+      ('run-degraded', '2026-10-01', '2026-10-01T18:47:00Z',
+       '{"run_status":"degraded","status_reasons":["Map success rate 0/12"]}'),
+      ('run-before-status', '2026-09-01', '2026-09-01T18:47:00Z', '{"articles_ingested":3}');
   `);
   legacy.close();
 }
@@ -60,7 +71,7 @@ describe("state DB", () => {
   test("a new DB is created at the latest schema version", () => {
     state = loadStateManager(":memory:");
     expect(state.getSchemaVersion()).toBe(state.SCHEMA_VERSION);
-    expect(state.SCHEMA_VERSION).toBe(2);
+    expect(state.SCHEMA_VERSION).toBe(3);
     expect(state.isProcessed("https://example.com/a")).toBe(false);
   });
 
@@ -69,10 +80,51 @@ describe("state DB", () => {
     createLegacyDb(file);
 
     state = loadStateManager(file);
-    expect(state.getSchemaVersion()).toBe(2);
+    expect(state.getSchemaVersion()).toBe(3);
     expect(state.isProcessed("https://example.com/old")).toBe(true);
     state.markAsEvaluated("https://example.com/new", "excluded", 0, "tech");
     expect(state.isEvaluated("https://example.com/new")).toBe(true);
+    state.closeDb();
+
+    // The run outcome is backfilled from metrics_json (NULL for runs recorded before it existed).
+    const raw = new Database(file);
+    expect(raw.prepare("SELECT run_id, run_status, status_reasons FROM pipeline_runs ORDER BY date").all()).toEqual([
+      { run_id: "run-before-status", run_status: null, status_reasons: null },
+      { run_id: "run-degraded", run_status: "degraded", status_reasons: '["Map success rate 0/12"]' },
+    ]);
+    raw.close();
+  });
+
+  test("a run record stores its outcome in its own columns", () => {
+    const file = path.join(tmpDir, "runs.db");
+    state = loadStateManager(file);
+    state.savePipelineRun({
+      run_id: "run-failed",
+      date: "2026-10-17",
+      started_at: "2026-10-17T18:47:00Z",
+      articles_ingested: 0,
+      articles_skipped_evaluated: 0,
+      articles_scored: 0,
+      articles_selected: 0,
+      articles_by_purpose: {},
+      llm_calls: [],
+      total_tokens: { input: 0, output: 0 },
+      total_cost_usd: 0,
+      errors: ["Fatal: disk full"],
+      sources_status: [],
+      extraction: { attempted: 0, failed: 0, fallback: 0 },
+      run_status: "failed",
+      status_reasons: ["Fatal: disk full"],
+    });
+    state.closeDb();
+
+    const raw = new Database(file);
+    expect(raw.prepare("SELECT run_status, status_reasons, error_count FROM pipeline_runs").get()).toEqual({
+      run_status: "failed",
+      status_reasons: '["Fatal: disk full"]',
+      error_count: 1,
+    });
+    raw.close();
   });
 
   test("an evaluated article is not marked processed, and its record expires", () => {

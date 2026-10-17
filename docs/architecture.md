@@ -317,7 +317,7 @@ EnvSchema = z.object({
 
 ## Persistence Schema (SQLite)
 
-`pipeline_state.db` は WAL モードで動作し、4 テーブルでパイプラインの状態を管理します。スキーマの版は `PRAGMA user_version` に記録し、開くときに `state_manager.ts` の `MIGRATIONS` を順に適用します (現在 version 2)。DB のパスは環境変数 `PIPELINE_STATE_DB` で差し替えられます (テストでは `:memory:`)。
+`pipeline_state.db` は WAL モードで動作し、4 テーブルでパイプラインの状態を管理します。スキーマの版は `PRAGMA user_version` に記録し、開くときに `state_manager.ts` の `MIGRATIONS` を順に適用します (現在 version 3)。DB のパスは環境変数 `PIPELINE_STATE_DB` で差し替えられます (テストでは `:memory:`)。
 
 ### processed_urls — 冪等性保証
 
@@ -360,6 +360,8 @@ EnvSchema = z.object({
 | `total_cost_usd`      | REAL    | 推定コスト合計        |
 | `quality_score`       | REAL    | 品質スコア            |
 | `metrics_json`        | TEXT    | 完全メトリクス (JSON) |
+| `run_status`          | TEXT    | `success` / `degraded` / `skipped` / `failed` |
+| `status_reasons`      | TEXT    | ステータスの理由 (JSON 配列) |
 
 ### source_health — ソース健全性
 
@@ -597,6 +599,8 @@ degraded の実行は次のように扱われます。
 - 終了コード 2 でジョブを失敗させる。ワークフローはステップ出力 `run_status` を見て、状態 DB とメトリクスだけをコミットする
 
 Map で失敗した記事は、degraded でない実行でも Reduce に渡さず（タイトルだけで要約させない）、処理済みにもしません。
+
+実行ステータスは success / degraded / skipped / failed のどれでも `pipeline_runs`（`run_status`・`status_reasons` 列）・メトリクス JSON・Job Summary に残ります。致命的なエラーで止まった実行は failed（終了コード 1）で、理由にエラーの内容（`Fatal: …`）が入り、ワークフローは degraded と同じく状態 DB とメトリクスをコミットします。メトリクス JSON は success が `<日付>_metrics.json`、それ以外が `<日付>_metrics.<status>.json` なので、同じ日の再実行が公開した実行の記録を上書きしません。
 
 品質スコアは `src/evaluation/quality_checker.ts` が次の 7 項目で評価します（100 点満点、各項目の平均）:
 

@@ -2,7 +2,28 @@
  * Tests for metrics.ts — LLM cost estimation and GitHub summary generation.
  */
 
+import * as fs from "fs";
+import * as path from "path";
 import { estimateCost, metrics } from "../src/core/metrics";
+
+describe("persist", () => {
+  test("a run that did not succeed does not overwrite the metrics JSON of the day's successful run", () => {
+    const dir = path.join(process.cwd(), "_tmp_ai", "test_metrics_persist");
+    fs.rmSync(dir, { recursive: true, force: true });
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const date = metrics.getSnapshot().date;
+      metrics.setRunStatus("success");
+      expect(path.basename(metrics.persist(dir))).toBe(`${date}_metrics.json`);
+      metrics.setRunStatus("failed", ["Fatal: disk full"]);
+      expect(path.basename(metrics.persist(dir))).toBe(`${date}_metrics.failed.json`);
+      expect(fs.readdirSync(dir).sort()).toEqual([`${date}_metrics.failed.json`, `${date}_metrics.json`]);
+    } finally {
+      jest.restoreAllMocks();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("toGitHubSummary run status", () => {
   test("shows the run status, map success and the reasons of a degraded run", () => {
