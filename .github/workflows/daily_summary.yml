@@ -116,10 +116,10 @@ jobs:
           path: '_site'
 
       - name: Commit and push generated summaries to artifacts repo
-        # A degraded run fails the pipeline step (nothing is published) but its run record —
-        # metrics JSON and pipeline_state.db — is still committed so the failure stays visible.
-        # A dry run commits nothing.
-        if: ${{ env.DRY_RUN != 'true' && (success() || steps.pipeline.outputs.run_status == 'degraded') }}
+        # A degraded or failed run fails the pipeline step but its run record — metrics JSON and
+        # pipeline_state.db — is still committed so the failure stays visible. (A build failure
+        # sets no run_status, so it commits nothing.) A dry run commits nothing.
+        if: ${{ env.DRY_RUN != 'true' && (success() || steps.pipeline.outputs.run_status == 'degraded' || steps.pipeline.outputs.run_status == 'failed') }}
         run: |
           # Pushes the current branch, rebasing onto the remote when it moved. Fails after 3 attempts.
           push_with_retry() {

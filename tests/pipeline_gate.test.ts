@@ -155,7 +155,9 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
     savePipelineRun: require("../src/ingestion/state_manager").savePipelineRun,
   };
   // Keep metrics JSON out of the working tree.
-  jest.spyOn(require("../src/core/metrics").metrics, "persist").mockReturnValue("metrics.json");
+  mocks["persist"] = jest
+    .spyOn(require("../src/core/metrics").metrics, "persist")
+    .mockReturnValue("metrics.json") as unknown as jest.Mock;
 
   mocks["fetchRss"]!.mockResolvedValue(
     ARTICLES.map((a) => ({
@@ -227,6 +229,46 @@ describe("daily pipeline publication gate", () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.githubOutput).toContain("run_status=failed");
+    // The failed run still gets its metrics JSON and job summary, though its record cannot be saved.
+    expect(run.mocks["persist"]).toHaveBeenCalled();
+    expect(run.stepSummary).toContain("❌ failed");
+    expect(run.stepSummary).toContain("- Fatal: disk full");
+  });
+
+  test("a fatal error still leaves the run record, the metrics JSON and the job summary", async () => {
+    const run = await runPipeline((mocks) => {
+      mocks["fetchRss"]!.mockResolvedValue([]);
+      // The skipped run's record fails to save once (e.g. the DB was locked); the failure is then recorded.
+      mocks["savePipelineRun"]!.mockImplementationOnce(() => {
+        throw new Error("database is locked");
+      });
+    });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.mocks["savePipelineRun"]).toHaveBeenCalledTimes(2);
+    expect(run.mocks["savePipelineRun"]!.mock.calls[1][0]).toMatchObject({
+      run_status: "failed",
+      status_reasons: ["Fatal: database is locked"],
+      errors: ["Fatal: database is locked"],
+    });
+    expect(run.mocks["persist"]).toHaveBeenCalledTimes(1);
+    expect(run.stepSummary).toContain("❌ failed");
+    expect(run.stepSummary).toContain("- Fatal: database is locked");
+  });
+
+  test("a run with nothing new is recorded as skipped, with its metrics JSON and job summary", async () => {
+    const run = await runPipeline((mocks) => {
+      mocks["fetchRss"]!.mockResolvedValue([]);
+    });
+
+    expect(run.exitCode).toBe(0);
+    expect(run.githubOutput).toContain("run_status=skipped");
+    expect(run.mocks["savePipelineRun"]!.mock.calls[0][0]).toMatchObject({
+      run_status: "skipped",
+      status_reasons: ["No new articles found today."],
+    });
+    expect(run.mocks["persist"]).toHaveBeenCalledTimes(1);
+    expect(run.stepSummary).toContain("⏭️ skipped");
   });
 
   test("a run whose Map phase fails entirely is degraded and publishes nothing", async () => {
@@ -280,6 +322,9 @@ describe("daily pipeline publication gate", () => {
     expect(run.mocks["saveMarkdownFile"]).toHaveBeenCalledTimes(1);
     expect(run.mocks["markAsProcessed"]).toHaveBeenCalledTimes(2);
     expect(run.githubOutput).toContain("run_status=success");
+    expect(run.mocks["savePipelineRun"]!.mock.calls[0][0]).toMatchObject({ run_status: "success" });
+    expect(run.mocks["persist"]).toHaveBeenCalledTimes(1);
+    expect(run.stepSummary).toContain("✅ success");
     // Frontmatter lists source names and the headline the summary leads with.
     expect(run.mocks["saveMarkdownFile"]!.mock.calls[0][6]).toMatchObject({
       sources: ["Test Feed"],

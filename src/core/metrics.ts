@@ -220,12 +220,20 @@ class MetricsCollector {
     return this.metrics;
   }
 
-  /** Persists metrics to a JSON file in ARTIFACTS_METRICS/. */
+  /**
+   * Persists metrics to a JSON file in ARTIFACTS_METRICS/: `<date>_metrics.json` for a successful
+   * run, `<date>_metrics.<status>.json` otherwise, so a later failed or skipped run on the same day
+   * does not overwrite the record of the run that published.
+   */
   persist(outputDir: string = PATHS.ARTIFACTS_METRICS.absolute): string {
     const absoluteDir = path.resolve(process.cwd(), outputDir);
     fs.mkdirSync(absoluteDir, { recursive: true });
 
-    const filename = `${this.metrics.date}_metrics.json`;
+    const status = this.metrics.run_status;
+    const filename =
+      status === undefined || status === "success"
+        ? `${this.metrics.date}_metrics.json`
+        : `${this.metrics.date}_metrics.${status}.json`;
     const filePath = path.join(absoluteDir, filename);
     fs.writeFileSync(filePath, JSON.stringify(this.metrics, null, 2), "utf8");
     console.log(`📊 Metrics saved to: ${filePath}`);
