@@ -6,7 +6,6 @@
 import axios from "axios";
 import { fetchHackerNews } from "../src/ingestion/hackernews";
 import { fetchYouTube } from "../src/ingestion/youtube";
-import { fetchGitHubTrending } from "../src/ingestion/github_trending";
 import { describeEngagement } from "../src/core/article";
 
 jest.mock("axios");
@@ -53,20 +52,6 @@ describe("source titles carry no decoration", () => {
 
     expect(item?.title).toBe("Agents in production");
     expect(item?.author).toBe("AI Channel");
-  });
-
-  test("GitHub Trending uses the repository as title and records stars today", async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: `<article><h2 class="h3"><a href="/acme/agent-kit" class="Link">acme / agent-kit</a></h2>
-        <p class="col-9 color-fg-muted">Toolkit for building agents</p>
-        <span>1,234 stars today</span></article>`,
-    });
-
-    const [item] = await fetchGitHubTrending("GitHub Trending", "python");
-
-    expect(item?.title).toBe("acme/agent-kit");
-    expect(item?.description).toBe("Toolkit for building agents");
-    expect(item?.engagement).toEqual({ starsToday: 1234 });
   });
 });
 

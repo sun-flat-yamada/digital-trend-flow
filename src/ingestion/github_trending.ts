@@ -1,20 +1,69 @@
 /**
  * [Role] GitHub Trending repositories ingestion module.
- * [Mechanism] Scrapes the GitHub Trending page via a lightweight HTML
- * parser to extract trending repos as ArticleItems.
+ * [Mechanism] Fetches the GitHub Trending page and parses it with cheerio, one repository row
+ * (`article.Box-row`) at a time, so each repository keeps its own description and star count.
  *
  * Item: 2.3 New Source Types (GitHub Trending)
  */
 
 import axios from "axios";
+import * as cheerio from "cheerio";
 import { isProcessed } from "./state_manager";
 import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const GITHUB_TRENDING_URL = "https://github.com/trending";
+const MAX_ITEMS = 25;
+
+/** One repository row of the Trending page. */
+export interface TrendingRepo {
+  repoPath: string; // "owner/repo"
+  description?: string;
+  language?: string;
+  starsToday: number;
+}
+
+const collapse = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 /**
- * Fetches trending GitHub repositories.
+ * Parses the Trending page. Every field is read inside the repository's own row, so a repository
+ * without a description gets none (instead of the next repository's).
+ */
+export function parseTrendingPage(html: string): TrendingRepo[] {
+  const $ = cheerio.load(html);
+  const repos: TrendingRepo[] = [];
+  const seen = new Set<string>();
+
+  $("article.Box-row").each((_, row) => {
+    const $row = $(row);
+    const href = $row.find("h2 a").first().attr("href") ?? "";
+    const repoPath = href.replace(/^\//, "").trim();
+    if (!/^[^/\s]+\/[^/\s]+$/.test(repoPath) || seen.has(repoPath)) return;
+    seen.add(repoPath);
+
+    const description = collapse($row.children("p").first().text());
+    const language = collapse($row.find('[itemprop="programmingLanguage"]').first().text());
+    const starsText = $row
+      .find("span")
+      .toArray()
+      .map((span) => collapse($(span).text()))
+      .find((text) => /stars? today/i.test(text));
+    const starsToday = Number(starsText?.match(/([\d,]+)\s+stars? today/i)?.[1]?.replace(/,/g, "") ?? 0);
+
+    repos.push({
+      repoPath,
+      ...(description ? { description } : {}),
+      ...(language ? { language } : {}),
+      starsToday,
+    });
+  });
+
+  return repos;
+}
+
+/**
+ * Fetches trending GitHub repositories. Throws when the page has no repository row, which is how
+ * a change in GitHub's markup shows up (rather than as a silently empty source).
  */
 export async function fetchGitHubTrending(
   sourceName: string = "GitHub Trending",
@@ -35,51 +84,28 @@ export async function fetchGitHubTrending(
       },
     });
 
-    const html = response.data as string;
+    const repos = parseTrendingPage(String(response.data));
+    if (repos.length === 0) {
+      throw new Error("the page contained no repositories (the page markup may have changed)");
+    }
+
     const newItems: ArticleItem[] = [];
-
-    // Extract repo links from the trending page HTML
-    // Pattern: <h2 class="..."><a href="/owner/repo" ...>
-    const repoRegex = /<h2[^>]*>\s*<a[^>]*href="\/([^"]+)"[^>]*>/g;
-    let match;
-    const seen = new Set<string>();
-
-    while ((match = repoRegex.exec(html)) !== null) {
-      const repoPath = match[1]?.trim();
-      if (!repoPath || seen.has(repoPath)) continue;
-      seen.add(repoPath);
-
-      const repoUrl = `https://github.com/${repoPath}`;
+    for (const repo of repos) {
+      const repoUrl = `https://github.com/${repo.repoPath}`;
       if (isProcessed(repoUrl)) continue;
-
-      // Extract description if available
-      const descRegex = new RegExp(
-        `href="/${repoPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[\\s\\S]*?<p[^>]*class="[^"]*"[^>]*>\\s*([^<]+)`,
-        "m",
-      );
-      const descMatch = html.match(descRegex);
-      const description = descMatch?.[1]?.trim() ?? "";
-
-      // Extract stars count
-      const starsRegex = new RegExp(
-        `${repoPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?(\\d[\\d,]*) stars today`,
-        "m",
-      );
-      const starsMatch = html.match(starsRegex);
-      const starsToday = Number(starsMatch?.[1]?.replace(/,/g, "") ?? "0");
 
       newItems.push({
         sourceName,
         sourceType: "github_trending",
         purpose,
-        title: repoPath,
+        title: repo.repoPath,
         url: repoUrl,
         publishedAt: new Date().toISOString(),
-        ...(description ? { description } : {}),
-        engagement: { starsToday },
+        ...(repo.description ? { description: repo.description } : {}),
+        engagement: { starsToday: repo.starsToday },
       });
 
-      if (newItems.length >= 25) break;
+      if (newItems.length >= MAX_ITEMS) break;
     }
 
     console.log(`  🐙 GitHub [${sourceName}]: ${newItems.length} trending repos`);
