@@ -6,7 +6,7 @@
 
 import axios from "axios";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const BSKY_PUBLIC_API = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts";
@@ -90,16 +90,16 @@ export async function fetchBluesky(
       const rawTitle = externalTitle || postText.slice(0, 100);
       if (!rawTitle) continue;
 
-      const title = `${rawTitle} (Bluesky: ♥${likes})`;
       const publishedAt = post.record?.createdAt ?? new Date().toISOString();
 
       articles.push({
         sourceName: `Bluesky (${post.author.handle})`,
         sourceType: "bluesky",
         purpose,
-        title,
+        title: rawTitle,
         url: targetUrl,
         publishedAt,
+        engagement: { likes },
         ...(postText ? { description: postText } : {}),
       });
 

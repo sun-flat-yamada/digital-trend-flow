@@ -9,7 +9,7 @@
 import axios from "axios";
 import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -70,7 +70,8 @@ export async function fetchYouTube(
         sourceName,
         sourceType: "youtube",
         purpose,
-        title: `🎬 ${item.snippet.title} — ${item.snippet.channelTitle}`,
+        title: item.snippet.title,
+        author: item.snippet.channelTitle,
         url: videoUrl,
         publishedAt: item.snippet.publishedAt,
         ...(item.snippet.description?.trim() ? { description: item.snippet.description.trim() } : {}),

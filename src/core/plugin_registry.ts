@@ -6,7 +6,7 @@
  * Items: 8.4 Event-driven hooks, 8.5 Plugin Architecture
  */
 
-import { ArticleItem } from "../ingestion/rss";
+import type { ArticleItem } from "./types";
 import { errorMessage } from "./errors";
 
 // ── Plugin Interfaces ──

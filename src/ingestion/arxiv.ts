@@ -8,7 +8,7 @@
 
 import axios from "axios";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const ARXIV_API_BASE = "https://export.arxiv.org/api/query";

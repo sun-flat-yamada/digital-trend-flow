@@ -6,7 +6,7 @@
 
 import axios from "axios";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 interface RedditPostData {
@@ -75,9 +75,10 @@ export async function fetchReddit(
         sourceName: `Reddit r/${cleanSubreddit}`,
         sourceType: "reddit",
         purpose,
-        title: `${post.title} (Reddit: ▲${post.score})`,
+        title: post.title,
         url: targetUrl,
         publishedAt: new Date(post.created_utc * 1000).toISOString(),
+        engagement: { score: post.score },
       });
 
       if (articles.length >= maxItems) break;

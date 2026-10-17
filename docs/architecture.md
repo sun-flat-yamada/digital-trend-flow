@@ -80,17 +80,22 @@ flowchart LR
 ソースアダプター（RSS, Raindrop, Grok 等）が共通で返す **正規化済み記事メタデータ**。全 7 ソースがこの型に変換して返す。
 
 ```typescript
-// src/ingestion/rss.ts
+// src/core/types.ts
 interface ArticleItem {
   sourceName: string;   // 情報源の表示名
   sourceType: string;   // "rss" | "raindrop" | "xai_grok" | ...
   purpose: string;      // config.purposes のキー
-  title: string;        // 記事タイトル
+  title: string;        // 記事タイトル（公開時のまま。ソース固有の装飾は付けない）
   url: string;          // 正規化済み URL
   publishedAt: string;  // ISO 8601
   language?: string;    // "ja" | "en" (多言語対応)
+  description?: string; // ソースの要約（本文の抽出に失敗したときに使う）
+  author?: string;      // 著者・チャンネル（YouTube など）
+  engagement?: { score?: number; likes?: number; starsToday?: number }; // HN の points、Reddit の upvote、Bluesky の like、GitHub の当日の star
 }
 ```
+
+エンゲージメントはタイトルに埋め込まず、`describeEngagement`（`src/core/article.ts`）で 1 行にしてトリアージと Map のプロンプトに別項目として渡す。重複排除・キーワード判定・要約の見出しは、装飾のないタイトルで行われる。
 
 **境界の意図**: ソースごとに異なる生データ形式（RSS XML, Raindrop JSON, HN API 等）をすべて `ArticleItem` に正規化することで、下流のフィルタリングは**ソースの種類を一切知らない**。新規ソース追加時も、この型に変換すれば既存パイプラインがそのまま動作する。
 

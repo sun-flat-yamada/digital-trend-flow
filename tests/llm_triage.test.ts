@@ -14,7 +14,7 @@ import {
   type TriagePurpose,
   type TriageVerdict,
 } from "../src/filtering/llm_triage";
-import type { ArticleItem } from "../src/ingestion/rss";
+import type { ArticleItem } from "../src/core/types";
 import type { LLMRequest, LLMResponse } from "../src/summarization/llm_gateway";
 import type { Purpose } from "../src/core/types";
 
@@ -90,6 +90,15 @@ describe("buildTriageUserPrompt", () => {
     const parsed = JSON.parse(line);
     expect(parsed).toMatchObject({ id: 7, title: "Title 7", source: "Feed (rss)" });
     expect(parsed.description).toHaveLength(200);
+    expect(parsed).not.toHaveProperty("signals");
+  });
+
+  test("passes a candidate's engagement signals separately from its title", () => {
+    const prompt = buildTriageUserPrompt(PURPOSES, [
+      { id: 1, item: item(1, { sourceType: "hackernews", engagement: { score: 439 } }) },
+    ]);
+    const parsed = JSON.parse(prompt.split("\n").find((l) => l.startsWith("{"))!);
+    expect(parsed).toMatchObject({ title: "Title 1", signals: "Hacker News: 439 points" });
   });
 });
 

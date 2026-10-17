@@ -274,3 +274,31 @@ export const EnvSchema = z.object({
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
+
+// --- Articles ---
+
+/** Engagement signals a source reports for an article. Kept out of the title. */
+export interface ArticleEngagement {
+  /** Hacker News points or Reddit upvotes. */
+  score?: number;
+  /** Bluesky likes. */
+  likes?: number;
+  /** GitHub stars gained today. */
+  starsToday?: number;
+}
+
+/** One article (or post, video, repository) as fetched from a source, before body extraction. */
+export interface ArticleItem {
+  sourceName: string;
+  sourceType: string;
+  purpose: string; // Links to a key in config.purposes
+  /** The title as published, without source-specific decoration. */
+  title: string;
+  url: string;
+  publishedAt: string;
+  language?: string; // Item 2.6: Multi-language ingestion
+  description?: string; // Plain-text summary from the source; used when content extraction fails
+  /** Author or channel, when the source names one (e.g. the YouTube channel). */
+  author?: string;
+  engagement?: ArticleEngagement;
+}

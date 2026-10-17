@@ -1,7 +1,7 @@
 import axios from "axios";
 import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
-import { ArticleItem } from "./rss";
+import type { ArticleItem } from "../core/types";
 import { normalizeUrl } from "../core/url";
 import { errorMessage } from "../core/errors";
 

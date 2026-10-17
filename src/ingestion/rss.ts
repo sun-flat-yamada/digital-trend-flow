@@ -6,17 +6,10 @@
 import Parser from "rss-parser";
 import { isProcessed } from "./state_manager";
 import { errorMessage } from "../core/errors";
+import type { ArticleItem } from "../core/types";
 
-export interface ArticleItem {
-  sourceName: string;
-  sourceType: string;
-  purpose: string; // Links to a key in config.purposes
-  title: string;
-  url: string;
-  publishedAt: string;
-  language?: string; // Item 2.6: Multi-language ingestion
-  description?: string; // Plain-text summary from the source; used when content extraction fails
-}
+// ArticleItem lives in core/types; re-exported for existing imports.
+export type { ArticleItem };
 
 // Some publishers reject requests without a browser-like User-Agent (HTTP 403).
 const parser = new Parser({

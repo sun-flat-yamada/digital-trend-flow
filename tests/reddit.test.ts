@@ -64,8 +64,8 @@ describe("fetchReddit", () => {
     const articles = await fetchReddit("LocalLLaMA", 50, 10, "ai_dev_tools");
 
     expect(articles.length).toBe(1);
-    expect(articles[0]?.title).toContain("DeepSeek-R1 Local Setup Guide");
-    expect(articles[0]?.title).toContain("▲150");
+    expect(articles[0]?.title).toBe("DeepSeek-R1 Local Setup Guide");
+    expect(articles[0]?.engagement).toEqual({ score: 150 });
     expect(articles[0]?.sourceType).toBe("reddit");
     expect(articles[0]?.url).toBe("https://github.com/deepseek-ai/DeepSeek-R1");
   });
