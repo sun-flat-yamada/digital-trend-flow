@@ -9,13 +9,13 @@
   },
   "scripts": {
     "test:config": "ts-node src/cli/test_config.ts",
-    "test:unit": "jest --forceExit",
-    "test:golden": "jest tests/golden_regression --forceExit",
+    "test:unit": "jest",
+    "test:golden": "jest tests/golden_regression",
     "test": "npm run type-check && npm run test:config && npm run test:unit",
     "type-check": "tsc --noEmit",
     "build": "tsc",
     "build:pages": "ts-node src/cli/build_pages.ts",
-    "start": "node dist/main.js",
+    "start": "node dist/cli/daily.js",
     "debug:filter": "ts-node src/cli/dry_run.ts",
     "lint": "eslint .",
     "format": "eslint . --fix"

@@ -51,7 +51,7 @@ jobs:
         run: npm run test:config
 
       - name: Unit tests
-        run: npx jest --forceExit
+        run: npx jest
 
       - name: Build
         run: npm run build

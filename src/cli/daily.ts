@@ -1,0 +1,42 @@
+/**
+ * Entry point of the daily pipeline (`npm start`, used by .github/workflows/daily_summary.yml).
+ * Runs the pipeline, shuts it down, exposes the `run_status` step output and sets the exit code.
+ */
+
+import * as fs from "fs";
+import { runDailyPipeline, shutdownPipeline } from "../main";
+import { metrics } from "../core/metrics";
+import { registry } from "../core/plugin_registry";
+
+// A degraded run exits non-zero so the job fails visibly; the workflow reads the `run_status`
+// step output to still commit the run record (see .github/workflows/daily_summary.yml).
+export const EXIT_CODE_DEGRADED = 2;
+export const EXIT_CODE_FAILED = 1;
+
+/** Exposes a step output (e.g. `run_status`) to later workflow steps, when running in Actions. */
+function writeGitHubOutput(key: string, value: string): void {
+  const outputPath = process.env["GITHUB_OUTPUT"];
+  if (!outputPath) return;
+  fs.appendFileSync(outputPath, `${key}=${value}\n`, "utf8");
+}
+
+/** Runs the daily pipeline to completion and resolves with the process exit code. Never rejects. */
+export async function runDaily(): Promise<number> {
+  try {
+    const status = await runDailyPipeline();
+    await shutdownPipeline();
+    writeGitHubOutput("run_status", status);
+    return status === "degraded" ? EXIT_CODE_DEGRADED : 0;
+  } catch (err: any) {
+    await shutdownPipeline();
+    console.error("💀 Fatal pipeline error:", err);
+    metrics.recordError(`Fatal: ${err?.message ?? err}`);
+    await registry.events.emit("pipeline:error", { error: String(err) }).catch(() => {});
+    writeGitHubOutput("run_status", "failed");
+    return EXIT_CODE_FAILED;
+  }
+}
+
+if (require.main === module) {
+  runDaily().then((code) => process.exit(code));
+}

@@ -1,6 +1,7 @@
 /**
  * Main pipeline orchestrator for Digital Trend Flow.
- * Implements all 36 improvement items across 8 categories.
+ * Importing this module has no side effects: the daily entry point is src/cli/daily.ts, which
+ * calls runDailyPipeline() and shutdownPipeline() and turns the run status into an exit code.
  */
 
 import * as fs from "fs";
@@ -79,9 +80,10 @@ interface ScoredArticle {
 const errorMessageOf = (reason: unknown): string => (reason instanceof Error ? reason.message : String(reason));
 
 /**
- * Main pipeline orchestrator. Resolves with the run status; a "degraded" run publishes nothing.
+ * Runs the daily pipeline. Resolves with the run status; a "degraded" run publishes nothing.
+ * Call shutdownPipeline() afterwards (also when this rejects) to flush state and close the DB.
  */
-async function main(): Promise<RunStatus> {
+export async function runDailyPipeline(): Promise<RunStatus> {
   const today = new Date().toISOString().split("T")[0] ?? "unknown-date";
   console.log(`\n🚀 Digital Trend Flow - Daily Pipeline Starting (${today})...`);
   console.log(`   ⚙️ API Concurrency: ${env.API_CONCURRENCY}, Interval: ${env.API_INTERVAL_MS}ms\n`);
@@ -690,13 +692,6 @@ function writeStepSummary(): void {
   console.log("📊 GitHub Actions summary written.");
 }
 
-/** Exposes a step output (e.g. `run_status`) to later workflow steps, when running in Actions. */
-function writeGitHubOutput(key: string, value: string): void {
-  const outputPath = process.env["GITHUB_OUTPUT"];
-  if (!outputPath) return;
-  fs.appendFileSync(outputPath, `${key}=${value}\n`, "utf8");
-}
-
 // ── Two-Pass Quota Selection ──
 
 function twoPassSelect(articles: ScoredArticle[]): ScoredArticle[] {
@@ -762,7 +757,8 @@ function twoPassSelect(articles: ScoredArticle[]): ScoredArticle[] {
   return selected;
 }
 
-async function cleanup(): Promise<void> {
+/** Flushes the state DB and Langfuse and closes the DB. Never throws. */
+export async function shutdownPipeline(): Promise<void> {
   try {
     flushState();
   } catch (e: any) {
@@ -779,22 +775,3 @@ async function cleanup(): Promise<void> {
     // Non-fatal
   }
 }
-
-// A degraded run exits non-zero so the job fails visibly; the workflow reads the `run_status`
-// step output to still commit the run record (see .github/workflows/daily_summary.yml).
-const EXIT_CODE_DEGRADED = 2;
-
-main()
-  .then(async (status) => {
-    await cleanup();
-    writeGitHubOutput("run_status", status);
-    process.exit(status === "degraded" ? EXIT_CODE_DEGRADED : 0);
-  })
-  .catch(async (err) => {
-    await cleanup();
-    console.error("💀 Fatal pipeline error:", err);
-    metrics.recordError(`Fatal: ${err.message ?? err}`);
-    registry.events.emit("pipeline:error", { error: String(err) }).catch(() => {});
-    writeGitHubOutput("run_status", "failed");
-    process.exit(1);
-  });

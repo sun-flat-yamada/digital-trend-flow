@@ -1,7 +1,7 @@
 /**
- * Integration tests for the daily pipeline's publication gate (src/main.ts).
- * Every external dependency is mocked. A degraded run must publish nothing, mark no URL as
- * processed, still save its run record, and exit with the "degraded" exit code.
+ * Integration tests for the daily pipeline's publication gate (src/main.ts, run through the
+ * src/cli/daily.ts entry point). Every external dependency is mocked. A degraded run must publish
+ * nothing, mark no URL as processed, still save its run record, and exit with the "degraded" exit code.
  */
 
 import * as fs from "fs";
@@ -115,16 +115,13 @@ ${"This technical breakthrough changes how engineering teams plan their architec
 const tmpDir = path.join(process.cwd(), "_tmp_ai", "test_pipeline_gate");
 
 interface PipelineRun {
-  exitCode: number | undefined;
+  exitCode: number;
   mocks: Record<string, jest.Mock>;
   githubOutput: string;
   stepSummary: string;
 }
 
-/**
- * Loads src/main.ts in a fresh module registry (importing it starts the pipeline) and resolves
- * when the pipeline calls process.exit.
- */
+/** Runs the daily entry point in a fresh module registry and resolves with its exit code. */
 async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void): Promise<PipelineRun> {
   jest.resetModules();
   fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -165,12 +162,7 @@ async function runPipeline(configure: (mocks: Record<string, jest.Mock>) => void
   );
   configure(mocks);
 
-  const exitCode = await new Promise<number | undefined>((resolve) => {
-    jest.spyOn(process, "exit").mockImplementation(((code?: number) => {
-      resolve(code);
-    }) as never);
-    require("../src/main");
-  });
+  const exitCode: number = await require("../src/cli/daily").runDaily();
 
   const read = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "");
   return { exitCode, mocks, githubOutput: read(outputPath), stepSummary: read(summaryPath) };
@@ -204,6 +196,31 @@ describe("daily pipeline publication gate", () => {
     delete process.env["GITHUB_OUTPUT"];
     delete process.env["GITHUB_STEP_SUMMARY"];
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("importing the pipeline modules runs nothing", async () => {
+    jest.resetModules();
+    const fetchRss: jest.Mock = require("../src/ingestion/rss").fetchRss;
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    require("../src/main");
+    require("../src/cli/daily");
+    // Give a pipeline started by the import time to reach its first fetch.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(fetchRss).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
+    exit.mockRestore();
+  });
+
+  test("an unexpected error fails the run with exit code 1", async () => {
+    const run = await runPipeline((mocks) => {
+      mocks["fetchRss"]!.mockResolvedValue([]);
+      mocks["savePipelineRun"]!.mockImplementation(() => {
+        throw new Error("disk full");
+      });
+    });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.githubOutput).toContain("run_status=failed");
   });
 
   test("a run whose Map phase fails entirely is degraded and publishes nothing", async () => {

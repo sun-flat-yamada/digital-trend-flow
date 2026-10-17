@@ -6,7 +6,7 @@
       "type": "node",
       "request": "launch",
       "runtimeArgs": ["-r", "ts-node/register"],
-      "args": ["${workspaceFolder}/src/main.ts"],
+      "args": ["${workspaceFolder}/src/cli/daily.ts"],
       "cwd": "${workspaceFolder}",
       "env": { "NODE_ENV": "development" },
       "envFile": "${workspaceFolder}/.env",
