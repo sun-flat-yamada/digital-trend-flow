@@ -4,6 +4,7 @@
  * source type the same way. Adapters throw on failure; an empty array means "reachable, nothing new".
  */
 
+import { config } from "../core/config";
 import type { ArticleItem, Source } from "../core/types";
 import { fetchRss } from "./rss";
 import { fetchRaindropBookmarks, type RaindropFetchResult } from "./raindrop";
@@ -20,6 +21,10 @@ export type SourceWithPurpose = Source & { purpose: string };
 /** Raindrop results also carry the IDs to archive after the run. */
 export type RaindropResultSet = RaindropFetchResult & { collectionId: number; archiveId: number | undefined };
 
+/** How far back a source fetches: its own `lookback_hours`, else `settings.freshness.max_age_hours`. */
+const lookbackHoursFor = (s: { lookback_hours?: number | undefined }): number =>
+  s.lookback_hours ?? config.settings.freshness.max_age_hours;
+
 /** Fetches one source. `onRaindrop` receives a Raindrop source's full result (for archiving). */
 export async function fetchSource(
   s: SourceWithPurpose,
@@ -27,7 +32,7 @@ export async function fetchSource(
 ): Promise<ArticleItem[]> {
   switch (s.type) {
     case "rss":
-      return fetchRss(s.name, s.url, s.purpose);
+      return fetchRss(s.name, s.url, s.purpose, lookbackHoursFor(s));
     case "raindrop": {
       const result = await fetchRaindropBookmarks(s.collection_id, s.name, s.lookback_hours, s.purpose);
       onRaindrop?.({ ...result, collectionId: s.collection_id, archiveId: s.archive_collection_id });
@@ -40,7 +45,7 @@ export async function fetchSource(
     case "arxiv":
       return fetchArxiv(s.query, s.name, s.max_results, s.purpose);
     case "youtube":
-      return fetchYouTube(s.name, s.query, s.channel_id, s.max_results, s.purpose);
+      return fetchYouTube(s.name, s.query, s.channel_id, s.max_results, s.purpose, lookbackHoursFor(s));
     case "github_trending":
       return fetchGitHubTrending(s.name, s.language_filter, s.since, s.purpose);
     case "reddit":

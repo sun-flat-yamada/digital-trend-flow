@@ -151,3 +151,12 @@ To prevent temporary rate-limiting from shutting down the entire pipeline, the c
 Phase 2 (Content Extraction via Jina Reader in `src/main.ts`) operates independently of LLM API quotas:
 - Concurrency defaults to `Math.max(env.API_CONCURRENCY, 3)`.
 - Request interval is set to `200 ms` to maintain fast scraping throughput without overloading target web servers.
+- Per request (`settings.extraction` in `config.yml`): timeout `jina_timeout_ms` (default `20000`), `jina_retries` retries of a transient failure (default `2`; 408/429/5xx/network only), and `host_failure_limit` (default `2`): after that many consecutive failures on one host, the rest of that host's URLs are skipped for the run.
+
+---
+
+## 9. Fetch Window & Cost Table
+
+- **Fetch window**: RSS and YouTube fetch items from the last `settings.freshness.max_age_hours` hours (default `72`, the same value freshness scoring uses). A source can override it with `lookback_hours` (e.g. `lookback_hours: 168` for a weekly feed). Raindrop has its own `lookback_hours` (default `48`).
+- **Cost table**: `settings.pricing` maps a model-name key to USD per 1M input / output tokens. A model is priced by the longest key its name contains (`gpt-4.1-mini` is not priced as `gpt-4.1`); `default` covers any other model. Setting `pricing` replaces the whole table; without it, the built-in table (`DEFAULT_PRICING` in `src/core/types.ts`, checked against the official pricing pages on 2026-10-17) is used.
+

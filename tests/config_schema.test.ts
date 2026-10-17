@@ -5,7 +5,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "yaml";
-import { ConfigSchema, EnvSchema } from "../src/core/types";
+import { ConfigSchema, DEFAULT_LOOKBACK_HOURS, DEFAULT_PRICING, EnvSchema } from "../src/core/types";
 
 describe("Config Schema Validation", () => {
   test("config.yml parses successfully against ConfigSchema", () => {
@@ -126,5 +126,19 @@ describe("Config Schema Validation", () => {
     const config = ConfigSchema.parse(raw);
 
     expect(config.settings.quality_gate).toEqual({ min_map_success_rate: 0.5, min_quality_score: 60 });
+  });
+
+  test("extraction, pricing and the fetch window keep the built-in defaults when omitted", () => {
+    const raw = yaml.parse(fs.readFileSync(path.join(process.cwd(), "config.yml"), "utf8"));
+    // The table in config.yml is the built-in one, so removing it changes no estimate.
+    expect(ConfigSchema.parse(raw).settings.pricing).toEqual(DEFAULT_PRICING);
+    delete raw.settings.extraction;
+    delete raw.settings.pricing;
+    delete raw.settings.freshness;
+    const config = ConfigSchema.parse(raw);
+
+    expect(config.settings.extraction).toEqual({ jina_timeout_ms: 20_000, jina_retries: 2, host_failure_limit: 2 });
+    expect(config.settings.pricing).toEqual(DEFAULT_PRICING);
+    expect(config.settings.freshness.max_age_hours).toBe(DEFAULT_LOOKBACK_HOURS);
   });
 });

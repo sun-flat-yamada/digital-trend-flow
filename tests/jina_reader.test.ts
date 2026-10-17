@@ -9,7 +9,17 @@ import { extractMarkdown, isRetryableStatus, resetExtractionState } from "../src
 jest.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-jest.mock("../src/core/config", () => ({ env: { JINA_API_KEY: "jina-key" } }));
+const mockExtraction = { jina_timeout_ms: 20_000, jina_retries: 2, host_failure_limit: 2 };
+jest.mock("../src/core/config", () => ({
+  config: {
+    settings: {
+      get extraction() {
+        return mockExtraction;
+      },
+    },
+  },
+  env: { JINA_API_KEY: "jina-key" },
+}));
 // Retry immediately so the tests do not wait for the backoff.
 jest.mock("../src/core/retry", () => {
   const actual = jest.requireActual("../src/core/retry");
@@ -54,6 +64,22 @@ describe("extractMarkdown", () => {
 
     await expect(extractMarkdown("https://example.com/a")).rejects.toThrow("empty content");
     expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+  });
+
+  test("uses the timeout, retry count and host failure limit from settings.extraction", async () => {
+    const defaults = { ...mockExtraction };
+    Object.assign(mockExtraction, { jina_timeout_ms: 5_000, jina_retries: 0, host_failure_limit: 1 });
+    try {
+      mockedAxios.get.mockRejectedValue(httpError(503));
+
+      await expect(extractMarkdown("https://slow.example.com/a")).rejects.toThrow("Jina returned HTTP 503");
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1); // no retry
+      expect(mockedAxios.get.mock.calls[0]?.[1]?.timeout).toBe(5_000);
+      await expect(extractMarkdown("https://slow.example.com/b")).rejects.toThrow("skipped: 1 consecutive");
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.assign(mockExtraction, defaults);
+    }
   });
 
   test("skips a host after two consecutive failures, without affecting other hosts", async () => {

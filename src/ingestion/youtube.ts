@@ -9,7 +9,7 @@
 import axios from "axios";
 import { env } from "../core/config";
 import { isProcessed } from "./state_manager";
-import type { ArticleItem } from "../core/types";
+import { DEFAULT_LOOKBACK_HOURS, type ArticleItem } from "../core/types";
 import { errorMessage } from "../core/errors";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -33,6 +33,7 @@ export async function fetchYouTube(
   channelId?: string,
   maxResults: number = 10,
   purpose: string = "ai_research",
+  lookbackHours: number = DEFAULT_LOOKBACK_HOURS,
 ): Promise<ArticleItem[]> {
   const apiKey = env.YOUTUBE_API_KEY;
 
@@ -48,7 +49,7 @@ export async function fetchYouTube(
       maxResults,
       order: "date",
       key: apiKey,
-      publishedAfter: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
+      publishedAfter: new Date(Date.now() - lookbackHours * 60 * 60 * 1000).toISOString(),
     };
 
     if (query) params["q"] = query;

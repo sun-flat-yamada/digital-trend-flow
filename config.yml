@@ -35,7 +35,35 @@ settings:
   freshness:
     enabled: true
     decay_lambda: 0.02   # 指数減衰係数 (大きいほど古い記事のスコアが低下)
-    max_age_hours: 72    # この時間を超えた記事は最低値
+    max_age_hours: 72    # この時間を超えた記事は最低値。RSS・YouTube の取得期間でもある (情報源の lookback_hours で上書きできる)
+
+  # 本文抽出 (Jina Reader) の動作
+  extraction:
+    jina_timeout_ms: 20000   # 1 リクエストのタイムアウト
+    jina_retries: 2          # 一時的な失敗 (408/429/5xx/ネットワーク) の再試行回数
+    host_failure_limit: 2    # 同じホストで連続してこの回数失敗したら、その実行では残りを取得しない
+
+  # LLM の単価表 (USD / 100 万トークン、有料枠の標準料金。2026-10-17 に公式の価格表で確認)
+  # モデル名に含まれる最も長いキーの単価を使う。どれにも当たらないモデルは default。
+  # ここに書くと表全体が置き換わる (省略時はコードの既定値 DEFAULT_PRICING と同じ)
+  pricing:
+    gemini-3.8-flash: {input: 0.75, output: 3.75}
+    gemini-3.6-flash: {input: 0.75, output: 3.75}
+    gemini-3.5-flash-lite: {input: 0.3, output: 2.5}
+    gemini-3.1-flash-lite: {input: 0.25, output: 1.5}
+    gemini-3.1-pro: {input: 2, output: 12}
+    gemini-3-flash: {input: 0.5, output: 3}
+    gemini-2.5-pro: {input: 1.25, output: 10}
+    gemini-2.5-flash: {input: 0.3, output: 2.5}
+    gemini-2.5-flash-lite: {input: 0.1, output: 0.4}
+    gpt-4.1: {input: 2, output: 8}
+    gpt-4.1-mini: {input: 0.4, output: 1.6}
+    gpt-4.1-nano: {input: 0.1, output: 0.4}
+    claude-sonnet-5: {input: 2, output: 10}
+    claude-sonnet-4: {input: 3, output: 15}
+    claude-haiku-5-5: {input: 0.1, output: 0.5}
+    claude-haiku-4-5: {input: 1, output: 5}
+    default: {input: 0.5, output: 2}
 
   # Item 5.2: 処理済みURL の TTL (日数)
   state_ttl_days: 90

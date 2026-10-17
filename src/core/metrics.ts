@@ -10,6 +10,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { PATHS } from "./paths";
+import { config } from "./config";
+import { DEFAULT_PRICING, type ModelPrice } from "./types";
 
 // ── LLM Call Metrics ──
 
@@ -79,44 +81,34 @@ export interface PipelineRunMetrics {
   map_succeeded?: number; // articles whose facts were extracted
 }
 
-// ── Pricing Table (per 1M tokens, approximate as of 2026-04) ──
+// ── Cost Estimation ──
 
-const PRICING: Record<string, { input: number; output: number }> = {
-  // Google Gemini
-  "gemini-3.1-flash-lite": { input: 0.25, output: 1.5 },
-  "gemini-3.8-flash": { input: 0.75, output: 3.75 },
-  "gemini-3.1-pro": { input: 2.0, output: 12.0 },
-  "flash-lite": { input: 0.25, output: 1.5 },
-  "gemini-2.5-flash": { input: 0.15, output: 0.6 },
-  "gemini-2.5-pro": { input: 1.25, output: 5.0 },
-  "gemini-2.0-flash": { input: 0.1, output: 0.4 },
-  "gemini-2.0-pro": { input: 1.0, output: 4.0 },
-  "gemini-3.0-flash": { input: 0.1, output: 0.4 },
-  "gemini-3.0-pro": { input: 1.0, output: 4.0 },
-  // OpenAI
-  "gpt-4.1": { input: 2.0, output: 8.0 },
-  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
-  "gpt-4.1-nano": { input: 0.1, output: 0.4 },
-  // Anthropic
-  "claude-sonnet-4": { input: 3.0, output: 15.0 },
-  "claude-haiku-4": { input: 0.8, output: 4.0 },
-  // Fallback
-  default: { input: 0.5, output: 2.0 },
-};
+/** The configured price table (`settings.pricing`), or the built-in one when config has none. */
+function configuredPricing(): Record<string, ModelPrice> {
+  return config.settings?.pricing ?? DEFAULT_PRICING;
+}
 
 /**
- * Estimates the cost of an LLM call based on known pricing.
+ * Estimates the cost of an LLM call from a price table (USD per 1M tokens), by default
+ * `settings.pricing` in config.yml.
  */
-export function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
+export function estimateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  pricingTable: Record<string, ModelPrice> = configuredPricing(),
+): number {
   // Use the most specific (longest) matching key, so "gpt-4.1-mini" is not priced as "gpt-4.1".
   const name = model.toLowerCase();
   const pricing =
-    Object.entries(PRICING)
+    Object.entries(pricingTable)
       .filter(([key]) => key !== "default" && name.includes(key.toLowerCase()))
-      .reduce<[string, { input: number; output: number }] | undefined>(
+      .reduce<[string, ModelPrice] | undefined>(
         (best, entry) => (best === undefined || entry[0].length > best[0].length ? entry : best),
         undefined,
-      )?.[1] ?? PRICING["default"]!;
+      )?.[1] ??
+    pricingTable["default"] ??
+    DEFAULT_PRICING["default"]!;
 
   const inputCost = (inputTokens / 1_000_000) * pricing.input;
   const outputCost = (outputTokens / 1_000_000) * pricing.output;

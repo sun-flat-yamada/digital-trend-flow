@@ -85,17 +85,34 @@ describe("estimateCost", () => {
   });
 
   test("calculates Gemini Flash cost correctly", () => {
-    // gemini-2.5-flash: $0.15/M input, $0.60/M output
+    // gemini-2.5-flash: $0.30/M input, $2.50/M output
     const cost = estimateCost("gemini-2.5-flash", 1000, 500);
-    // Expected: (1000/1M)*0.15 + (500/1M)*0.60 = 0.00015 + 0.0003 = 0.00045
-    expect(cost).toBeCloseTo(0.00045, 5);
+    // Expected: (1000/1M)*0.30 + (500/1M)*2.50 = 0.0003 + 0.00125 = 0.00155
+    expect(cost).toBeCloseTo(0.00155, 5);
+    // gemini-2.5-flash-lite is priced by its own (longer) key: $0.10/M, $0.40/M
+    expect(estimateCost("gemini-2.5-flash-lite", 1000, 500)).toBeCloseTo(0.0003, 5);
   });
 
   test("calculates Gemini Pro cost correctly", () => {
-    // gemini-2.5-pro: $1.25/M input, $5.00/M output
+    // gemini-2.5-pro: $1.25/M input, $10.00/M output
     const cost = estimateCost("gemini-2.5-pro", 10000, 2000);
-    // Expected: (10000/1M)*1.25 + (2000/1M)*5.00 = 0.0125 + 0.01 = 0.0225
-    expect(cost).toBeCloseTo(0.0225, 4);
+    // Expected: (10000/1M)*1.25 + (2000/1M)*10.00 = 0.0125 + 0.02 = 0.0325
+    expect(cost).toBeCloseTo(0.0325, 4);
+  });
+
+  test("prices the models the auto-resolver picks today", () => {
+    // gemini-3.5-flash-lite: $0.30/$2.50 (not gemini-3.1-flash-lite's $0.25/$1.50)
+    expect(estimateCost("gemini-3.5-flash-lite", 1_000_000, 1_000_000)).toBeCloseTo(2.8, 5);
+    // gemini-3.8-flash: $0.75/$3.75
+    expect(estimateCost("gemini-3.8-flash", 1_000_000, 1_000_000)).toBeCloseTo(4.5, 5);
+  });
+
+  test("uses a given price table, e.g. settings.pricing from config.yml", () => {
+    const table = { "my-model": { input: 1, output: 3 }, default: { input: 9, output: 9 } };
+    expect(estimateCost("my-model-v2", 1_000_000, 1_000_000, table)).toBeCloseTo(4, 5);
+    expect(estimateCost("other", 1_000_000, 0, table)).toBeCloseTo(9, 5);
+    // A table without a default falls back to the built-in default.
+    expect(estimateCost("other", 1_000_000, 0, {})).toBeCloseTo(0.5, 5);
   });
 
   test("calculates OpenAI GPT-4.1 cost correctly", () => {
