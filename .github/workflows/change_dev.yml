@@ -12,8 +12,9 @@ permissions:
 jobs:
   change-dev:
     name: Branch name and plan-first
-    # Fork の PR と Dependabot は独自の命名で、計画を書かない
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+    # Fork の PR と Dependabot は独自の命名で、計画を書かない。
+    # Dependabot の PR に人が push しても対象外にするため、actor ではなくブランチ名で判定する
+    if: github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.head_ref, 'dependabot/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
