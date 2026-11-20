@@ -25,6 +25,8 @@ cp .env.example .env
 - 失敗してもセッションは止めず、警告を出すだけにする。ログは `_tmp_ai/session-start-npm-ci.log`。その場合は手動で `npm ci` を実行する
 - テストには `GEMINI_API_KEY` が要る（ダミーの値でよい）: `GEMINI_API_KEY=dummy npx jest tests/url.test.ts`
 
+`.claude/settings.json` の `attribution`（`commit` と `pr` を空文字列）で、Claude Code がコミットに付ける `Co-Authored-By` 行と PR 本文に付ける署名を止める。リポジトリの設定なので、ローカル PC でもクラウドのセッションでも効く（古い版の Claude Code では `"includeCoAuthoredBy": false` にあたる）。
+
 ## Commands
 
 | Command | Description |
